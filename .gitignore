@@ -1,0 +1,17 @@
+# Node
+node_modules/
+dist/
+.cache/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Env & local
+.env
+.DS_Store
+
+# Builds
+build/
