@@ -6,12 +6,19 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": true,
-    "resolveJsonModule": true,
+
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": []
+
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }
