@@ -1,0 +1,7 @@
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.30,<0.31
+httpx>=0.27,<0.28
+python-jose[cryptography]>=3.3,<4.0
+starlette>=0.38,<0.39
+itsdangerous>=2.2,<3.0
+email-validator>=2.0.0

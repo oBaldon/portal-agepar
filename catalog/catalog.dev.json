@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2025-08-29T12:00:00Z",
+  "host": {
+    "version": "1.0.0",
+    "minBlockEngine": "1.0.0"
+  },
+  "blocks": [
+    {
+      "name": "demo",
+      "displayName": "Demo",
+      "version": "1.0.0",
+      "ui": {
+        "type": "iframe",
+        "url": "http://localhost:8000/demo"
+      },
+      "navigation": [
+        {
+          "label": "Demo",
+          "path": "/demo",
+          "icon": "Demo"
+        }
+      ],
+      "routes": [
+        {
+          "path": "/demo",
+          "kind": "iframe"
+        }
+      ]
+    },
+    {
+      "name": "form2json",
+      "displayName": "Formulário para JSON",
+      "version": "1.0.0",
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/form2json/ui"
+      },
+      "navigation": [
+        {
+          "label": "Formulário para JSON",
+          "path": "/form2json",
+          "icon": "FileJson"
+        }
+      ],
+      "routes": [
+        {
+          "path": "/form2json",
+          "kind": "iframe"
+        }
+      ]
+    }
+  ]
+}

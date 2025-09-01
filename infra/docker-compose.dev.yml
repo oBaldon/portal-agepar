@@ -1,0 +1,36 @@
+services:
+  bff:
+    build:
+      context: ../apps/bff
+      dockerfile: Dockerfile.dev
+    container_name: portal-agepar-bff
+    environment:
+      ENV: dev
+      AUTH_MODE: mock
+      EP_MODE: mock
+      SESSION_SECRET: dev-secret
+      CORS_ORIGINS: http://localhost:5173
+      CATALOG_FILE: /catalog/catalog.dev.json
+    volumes:
+      - ../apps/bff:/app
+      - ../catalog:/catalog:ro
+    ports:
+      - "8000:8000"
+    command: ./run_dev.sh
+    restart: unless-stopped
+
+  host:
+    image: node:20-alpine
+    container_name: portal-agepar-host
+    working_dir: /workspace
+    environment:
+      # O host consome o catálogo via URL absoluta (padrão), mas também há proxy configurado.
+      VITE_CATALOG_URL: http://localhost:8000/catalog/dev
+    volumes:
+      - ../apps/host:/workspace
+    ports:
+      - "5173:5173"
+    command: sh -lc 'test -f package-lock.json && npm ci || npm install; npm run dev'
+    depends_on:
+      - bff
+    restart: unless-stopped
