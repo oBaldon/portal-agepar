@@ -8,9 +8,7 @@
     "strict": true,
 
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
+    "paths": { "@/*": ["src/*"] },
 
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
