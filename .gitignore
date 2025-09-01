@@ -1,4 +1,6 @@
-# Node.js dependencies
+# ----------------------
+# Node.js / Frontend
+# ----------------------
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -9,26 +11,54 @@ dist/
 build/
 out/
 
+# ----------------------
+# Python / Backend
+# ----------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# Virtual env
+.venv/
+venv/
+ENV/
+
+# SQLite database (automations, BFF, etc.)
+*.db
+
+# ----------------------
 # Environment files
+# ----------------------
 .env
 .env.local
 .env.*.local
 
-# IDE files
+# ----------------------
+# IDE / Editor
+# ----------------------
 .vscode/
 .idea/
 *.sublime-workspace
 *.sublime-project
 
+# ----------------------
 # OS files
+# ----------------------
 .DS_Store
 Thumbs.db
 
+# ----------------------
 # Logs
+# ----------------------
 logs/
 *.log
 
+# ----------------------
 # Misc
+# ----------------------
 coverage/
 *.tgz
 *.zip
