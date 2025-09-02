@@ -60,7 +60,7 @@
       "displayName": "Possibilidades",
       "version": "1.0.0",
       "categoryId": "x",
-      "ui": { "type": "iframe", "url": "/api/demo?view=possibilidades" },
+      "ui": { "type": "iframe", "url": "/api/games/snake/ui" },
       "navigation": [
         { "label": "Possibilidades", "path": "/possibilidades", "icon": "Lightbulb" }
       ],

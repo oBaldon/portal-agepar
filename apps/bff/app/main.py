@@ -13,6 +13,8 @@ from starlette.middleware.sessions import SessionMiddleware
 # ---- Automations infra / routers ----
 from app.db import init_db
 from app.automations.form2json import router as form2json_router
+from app.games.snake import router as snake_router
+
 
 # ------------------------------------------------------------------------------
 # Configuração (envs)
@@ -49,6 +51,8 @@ APP.add_middleware(
     https_only=False,          # dev
     session_cookie="portal_agepar_session",
 )
+
+APP.include_router(snake_router)
 
 # ------------------------------------------------------------------------------
 # Startup
