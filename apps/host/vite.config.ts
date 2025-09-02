@@ -11,8 +11,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': 'http://bff:8000',
-      '/catalog': 'http://bff:8000'
+      '/api': { target: "http://bff:8000", changeOrigin: true },
+      '/catalog': { target: "http://bff:8000", changeOrigin: true }
     }
   }
 })

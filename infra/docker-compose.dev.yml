@@ -25,7 +25,8 @@ services:
     working_dir: /workspace
     environment:
       # O host consome o catálogo via URL absoluta (padrão), mas também há proxy configurado.
-      VITE_CATALOG_URL: http://localhost:8000/catalog/dev
+      VITE_CATALOG_URL: /catalog/dev 
+      VITE_API_BASE: /api 
     volumes:
       - ../apps/host:/workspace
     ports:
