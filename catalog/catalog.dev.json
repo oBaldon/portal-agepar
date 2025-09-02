@@ -11,7 +11,7 @@
       "version": "1.0.0",
       "ui": {
         "type": "iframe",
-        "url": "/demo"
+        "url": "/api/demo"
       },
       "navigation": [
         {

@@ -162,6 +162,11 @@ def demo_home() -> HTMLResponse:
 """
     return HTMLResponse(html)
 
+# ADD: alias sob /api (passa pelo proxy do Vite)
+@APP.get("/api/demo")
+def demo_home_api() -> HTMLResponse:
+    return demo_home()
+
 # ------------------------------------------------------------------------------
 # Catálogo de automações (índice)
 # ------------------------------------------------------------------------------
