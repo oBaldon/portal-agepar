@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+// src/App.tsx
+import { useEffect, useState } from "react";
 import {
   Link,
   NavLink,
@@ -8,12 +9,20 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+
 import { getMe, logout, pingEProtocolo } from "@/lib/api";
 import { loadCatalog } from "@/lib/catalog";
+
 import type { Catalog, Block, BlockRoute, User } from "@/types";
+import { userCanSeeBlock } from "@/types"; // para filtrar categorias “vazias” para o usuário
+
 import NotFound from "@/pages/NotFound";
 import HomeDashboard from "@/pages/HomeDashboard";
+import CategoryView from "@/pages/CategoryView";
 
+/* ============================================================================
+ * Componente utilitário para <iframe/> com altura ajustada ao header
+ * ==========================================================================*/
 function IframeBlock({ src }: { src: string }) {
   return (
     <iframe
@@ -24,27 +33,29 @@ function IframeBlock({ src }: { src: string }) {
   );
 }
 
-/** Redireciona a raiz (/) para a Home após auth + catálogo */
-function RootRedirect({
-  user,
-  catalog,
-}: {
-  user: User | null;
-  catalog: Catalog | null;
-}) {
+/* ============================================================================
+ * Redireciona a raiz (/) para a Home após auth + catálogo carregados
+ * ==========================================================================*/
+function RootRedirect({ user, catalog }: { user: User | null; catalog: Catalog | null }) {
   if (!user) return <Navigate to="/login" replace />;
   if (!catalog) return <div className="p-6">Carregando catálogo…</div>;
   return <Navigate to="/inicio" replace />;
 }
 
+/* ============================================================================
+ * App principal
+ * ==========================================================================*/
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
+
   const nav = useNavigate();
   const loc = useLocation();
 
-  // Autenticação
+  // ---------------------------
+  // 1) Autenticação (getMe)
+  // ---------------------------
   useEffect(() => {
     (async () => {
       try {
@@ -58,7 +69,9 @@ export default function App() {
     })();
   }, []);
 
-  // Catálogo (após login)
+  // -----------------------------------------
+  // 2) Carrega catálogo após autenticação
+  // -----------------------------------------
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -71,26 +84,25 @@ export default function App() {
     })();
   }, [user]);
 
-  const firstPath = useMemo(() => {
-    if (!catalog || !catalog.blocks.length) return "/login";
-    const b0 = catalog.blocks[0];
-    const nav0 = b0.navigation?.[0]?.path;
-    const rt0 = b0.routes?.[0]?.path;
-    return nav0 || rt0 || "/login";
-  }, [catalog]);
-
-  // Se estiver no /login ou / quando catálogo terminar de carregar, vá para a home
+  // -------------------------------------------------------------
+  // 3) Se estiver no /login ou / quando catálogo terminar de
+  //    carregar, vá para a home (/inicio)
+  // -------------------------------------------------------------
   useEffect(() => {
     if (user && catalog && (loc.pathname === "/login" || loc.pathname === "/")) {
       nav("/inicio", { replace: true });
     }
   }, [user, catalog, loc.pathname, nav]);
 
+  // ----------------------------------------
+  // 4) Resolve elemento de rota por bloco
+  // ----------------------------------------
   const routeElementFor = (block: Block, r: BlockRoute) => {
     if (r.kind === "iframe" && block.ui.type === "iframe") {
       return <IframeBlock src={block.ui.url} />;
     }
     if (r.kind === "react") {
+      // Suporte futuro: registrar componentes React nativos no host
       return (
         <div className="p-6">
           <h2 className="text-lg font-semibold">Bloco React não implementado</h2>
@@ -105,6 +117,9 @@ export default function App() {
     return <NotFound />;
   };
 
+  // -------------------------
+  // 5) Logout
+  // -------------------------
   const onLogout = async () => {
     await logout();
     setUser(null);
@@ -112,27 +127,31 @@ export default function App() {
     nav("/login");
   };
 
-  // Proteção de rota
+  // ------------------------------------------------------------
+  // 6) Proteção de rota: se não está logado (e não é /login)
+  // ------------------------------------------------------------
   if (!loading && !user && loc.pathname !== "/login") {
     return <Navigate to="/login" replace />;
   }
 
-  // UI helpers
+  // ------------------------------------------------------------
+  // 7) Helpers de UI (Navbar)
+  // ------------------------------------------------------------
   const activeCls = ({ isActive }: { isActive: boolean }) =>
     [
       "px-3 py-1.5 rounded-md text-sm transition",
-      isActive
-        ? "bg-sky-600 text-white shadow-sm"
-        : "text-slate-700 hover:bg-slate-100",
+      isActive ? "bg-sky-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100",
     ].join(" ");
 
   const initials =
-    user?.nome
-      ?.split(" ")
-      .map((s) => s[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "AG";
+    user?.nome?.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AG";
+
+  // Mostra apenas categorias que têm ao menos um bloco visível ao usuário
+  const visibleCategories = (catalog?.categories ?? []).filter((cat) =>
+    (catalog?.blocks ?? []).some(
+      (b) => b.categoryId === cat.id && !b.hidden && userCanSeeBlock(user, b)
+    )
+  );
 
   return (
     <div className="min-h-full">
@@ -143,6 +162,7 @@ export default function App() {
         style={{ ["--header-h" as any]: "56px" }}
       >
         <div className="mx-auto max-w-6xl px-4 h-[var(--header-h)] flex items-center gap-4">
+          {/* Logo + link para a Home */}
           <Link to="/inicio" className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold">
               A
@@ -157,18 +177,17 @@ export default function App() {
             Início
           </NavLink>
 
-          {/* Menu do catálogo */}
-          {catalog?.blocks?.flatMap((b) => b.navigation || []).map((n) => (
-            <NavLink key={n.path} to={n.path} className={activeCls}>
-              {n.label}
+          {/* Navbar por CATEGORIAS (não por blocos) */}
+          {visibleCategories.map((cat) => (
+            <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
+              {cat.label}
             </NavLink>
           ))}
 
+          {/* Ações e usuário */}
           <div className="ml-auto flex items-center gap-3">
             {user && (
-              <span className="hidden sm:inline text-sm text-slate-600">
-                Olá, {user.nome}
-              </span>
+              <span className="hidden sm:inline text-sm text-slate-600">Olá, {user.nome}</span>
             )}
             {user && (
               <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs font-semibold text-slate-700">
@@ -192,19 +211,19 @@ export default function App() {
         {/* Login */}
         <Route path="/login" element={<LazyLogin />} />
 
-        {/* Home com cards de blocos */}
-        <Route
-          path="/inicio"
-          element={<HomeDashboard catalog={catalog} firstPath={firstPath} />}
-        />
+        {/* Home com cards agrupados por categorias (RBAC aplicado no componente) */}
+        <Route path="/inicio" element={<HomeDashboard catalog={catalog} user={user} />} />
+
+        {/* Página de listagem por categoria */}
+        <Route path="/categoria/:id" element={<CategoryView catalog={catalog} />} />
 
         {/* Raiz decide com base em auth + catálogo */}
         <Route path="/" element={<RootRedirect user={user} catalog={catalog} />} />
 
-        {/* Rotas do catálogo */}
+        {/* Rotas dos blocos do catálogo (iframe/react) */}
         {catalog?.blocks?.map((b) =>
           b.routes?.map((r) => (
-            <Route key={r.path} path={r.path} element={routeElementFor(b, r)} />
+            <Route key={`${b.name}:${r.path}`} path={r.path} element={routeElementFor(b, r)} />
           ))
         )}
 
@@ -218,6 +237,9 @@ export default function App() {
   );
 }
 
+/* ============================================================================
+ * Lazy loader do Login (mantém o bundle inicial pequeno)
+ * ==========================================================================*/
 function LazyLogin() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
@@ -226,6 +248,9 @@ function LazyLogin() {
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }
 
+/* ============================================================================
+ * PingView — utilitário para testar conectividade com o BFF
+ * ==========================================================================*/
 function PingView() {
   const [resp, setResp] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);

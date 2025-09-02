@@ -1,3 +1,4 @@
+# infra/docker-compose.dev.yml
 services:
   bff:
     build:
@@ -34,4 +35,17 @@ services:
     command: sh -lc 'test -f package-lock.json && npm ci || npm install; npm run dev'
     depends_on:
       - bff
+    restart: unless-stopped
+
+  docs:
+    build:
+      context: ../            # raiz do monorepo
+      dockerfile: docs/Dockerfile.dev   # Dockerfile está em docs/
+    container_name: portal-agepar-docs
+    working_dir: /workspace
+    volumes:
+      - ../docs:/workspace/docs:ro              # monta só o conteúdo da docs/ como RO
+      - ../mkdocs.yml:/workspace/mkdocs.yml:ro  # mkdocs.yml da raiz
+    expose:
+      - "8000"
     restart: unless-stopped

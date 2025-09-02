@@ -1,3 +1,4 @@
+// vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
@@ -11,8 +12,23 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': { target: "http://bff:8000", changeOrigin: true },
-      '/catalog': { target: "http://bff:8000", changeOrigin: true }
+      '/api': { target: 'http://bff:8000', changeOrigin: true },
+      '/catalog': { target: 'http://bff:8000', changeOrigin: true },
+
+      // Docs via MkDocs no container "docs"
+      '/docs': {
+        target: 'http://docs:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/docs/, '/'),
+        ws: true, // por via das dúvidas
+      },
+      // **Crucial**: estáticos do MkDocs Material são absolutos
+      '/assets': { target: 'http://docs:8000', changeOrigin: true },
+      '/images': { target: 'http://docs:8000', changeOrigin: true },
+      '/fonts':  { target: 'http://docs:8000', changeOrigin: true },
+      // Endpoints do livereload do MkDocs (WebSocket + script)
+      '/livereload': { target: 'http://docs:8000', changeOrigin: true, ws: true },
+      '/livereload.js': { target: 'http://docs:8000', changeOrigin: true },
     }
   }
 })

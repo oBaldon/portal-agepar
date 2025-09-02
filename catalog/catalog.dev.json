@@ -4,50 +4,70 @@
     "version": "1.0.0",
     "minBlockEngine": "1.0.0"
   },
+
+  "categories": [
+    { "id": "cat1", "label": "Compras", "icon": "ShoppingCart" },
+    { "id": "cat2", "label": "Categoria 2", "icon": "ShieldCheck" },
+    { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical" }
+  ],
+
   "blocks": [
     {
       "name": "demo",
       "displayName": "Demo",
       "version": "1.0.0",
-      "ui": {
-        "type": "iframe",
-        "url": "/api/demo"
-      },
+      "categoryId": "x",
+      "ui": { "type": "iframe", "url": "/api/demo" },
       "navigation": [
-        {
-          "label": "Demo",
-          "path": "/demo",
-          "icon": "Demo"
-        }
+        { "label": "Demo", "path": "/demo", "icon": "Sparkles" }
       ],
       "routes": [
-        {
-          "path": "/demo",
-          "kind": "iframe"
-        }
-      ]
+        { "path": "/demo", "kind": "iframe" }
+      ],
+      "tags": ["exemplo"]
     },
     {
       "name": "form2json",
       "displayName": "Formulário para JSON",
       "version": "1.0.0",
-      "ui": {
-        "type": "iframe",
-        "url": "/api/automations/form2json/ui"
-      },
+      "categoryId": "cat1",
+      "ui": { "type": "iframe", "url": "/api/automations/form2json/ui" },
       "navigation": [
-        {
-          "label": "Formulário para JSON",
-          "path": "/form2json",
-          "icon": "FileJson"
-        }
+        { "label": "Formulário para JSON", "path": "/form2json", "icon": "FileJson" }
       ],
       "routes": [
-        {
-          "path": "/form2json",
-          "kind": "iframe"
-        }
-      ]
+        { "path": "/form2json", "kind": "iframe" }
+      ],
+      "tags": ["utilitário"]
+    },
+
+    {
+      "name": "automacao2",
+      "displayName": "Automação 2",
+      "version": "1.0.0",
+      "categoryId": "cat2",
+      "ui": { "type": "iframe", "url": "/api/demo?view=automacao2" },
+      "navigation": [
+        { "label": "Automação 2", "path": "/automacao-2", "icon": "Workflow" }
+      ],
+      "routes": [
+        { "path": "/automacao-2", "kind": "iframe" }
+      ],
+      "tags": ["exemplo", "piloto"]
+    },
+    {
+      "name": "possibilidades",
+      "displayName": "Possibilidades",
+      "version": "1.0.0",
+      "categoryId": "x",
+      "ui": { "type": "iframe", "url": "/api/demo?view=possibilidades" },
+      "navigation": [
+        { "label": "Possibilidades", "path": "/possibilidades", "icon": "Lightbulb" }
+      ],
+      "routes": [
+        { "path": "/possibilidades", "kind": "iframe" }
+      ],
+      "tags": ["idéias", "exploração"]
     }
   ]
 }

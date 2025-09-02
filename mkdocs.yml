@@ -1,0 +1,44 @@
+site_name: Portal AGEPAR — Guia do Usuário
+repo_url: "https://github.com/oBaldon/portal-agepar"
+theme:
+  name: material
+  language: pt-BR
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.tabs.link
+    - content.code.copy
+    - toc.integrate
+  palette:
+    - scheme: default
+      primary: blue
+      accent: light blue
+markdown_extensions:
+  - admonition
+  - footnotes
+  - tables
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+plugins:
+  - search
+  - glightbox
+  - mermaid2
+nav:
+  - Início: index.md
+  - Como usar:
+      - Como entrar: uso/como-entrar.md
+      - Como navegar: uso/como-navegar.md
+  - Fluxo de compras:
+      - Visão geral: fluxo-compras/visao-geral.md
+  - Automações:
+      - Sobre as automações: automacoes/index.md
+      - Formulário → JSON: automacoes/form2json.md
+  - Ajuda:
+      - Perguntas frequentes (FAQ): ajuda/perguntas-frequentes.md
+      - Segurança & privacidade: ajuda/seguranca-privacidade.md
+      - Suporte: ajuda/suporte.md
+  - Glossário: glossario.md
+  - Mudanças & novidades: mudancas-novidades.md
