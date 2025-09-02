@@ -24,15 +24,13 @@ async def snake_ui():
   .tag { font-size:11px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; color:var(--muted); background:#fff; }
   .row { display:grid; grid-template-columns: 1fr 340px; gap:16px; }
   @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
-  canvas { background:#0b1020; border-radius:12px; width:100%; height:auto; image-rendering: pixelated; }
+  canvas { background:#0b1020; border-radius:12px; width:100%; height:auto; image-rendering: pixelated; outline: none; }
   .panel { display:grid; gap:12px; }
   .kv { display:flex; gap:8px; align-items:center; justify-content:space-between; }
   .kv .label { color:var(--muted); font-size:13px; }
   .kv .val { font-weight:700; }
   .btns { display:flex; flex-wrap:wrap; gap:8px; }
-  button {
-    padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; cursor:pointer;
-  }
+  button { padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; cursor:pointer; }
   button.primary { background: var(--accent); color:white; border-color:var(--accent); }
   button:disabled { opacity:.5; cursor:not-allowed; }
   .hint { color:var(--muted); font-size:13px; }
@@ -49,14 +47,14 @@ async def snake_ui():
 
   <div class="row">
     <div class="card">
-      <canvas id="cv" width="600" height="600" aria-label="tabuleiro do jogo"></canvas>
-      <div class="footer">Controles: setas do teclado (↑ ↓ ← →) ou W A S D. P/pausar: Espaço.</div>
+      <canvas id="cv" width="600" height="600" tabindex="0" aria-label="tabuleiro do jogo"></canvas>
+      <div class="footer">Controles: setas do teclado (↑ ↓ ← →) ou W A S D. Pausar/retomar: Espaço. Em telas touch: deslize.</div>
     </div>
 
     <div class="card panel">
-      <div class="kv"><span class="label">Status</span><span id="st" class="val">pronto</span></div>
+      <div class="kv"><span class="label">Status</span><span id="st" class="val" aria-live="polite">pronto</span></div>
       <div class="kv"><span class="label">Pontuação</span><span id="sc" class="val">0</span></div>
-      <div class="kv"><span class="label">Recorde (sessão)</span><span id="hi" class="val">0</span></div>
+      <div class="kv"><span class="label">Recorde (local)</span><span id="hi" class="val">0</span></div>
 
       <div>
         <div class="label">Dificuldade</div>
@@ -85,7 +83,7 @@ async def snake_ui():
       </div>
 
       <div class="hint">
-        Dica: redimensione a janela/iframe — o canvas se ajusta automaticamente, mantendo pixels “crisp”.
+        Dica: redimensione a janela/iframe — o canvas se ajusta automaticamente mantendo os pixels “crisp”.
       </div>
     </div>
   </div>
@@ -106,23 +104,27 @@ async def snake_ui():
   let speed = 110;        // ms por tick
   let cell;               // pixels por célula (derivado do tamanho do canvas)
   let snake, dir, nextDir, food, score, best = 0, running = false, timer = null, dead = false;
+  let turnLocked = false; // evita múltiplas viradas no mesmo tick
+
+  // Carrega recorde (localStorage)
+  try {
+    const saved = localStorage.getItem('snake_best');
+    if (saved) best = Math.max(0, parseInt(saved, 10) || 0);
+  } catch {}
+  hi.textContent = String(best);
 
   // Ajuste responsivo do canvas (quadrado, até 600px)
-    function fitCanvas() {
-        const container = cv.parentElement;
-        // se ainda não houver largura calculada, usa um fallback seguro (600)
-        const available = Math.max(300, Math.min(600, Math.floor((container?.clientWidth || 600))));
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-        cv.style.width = available + 'px';
-        cv.style.height = available + 'px';
-        cv.width = Math.floor(available * dpr);
-        cv.height = Math.floor(available * dpr);
-
-        cell = Math.max(4, Math.floor(cv.width / grid));
-        draw();
-    }
-
+  function fitCanvas() {
+    const container = cv.parentElement;
+    const available = Math.max(300, Math.min(600, Math.floor((container?.clientWidth || 600))));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.style.width = available + 'px';
+    cv.style.height = available + 'px';
+    cv.width = Math.floor(available * dpr);
+    cv.height = Math.floor(available * dpr);
+    cell = Math.max(4, Math.floor(cv.width / grid));
+    draw();
+  }
   window.addEventListener('resize', fitCanvas);
 
   // Utilidades
@@ -138,7 +140,7 @@ async def snake_ui():
   }
 
   function reset() {
-    score = 0; dead = false; running = false; clearInterval(timer); timer = null;
+    score = 0; dead = false; running = false; clearInterval(timer); timer = null; turnLocked = false;
     dir = {x:1, y:0}; nextDir = {x:1, y:0};
     const mid = Math.floor(grid/2);
     snake = [{x:mid-1,y:mid}, {x:mid-2,y:mid}];
@@ -151,16 +153,16 @@ async def snake_ui():
   }
 
   function start() {
-    if (!snake || snake.length === 0 || dead) {
-        reset(); // garante estado inicial válido
-    }
+    if (!snake || snake.length === 0 || dead) reset(); // garante estado válido
     if (running) return;
-    running = true; dead = false;
+    running = true; dead = false; turnLocked = false;
     st.textContent = 'jogando';
     btnStart.disabled = true;
     btnPause.disabled = false;
     clearInterval(timer);
     timer = setInterval(tick, speed);
+    // foco no canvas para as teclas funcionarem imediatamente
+    try { cv.focus(); } catch {}
   }
 
   function pauseToggle() {
@@ -178,40 +180,54 @@ async def snake_ui():
   }
 
   function gameOver() {
-    running = false; dead = true;
+    running = false; dead = true; turnLocked = false;
     clearInterval(timer); timer = null;
     st.textContent = 'game over';
     btnStart.disabled = false;
     btnPause.disabled = true;
-    if (score > best) { best = score; hi.textContent = String(best); }
+    if (score > best) {
+      best = score;
+      hi.textContent = String(best);
+      try { localStorage.setItem('snake_best', String(best)); } catch {}
+    }
     draw(true);
   }
 
   function setDir(nx, ny) {
-    // evita 180°
+    // evita 180° vs direção atual
     if (nx === -dir.x && ny === -dir.y) return;
     nextDir = {x:nx, y:ny};
   }
 
   function tick() {
-    dir = nextDir;
-    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    // libera uma única virada por tick
+    turnLocked = false;
+
+    // próxima cabeça
+    const head = { x: snake[0].x + nextDir.x, y: snake[0].y + nextDir.y };
 
     // colisão com paredes
     if (head.x < 0 || head.x >= grid || head.y < 0 || head.y >= grid) return gameOver();
-    // colisão com corpo
-    if (snake.some(s => eq(s, head))) return gameOver();
 
+    const eating = eq(head, food);
+
+    // colisão com corpo:
+    // - se NÃO for comer, a cauda vai sair: ignoramos a última célula ao verificar colisão
+    // - se for comer, verificamos contra o corpo inteiro
+    const bodyToCheck = eating ? snake : snake.slice(0, -1);
+    if (bodyToCheck.some(s => eq(s, head))) return gameOver();
+
+    // movimento
     snake.unshift(head);
-
-    if (eq(head, food)) {
-      score++;
-      sc.textContent = String(score);
+    if (eating) {
+      score++; sc.textContent = String(score);
       placeFood();
     } else {
       snake.pop();
     }
 
+    // confirma a direção aplicada neste tick
+    dir = nextDir;
     draw();
   }
 
@@ -234,24 +250,50 @@ async def snake_ui():
     ctx.fillStyle = '#ef4444';
     ctx.fillRect(food.x*cell+pad, food.y*cell+pad, cell-2*pad, cell-2*pad);
 
-    // cobra
+    // cobra (leve gradiente por alpha)
     for (let i=0;i<snake.length;i++){
       const s = snake[i];
       const t = i === 0 ? 1 : (0.65 + 0.35*(1 - i/snake.length));
-      ctx.fillStyle = end ? 'rgba(239,68,68,0.8)' : `rgba(56,189,248,${t})`;
+      ctx.fillStyle = end ? 'rgba(239,68,68,0.85)' : `rgba(56,189,248,${t})`;
       ctx.fillRect(s.x*cell+1, s.y*cell+1, cell-2, cell-2);
     }
   }
 
-  // Controles
+  // Controles teclado
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
     if (k === ' ') { e.preventDefault(); pauseToggle(); return; }
-    if (['arrowup','w'].includes(k)) { e.preventDefault(); setDir(0,-1); }
-    if (['arrowdown','s'].includes(k)) { e.preventDefault(); setDir(0, 1); }
-    if (['arrowleft','a'].includes(k)) { e.preventDefault(); setDir(-1,0); }
-    if (['arrowright','d'].includes(k)) { e.preventDefault(); setDir(1, 0); }
+
+    // só permite virar 1x por tick
+    if (turnLocked) { e.preventDefault(); return; }
+
+    if (['arrowup','w'].includes(k)) { e.preventDefault(); setDir(0,-1); turnLocked = true; }
+    if (['arrowdown','s'].includes(k)) { e.preventDefault(); setDir(0, 1); turnLocked = true; }
+    if (['arrowleft','a'].includes(k)) { e.preventDefault(); setDir(-1,0); turnLocked = true; }
+    if (['arrowright','d'].includes(k)) { e.preventDefault(); setDir(1, 0); turnLocked = true; }
   });
+
+  // Gestos (swipe) para mobile
+  let touchStart = null;
+  cv.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    touchStart = { x: t.clientX, y: t.clientY, t: performance.now() };
+  }, {passive:true});
+
+  cv.addEventListener('touchend', (e) => {
+    if (!touchStart) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    // gesto curto/rápido
+    if (Math.max(ax, ay) > 20) {
+      if (ax > ay) setDir(dx > 0 ? 1 : -1, 0);
+      else setDir(0, dy > 0 ? 1 : -1);
+      turnLocked = true;
+    }
+    touchStart = null;
+  }, {passive:true});
 
   // UI: dificuldade
   diffSel.addEventListener('click', (e) => {
@@ -276,15 +318,20 @@ async def snake_ui():
   btnPause.addEventListener('click', pauseToggle);
   btnReset.addEventListener('click', () => { reset(); st.textContent='pronto'; });
 
-// boot
-    function boot() {
-    fitCanvas();
-        reset();
-        // roda um ajuste pós-layout no próximo frame
-        requestAnimationFrame(() => { fitCanvas(); draw(); });
+  // Pausa automática se a aba ficar oculta (economiza CPU)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && running && timer) {
+      pauseToggle();
     }
-    boot();
+  });
 
+  // Boot sólido: ajusta, reseta e re-ajusta pós-layout
+  function boot() {
+    fitCanvas();
+    reset();
+    requestAnimationFrame(() => { fitCanvas(); draw(); });
+  }
+  boot();
 })();
 </script>
 """
