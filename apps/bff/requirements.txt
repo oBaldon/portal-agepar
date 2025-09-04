@@ -5,3 +5,5 @@ python-jose[cryptography]>=3.3,<4.0
 starlette>=0.38,<0.39
 itsdangerous>=2.2,<3.0
 email-validator>=2.0.0
+psycopg[binary]>=3.2,<3.3
+argon2-cffi>=23.1,<24.0

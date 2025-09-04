@@ -14,6 +14,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.db import init_db
 from app.automations.form2json import router as form2json_router
 from app.games.snake import router as snake_router
+from app.auth.routes import router as auth_router
+from app.auth.middleware import DbSessionMiddleware
+from app.auth.sessions import router as auth_sessions_router
 
 
 # ------------------------------------------------------------------------------
@@ -36,6 +39,7 @@ OIDC_JWKS_URL = os.getenv("OIDC_JWKS_URL", "")
 # ------------------------------------------------------------------------------
 APP = FastAPI(title="Portal AGEPAR BFF", version="0.2.0", docs_url="/docs", redoc_url="/redoc")
 
+# CORS primeiro (fica mais interno após os próximos add_middleware)
 APP.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -44,6 +48,12 @@ APP.add_middleware(
     allow_headers=["*"],
 )
 
+# IMPORTANTE (ordem dos middlewares):
+# Em Starlette, o ÚLTIMO add_middleware é o mais externo (executa primeiro).
+# Para que DbSessionMiddleware TENHA acesso a request.session, o SessionMiddleware
+# deve executar ANTES (ser o mais externo). Portanto: adicionamos DbSessionMiddleware
+# ANTES e SessionMiddleware DEPOIS.
+APP.add_middleware(DbSessionMiddleware)
 APP.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
@@ -52,7 +62,10 @@ APP.add_middleware(
     session_cookie="portal_agepar_session",
 )
 
+# Routers
 APP.include_router(snake_router)
+APP.include_router(auth_router)
+APP.include_router(auth_sessions_router)
 
 # ------------------------------------------------------------------------------
 # Startup
@@ -81,38 +94,31 @@ def _require_user(req: Request) -> Dict[str, Any]:
 def health() -> Dict[str, str]:
     return {"status": "ok"}
 
-@APP.get("/api/auth/login")
-def auth_login(
-    request: Request,
-    cpf: Optional[str] = Query(None),
-    nome: Optional[str] = Query(None),
-    email: Optional[str] = Query(None),
-    roles: Optional[str] = Query(None),      # csv
-    unidades: Optional[str] = Query(None),   # csv
-) -> Dict[str, Any]:
-    """
-    Modo mock: cria sessão a partir de query params.
-    Se nada vier, usa um usuário de teste.
-    """
-    if AUTH_MODE != "mock":
-        # TODO OIDC: iniciar fluxo Authorization Code + PKCE.
-        raise HTTPException(status_code=501, detail="OIDC not implemented in dev")
-
-    user = {
-        "cpf": cpf or "00000000000",
-        "nome": nome or "Usuário de Teste",
-        "email": email or "teste@example.com",
-        "roles": [r.strip() for r in (roles or "user").split(",") if r.strip()],
-        "unidades": [u.strip() for u in (unidades or "AGEPAR").split(",") if u.strip()],
-        "auth_mode": AUTH_MODE,
-    }
-    request.session["user"] = user
-    return user
-
-@APP.post("/api/auth/logout")
-def auth_logout(request: Request) -> Dict[str, bool]:
-    request.session.clear()
-    return {"ok": True}
+# Modo mock: apenas o GET /api/auth/login (evitamos conflito com o logout real)
+if AUTH_MODE == "mock":
+    @APP.get("/api/auth/login")
+    def auth_login(
+        request: Request,
+        cpf: Optional[str] = Query(None),
+        nome: Optional[str] = Query(None),
+        email: Optional[str] = Query(None),
+        roles: Optional[str] = Query(None),      # csv
+        unidades: Optional[str] = Query(None),   # csv
+    ) -> Dict[str, Any]:
+        """
+        Modo mock: cria sessão a partir de query params.
+        Se nada vier, usa um usuário de teste.
+        """
+        user = {
+            "cpf": cpf or "00000000000",
+            "nome": nome or "Usuário de Teste",
+            "email": email or "teste@example.com",
+            "roles": [r.strip() for r in (roles or "user").split(",") if r.strip()],
+            "unidades": [u.strip() for u in (unidades or "AGEPAR").split(",") if u.strip()],
+            "auth_mode": AUTH_MODE,
+        }
+        request.session["user"] = user
+        return user
 
 @APP.get("/api/me")
 def get_me(request: Request) -> Dict[str, Any]:
