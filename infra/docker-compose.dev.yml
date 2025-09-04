@@ -1,4 +1,3 @@
-# infra/docker-compose.dev.yml
 services:
   bff:
     build:
@@ -10,7 +9,7 @@ services:
       AUTH_MODE: mock
       EP_MODE: mock
       SESSION_SECRET: dev-secret
-      CORS_ORIGINS: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       CATALOG_FILE: /catalog/catalog.dev.json
     volumes:
       - ../apps/bff:/app
@@ -18,6 +17,8 @@ services:
     ports:
       - "8000:8000"
     command: ./run_dev.sh
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   host:
@@ -25,27 +26,33 @@ services:
     container_name: portal-agepar-host
     working_dir: /workspace
     environment:
-      # O host consome o catálogo via URL absoluta (padrão), mas também há proxy configurado.
-      VITE_CATALOG_URL: /catalog/dev 
-      VITE_API_BASE: /api 
+      VITE_CATALOG_URL: /catalog/dev
+      VITE_API_BASE: /api
+      CHOKIDAR_USEPOLLING: "1"
+      FORCE_COLOR: "1"
     volumes:
       - ../apps/host:/workspace
+      - portal_agepar_node_modules:/workspace/node_modules
     ports:
       - "5173:5173"
-    command: sh -lc 'test -f package-lock.json && npm ci || npm install; npm run dev'
+    command: sh -lc 'test -f package-lock.json && npm ci || npm install; npm run dev -- --host 0.0.0.0 --port 5173'
     depends_on:
       - bff
+      - docs
     restart: unless-stopped
 
   docs:
     build:
-      context: ../            # raiz do monorepo
-      dockerfile: docs/Dockerfile.dev   # Dockerfile está em docs/
+      context: ../
+      dockerfile: docs/Dockerfile.dev
     container_name: portal-agepar-docs
     working_dir: /workspace
     volumes:
-      - ../docs:/workspace/docs:ro              # monta só o conteúdo da docs/ como RO
-      - ../mkdocs.yml:/workspace/mkdocs.yml:ro  # mkdocs.yml da raiz
+      - ../docs:/workspace/docs:ro
+      - ../mkdocs.yml:/workspace/mkdocs.yml:ro
     expose:
       - "8000"
     restart: unless-stopped
+
+volumes:
+  portal_agepar_node_modules:

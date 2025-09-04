@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: portal-agepar-postgres
+    environment:
+      POSTGRES_DB: ${PGDATABASE:-portal}
+      POSTGRES_USER: ${PGUSER:-portal}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-portaldev}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "${PGPORT_MAP:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-portal} -d ${PGDATABASE:-portal} -h localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # ATENÇÃO: este caminho é relativo ao próprio arquivo (pasta infra/)
+      - ./sql:/docker-entrypoint-initdb.d:ro
+
+  # Override no BFF apenas para injetar DATABASE_URL enquanto mantemos AUTH_MODE=mock
+  bff:
+    environment:
+      DATABASE_URL: "postgresql://${PGUSER:-portal}:${PGPASSWORD:-portaldev}@postgres:5432/${PGDATABASE:-portal}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pg_data:
