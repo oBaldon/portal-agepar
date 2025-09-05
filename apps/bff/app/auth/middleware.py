@@ -1,34 +1,39 @@
 from __future__ import annotations
 
 import os
-from typing import Callable, Iterable, Optional
+from typing import Iterable, Optional
 
 import psycopg
-from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 # Config via env
 DATABASE_URL = os.getenv("DATABASE_URL")
 SESSION_SLIDING = os.getenv("SESSION_SLIDING", "1") in ("1", "true", "True")
 SESSION_RENEW_BEFORE_MINUTES = int(os.getenv("SESSION_RENEW_BEFORE_MINUTES", "30"))
 
-# Prefixos que pulamos (docs, static etc.)
-SKIP_PREFIXES: Iterable[str] = tuple(
-    (os.getenv("SESSION_MW_SKIP_PREFIXES") or "/openapi,/docs,/redoc,/static,/catalog").split(",")
-)
+# Prefixos que pulamos (docs, estáticos etc.)
+# Observação: incluímos "/openapi.json" explicitamente para evitar tocar no schema.
+_raw_skips = os.getenv("SESSION_MW_SKIP_PREFIXES") or "/openapi,/openapi.json,/docs,/redoc,/static,/catalog"
+SKIP_PREFIXES: Iterable[str] = tuple(p.strip() for p in _raw_skips.split(",") if p.strip())
+
 
 def _pg_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not configured")
-    # conexões curtas; autocommit
+    # Conexões curtas; autocommit
     return psycopg.connect(DATABASE_URL, autocommit=True)
+
 
 class DbSessionMiddleware:
     """
     Valida a sessão server-side (Postgres) em cada request.
-    - Se válida: atualiza last_seen_at; e se faltando pouco para expirar, renova expires_at (sliding).
-    - Se inválida/expirada/revogada: limpa request.session (efeito prático: usuário "desloga").
-    Não intercepta a resposta nem força 401 — mantém retrocompatibilidade.
+
+    - Se válida: atualiza last_seen_at; e, se faltando pouco para expirar,
+      renova expires_at (sliding), preservando o TTL original.
+    - Se inválida/expirada/revogada: limpa request.session (efeito prático: usuário “desloga”).
+    - Não intercepta a resposta nem força 401 — mantém retrocompatibilidade.
+      (As rotas protegidas continuam checando /api/me etc.)
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -40,7 +45,7 @@ class DbSessionMiddleware:
             return
 
         path: str = scope.get("path", "") or ""
-        if any(path.startswith(p.strip()) for p in SKIP_PREFIXES if p.strip()):
+        if any(path.startswith(prefix) for prefix in SKIP_PREFIXES):
             await self.app(scope, receive, send)
             return
 
@@ -53,6 +58,7 @@ class DbSessionMiddleware:
         except Exception:
             db_sess_id = None
 
+        # Se não há sessão, seguimos o fluxo normal.
         if not db_sess_id:
             await self.app(scope, receive, send)
             return
@@ -94,13 +100,12 @@ class DbSessionMiddleware:
                     except Exception:
                         pass
                 else:
-                    # Sessão válida; não precisamos mexer no request.session["user"]
-                    # (mantém compat), mas poderíamos armazenar informações em request.state.
-                    user_id, created_at, new_expires_at = row  # noqa: F841
-                    # Opcional: request.state.user_id = user_id
+                    # Sessão válida; poderíamos popular request.state.* se necessário.
+                    # user_id, created_at, new_expires_at = row
+                    pass
         except Exception:
             # Falha de banco não deve derrubar a requisição; apenas não valida.
-            # (podemos logar no futuro)
+            # (poderemos logar no futuro)
             pass
 
         await self.app(scope, receive, send)

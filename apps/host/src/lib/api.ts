@@ -1,3 +1,4 @@
+// apps/host/src/lib/api.ts
 import type { User } from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -10,6 +11,10 @@ async function j<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+/* =========================
+ * Auth (real, server-side)
+ * ========================= */
+
 export async function getMe(): Promise<User> {
   const res = await fetch(`${API_BASE}/me`, {
     method: "GET",
@@ -18,34 +23,97 @@ export async function getMe(): Promise<User> {
   return j<User>(res);
 }
 
-export type LoginParams = Partial<Pick<User, "cpf" | "nome" | "email">> & {
-  roles?: string[];
-  unidades?: string[];
-};
-
-export async function login(params?: LoginParams): Promise<User> {
-  const usp = new URLSearchParams();
-  if (params?.cpf) usp.set("cpf", params.cpf);
-  if (params?.nome) usp.set("nome", params.nome);
-  if (params?.email) usp.set("email", params.email);
-  if (params?.roles?.length) usp.set("roles", params.roles.join(","));
-  if (params?.unidades?.length) usp.set("unidades", params.unidades.join(","));
-
-  const url = usp.toString()
-    ? `${API_BASE}/auth/login?${usp.toString()}`
-    : `${API_BASE}/auth/login`;
-
-  const res = await fetch(url, { method: "GET", credentials: "include" });
-  return j<User>(res);
-}
-
+/** Logout real (POST 204 No Content) */
 export async function logout(): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/logout`, {
     method: "POST",
     credentials: "include",
   });
-  await j(res);
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
+  }
 }
+
+/** Login real (POST /api/auth/login) */
+export async function loginWithPassword(params: {
+  identifier: string;
+  password: string;
+  remember_me?: boolean;
+}): Promise<User> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      identifier: params.identifier,
+      password: params.password,
+      remember_me: !!params.remember_me,
+    }),
+  });
+  return j<User>(res);
+}
+
+export type RegisterResponse = {
+  id: string;
+  name: string;
+  email?: string | null;
+  cpf?: string | null;
+  status: string;
+};
+
+/** Registro (POST /api/auth/register) */
+export async function registerUser(params: {
+  name: string;
+  email?: string;
+  cpf?: string;
+  password: string;
+}): Promise<RegisterResponse> {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return j<RegisterResponse>(res);
+}
+
+/* =========================
+ * Sessões de conta
+ * ========================= */
+
+export type SessionItem = {
+  id: string;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  current: boolean;
+};
+
+export async function listSessions(): Promise<SessionItem[]> {
+  const res = await fetch(`${API_BASE}/auth/sessions`, {
+    credentials: "include",
+  });
+  return j<SessionItem[]>(res);
+}
+
+export async function revokeSession(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/sessions/${id}/revoke`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
+  }
+}
+
+/* =========================
+ * Ping / utilidades
+ * ========================= */
 
 export async function pingEProtocolo(): Promise<{ actor: string; ep_mode: string; ok: boolean }> {
   const res = await fetch(`${API_BASE}/eprotocolo/ping`, {
@@ -55,7 +123,9 @@ export async function pingEProtocolo(): Promise<{ actor: string; ep_mode: string
   return j(res);
 }
 
-/* ---------- Automações (usando API_BASE) ---------- */
+/* =========================
+ * Automações
+ * ========================= */
 
 export async function listAutomations() {
   const r = await fetch(`${API_BASE}/automations`, { credentials: "include" });

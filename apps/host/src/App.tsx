@@ -10,15 +10,17 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import { getMe, logout, pingEProtocolo } from "@/lib/api";
+import { pingEProtocolo } from "@/lib/api";
 import { loadCatalog } from "@/lib/catalog";
 
 import type { Catalog, Block, BlockRoute, User } from "@/types";
-import { userCanSeeBlock } from "@/types"; // para filtrar categorias “vazias” para o usuário
+import { userCanSeeBlock } from "@/types";
 
 import NotFound from "@/pages/NotFound";
 import HomeDashboard from "@/pages/HomeDashboard";
 import CategoryView from "@/pages/CategoryView";
+import AccountSessions from "@/pages/AccountSessions";
+import { useAuth } from "@/auth/AuthProvider";
 
 /* ============================================================================
  * Componente utilitário para <iframe/> com altura ajustada ao header
@@ -46,34 +48,20 @@ function RootRedirect({ user, catalog }: { user: User | null; catalog: Catalog |
  * App principal
  * ==========================================================================*/
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading, logout: doLogout } = useAuth();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const nav = useNavigate();
   const loc = useLocation();
 
-  // ---------------------------
-  // 1) Autenticação (getMe)
-  // ---------------------------
-  useEffect(() => {
-    (async () => {
-      try {
-        const me = await getMe();
-        setUser(me);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
   // -----------------------------------------
-  // 2) Carrega catálogo após autenticação
+  // Carrega catálogo após autenticação
   // -----------------------------------------
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setCatalog(null);
+      return;
+    }
     (async () => {
       try {
         const c = await loadCatalog();
@@ -85,8 +73,8 @@ export default function App() {
   }, [user]);
 
   // -------------------------------------------------------------
-  // 3) Se estiver no /login ou / quando catálogo terminar de
-  //    carregar, vá para a home (/inicio)
+  // Se estiver no /login ou / quando catálogo terminar de carregar,
+  // vá para a home (/inicio)
   // -------------------------------------------------------------
   useEffect(() => {
     if (user && catalog && (loc.pathname === "/login" || loc.pathname === "/")) {
@@ -95,14 +83,13 @@ export default function App() {
   }, [user, catalog, loc.pathname, nav]);
 
   // ----------------------------------------
-  // 4) Resolve elemento de rota por bloco
+  // Resolve elemento de rota por bloco
   // ----------------------------------------
   const routeElementFor = (block: Block, r: BlockRoute) => {
     if (r.kind === "iframe" && block.ui.type === "iframe") {
       return <IframeBlock src={block.ui.url} />;
     }
     if (r.kind === "react") {
-      // Suporte futuro: registrar componentes React nativos no host
       return (
         <div className="p-6">
           <h2 className="text-lg font-semibold">Bloco React não implementado</h2>
@@ -118,24 +105,24 @@ export default function App() {
   };
 
   // -------------------------
-  // 5) Logout
+  // Logout (via AuthProvider)
   // -------------------------
   const onLogout = async () => {
-    await logout();
-    setUser(null);
+    await doLogout();
     setCatalog(null);
     nav("/login");
   };
 
   // ------------------------------------------------------------
-  // 6) Proteção de rota: se não está logado (e não é /login)
+  // Proteção de rota: permite /login e /registrar sem auth
   // ------------------------------------------------------------
-  if (!loading && !user && loc.pathname !== "/login") {
+  const publicPaths = new Set<string>(["/login", "/registrar"]);
+  if (!loading && !user && !publicPaths.has(loc.pathname)) {
     return <Navigate to="/login" replace />;
   }
 
   // ------------------------------------------------------------
-  // 7) Helpers de UI (Navbar)
+  // Helpers de UI (Navbar)
   // ------------------------------------------------------------
   const activeCls = ({ isActive }: { isActive: boolean }) =>
     [
@@ -158,12 +145,11 @@ export default function App() {
       {/* Header */}
       <header
         className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur"
-        // define a CSS var usada pelo IframeBlock p/ calcular a altura
         style={{ ["--header-h" as any]: "56px" }}
       >
         <div className="mx-auto max-w-6xl px-4 h-[var(--header-h)] flex items-center gap-4">
-          {/* Logo + link para a Home */}
-          <Link to="/inicio" className="flex items-center gap-2">
+          {/* Logo + link para a Home (se logado) ou raiz */}
+          <Link to={user ? "/inicio" : "/"} className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold">
               A
             </div>
@@ -172,35 +158,54 @@ export default function App() {
             </div>
           </Link>
 
-          {/* “Início” sempre visível */}
-          <NavLink to="/inicio" className={activeCls}>
-            Início
-          </NavLink>
-
-          {/* Navbar por CATEGORIAS (não por blocos) */}
-          {visibleCategories.map((cat) => (
-            <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
-              {cat.label}
-            </NavLink>
-          ))}
+          {/* “Início” + categorias: apenas quando logado */}
+          {user && (
+            <>
+              <NavLink to="/inicio" className={activeCls}>
+                Início
+              </NavLink>
+              {visibleCategories.map((cat) => (
+                <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
+                  {cat.label}
+                </NavLink>
+              ))}
+            </>
+          )}
 
           {/* Ações e usuário */}
           <div className="ml-auto flex items-center gap-3">
-            {user && (
-              <span className="hidden sm:inline text-sm text-slate-600">Olá, {user.nome}</span>
-            )}
-            {user && (
-              <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs font-semibold text-slate-700">
-                {initials}
-              </div>
-            )}
-            {user && (
-              <button
-                onClick={onLogout}
-                className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
-              >
-                Sair
-              </button>
+            {user ? (
+              <>
+                <span className="hidden sm:inline text-sm text-slate-600">Olá, {user.nome}</span>
+                <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs font-semibold text-slate-700">
+                  {initials}
+                </div>
+                <Link
+                  to="/conta/sessoes"
+                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
+                  title="Gerenciar sessões ativas"
+                >
+                  Sessões
+                </Link>
+                <button
+                  onClick={onLogout}
+                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
+                >
+                  Sair
+                </button>
+              </>
+            ) : (
+              <>
+                <NavLink to="/login" className={activeCls}>
+                  Entrar
+                </NavLink>
+                <Link
+                  to="/registrar"
+                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
+                >
+                  Criar conta
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -211,6 +216,9 @@ export default function App() {
         {/* Login */}
         <Route path="/login" element={<LazyLogin />} />
 
+        {/* Registro */}
+        <Route path="/registrar" element={<LazyRegister />} />
+
         {/* Home com cards agrupados por categorias (RBAC aplicado no componente) */}
         <Route path="/inicio" element={<HomeDashboard catalog={catalog} user={user} />} />
 
@@ -219,6 +227,9 @@ export default function App() {
 
         {/* Raiz decide com base em auth + catálogo */}
         <Route path="/" element={<RootRedirect user={user} catalog={catalog} />} />
+
+        {/* Página de sessões da conta */}
+        <Route path="/conta/sessoes" element={<AccountSessions />} />
 
         {/* Rotas dos blocos do catálogo (iframe/react) */}
         {catalog?.blocks?.map((b) =>
@@ -249,6 +260,17 @@ function LazyLogin() {
 }
 
 /* ============================================================================
+ * Lazy loader do Register
+ * ==========================================================================*/
+function LazyRegister() {
+  const [Comp, setComp] = useState<null | React.ComponentType>(null);
+  useEffect(() => {
+    import("@/pages/Register").then((m) => setComp(() => m.default));
+  }, []);
+  return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
+}
+
+/* ============================================================================
  * PingView — utilitário para testar conectividade com o BFF
  * ==========================================================================*/
 function PingView() {
@@ -265,7 +287,7 @@ function PingView() {
   }, []);
   return (
     <div className="p-6">
-      <h2 className="text-lg font-semibold">Ping eProtocolo (mock)</h2>
+      <h2 className="text-lg font-semibold">Ping eProtocolo</h2>
       <pre className="mt-2 text-sm bg-slate-100 p-3 rounded">
         {err ? err : JSON.stringify(resp, null, 2)}
       </pre>

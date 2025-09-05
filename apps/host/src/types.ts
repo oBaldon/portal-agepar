@@ -6,7 +6,10 @@
    - Retrocompatível: se "categories" não vier no catálogo, tudo segue funcionando.
    - As categorias servem para organizar a navbar e os cards da Home por grupos.
    - "categoryId" no Block referencia Category.id (ex.: "compras").
+   - Autenticação: mock é legado; manter apenas para ambientes com AUTH_MODE=mock.
    ============================================================================= */
+
+export type AuthMode = "local" | "oidc" | "mock";
 
 /** Link de navegação gerado por um bloco. */
 export type NavigationLink = {
@@ -45,31 +48,26 @@ export type Block = {
   /** Nome técnico único. ex.: "form2json". */
   name: string;
   /** Nome amigável. ex.: "Formulário para JSON". */
-  displayName: string;
+  displayName?: string; // opcional p/ retrocompat
   /** Versão do bloco (para exibição/auditoria). */
   version: string;
 
   /** Como o bloco será exibido. */
   ui: BlockUI;
   /** Links gerados pelo bloco (usados para roteamento SPA). */
-  navigation: NavigationLink[];
+  navigation?: NavigationLink[]; // opcional p/ retrocompat
   /** Rotas reais do bloco (precisam existir no Router). */
-  routes: BlockRoute[];
+  routes?: BlockRoute[]; // opcional p/ retrocompat
 
   // ---- Metadados opcionais (retrocompatíveis) ----
-
   /** Categoria à qual o bloco pertence (Category.id). */
   categoryId?: string;
-
   /** Rótulos livres para busca/filtragem. */
   tags?: string[];
-
   /** Descrição curta (aparece no card da Home/Categoria). */
   description?: string;
-
   /** Se true, esconder na lista/menus (mas rotas continuam válidas). */
   hidden?: boolean;
-
   /** Ordenação dentro da categoria (menor = aparece primeiro). */
   order?: number;
 
@@ -84,7 +82,7 @@ export type Block = {
 /** Catálogo entregue pelo BFF e consumido pelo host. */
 export type Catalog = {
   /** ISO string de quando o catálogo foi gerado. */
-  generatedAt: string;
+  generatedAt?: string; // opcional p/ retrocompat
   /** Metadados do host. */
   host: { version: string; minBlockEngine: string };
   /** Categorias disponíveis (opcional para manter retrocompatibilidade). */
@@ -95,13 +93,13 @@ export type Catalog = {
 
 /** Usuário autenticado (via sessão). */
 export type User = {
-  cpf: string;
+  cpf: string | null;
   nome: string;
-  email: string;
+  email: string | null;
   roles: string[];
   unidades: string[];
-  /** Indica mecanismo de auth atual (ex.: "mock", "oidc"). */
-  auth_mode?: string;
+  /** Mecanismo de auth atual. "mock" é legado e só deve aparecer em DEV. */
+  auth_mode?: AuthMode;
 };
 
 /* =============================================================================
@@ -159,7 +157,7 @@ export function groupBlocksByCategory(
     if (!buckets[cat.id]) {
       const idx = Object.prototype.hasOwnProperty.call(catIndex, cat.id)
         ? catIndex[cat.id]
-        : nextIdx++; // categoria não listada em catalog.categories → aparece no final, na ordem encontrada
+        : nextIdx++; // categoria fora da lista → vai para o final, na ordem encontrada
       buckets[cat.id] = { category: cat, blocks: [], idx };
     }
     return buckets[cat.id];
@@ -194,4 +192,9 @@ export function userCanSeeBlock(user: User | null, block: Block): boolean {
 
   const userRoles = new Set(user.roles.map((r) => r.trim().toLowerCase()));
   return required.some((r) => userRoles.has(r.trim().toLowerCase()));
+}
+
+/** Helper para identificar sessão mock (legado), útil para banners/avisos em DEV. */
+export function isMockSession(user: User | null): boolean {
+  return !!user && user.auth_mode === "mock";
 }

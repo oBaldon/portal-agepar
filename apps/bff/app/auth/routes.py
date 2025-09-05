@@ -1,3 +1,4 @@
+# apps/bff/app/auth/routes.py
 from __future__ import annotations
 
 import os
@@ -40,6 +41,7 @@ def _normalize_identifier(identifier: str) -> Dict[str, Optional[str]]:
     ident = (identifier or "").strip()
     if CPF_RE.fullmatch(ident):
         return {"cpf": ident, "email": None}
+    # e-mail: deixamos o banco (citext) tratar case-insensitive; aqui só trimamos
     return {"cpf": None, "email": ident}
 
 
@@ -154,8 +156,8 @@ class LoginOut(BaseModel):
     cpf: Optional[str] = None
     nome: str
     email: Optional[str] = None
-    roles: List[str] = []
-    unidades: List[str] = []
+    roles: List[str] = Field(default_factory=list)
+    unidades: List[str] = Field(default_factory=list)
     auth_mode: str
 
 
@@ -272,7 +274,7 @@ def login_user(payload: LoginIn, request: Request):
 
         roles = _load_roles(conn, user_id)
 
-        # Compat: session "mock" continua existindo
+        # Compat: session para o front (mantida em cookie)
         user_payload = {
             "cpf": u_cpf,
             "nome": u_name,
@@ -324,6 +326,6 @@ def logout_user(request: Request):
             ua=ua,
         )
 
-    # Limpa a sessão compatível com o mock atual
+    # Limpa a sessão compatível com o front
     request.session.clear()
     return Response(status_code=204)

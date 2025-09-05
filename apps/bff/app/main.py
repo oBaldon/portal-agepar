@@ -23,13 +23,17 @@ from app.auth.sessions import router as auth_sessions_router
 # Configuração (envs)
 # ------------------------------------------------------------------------------
 ENV = os.getenv("ENV", "dev")
-AUTH_MODE = os.getenv("AUTH_MODE", "mock")         # futuro: "oidc"
+
+# Agora o padrão é "local" (login real). O mock vira legado e fica desativado.
+AUTH_MODE = os.getenv("AUTH_MODE", "local")  # valores: "local" (real), futuramente "oidc"
+AUTH_LEGACY_MOCK = os.getenv("AUTH_LEGACY_MOCK", "0").lower() in ("1", "true", "yes")
+
 EP_MODE = os.getenv("EP_MODE", "mock")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
 CATALOG_FILE = Path(os.getenv("CATALOG_FILE", "/catalog/catalog.dev.json"))
 
-# Placeholders para OIDC (não usados no modo mock)
+# Placeholders para OIDC (não usados por enquanto)
 OIDC_ISSUER = os.getenv("OIDC_ISSUER", "")
 OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID", "")
 OIDC_JWKS_URL = os.getenv("OIDC_JWKS_URL", "")
@@ -50,8 +54,8 @@ APP.add_middleware(
 
 # IMPORTANTE (ordem dos middlewares):
 # Em Starlette, o ÚLTIMO add_middleware é o mais externo (executa primeiro).
-# Para que DbSessionMiddleware TENHA acesso a request.session, o SessionMiddleware
-# deve executar ANTES (ser o mais externo). Portanto: adicionamos DbSessionMiddleware
+# Para que DbSessionMiddleware tenha acesso a request.session, o SessionMiddleware
+# precisa executar ANTES (ser o mais externo). Portanto: adicionamos DbSessionMiddleware
 # ANTES e SessionMiddleware DEPOIS.
 APP.add_middleware(DbSessionMiddleware)
 APP.add_middleware(
@@ -64,8 +68,8 @@ APP.add_middleware(
 
 # Routers
 APP.include_router(snake_router)
-APP.include_router(auth_router)
-APP.include_router(auth_sessions_router)
+APP.include_router(auth_router)          # /api/auth/login (POST), /api/auth/logout (POST), /api/auth/register...
+APP.include_router(auth_sessions_router) # /api/auth/sessions[...]
 
 # ------------------------------------------------------------------------------
 # Startup
@@ -94,10 +98,13 @@ def _require_user(req: Request) -> Dict[str, Any]:
 def health() -> Dict[str, str]:
     return {"status": "ok"}
 
-# Modo mock: apenas o GET /api/auth/login (evitamos conflito com o logout real)
-if AUTH_MODE == "mock":
+# ------------------------------------------------------------------------------
+# MOCK legado (opcional): habilite somente em DEV e quando realmente precisar
+# Sete AUTH_LEGACY_MOCK=1 para expor o GET /api/auth/login com params.
+# ------------------------------------------------------------------------------
+if AUTH_LEGACY_MOCK:
     @APP.get("/api/auth/login")
-    def auth_login(
+    def legacy_mock_login(
         request: Request,
         cpf: Optional[str] = Query(None),
         nome: Optional[str] = Query(None),
@@ -106,8 +113,8 @@ if AUTH_MODE == "mock":
         unidades: Optional[str] = Query(None),   # csv
     ) -> Dict[str, Any]:
         """
-        Modo mock: cria sessão a partir de query params.
-        Se nada vier, usa um usuário de teste.
+        [LEGADO/DEV] Cria sessão mock a partir de query params.
+        Só é exposto quando AUTH_LEGACY_MOCK=1.
         """
         user = {
             "cpf": cpf or "00000000000",
@@ -115,9 +122,10 @@ if AUTH_MODE == "mock":
             "email": email or "teste@example.com",
             "roles": [r.strip() for r in (roles or "user").split(",") if r.strip()],
             "unidades": [u.strip() for u in (unidades or "AGEPAR").split(",") if u.strip()],
-            "auth_mode": AUTH_MODE,
+            "auth_mode": "mock",
         }
         request.session["user"] = user
+        # Não cria sessão no banco — uso apenas temporário em DEV.
         return user
 
 @APP.get("/api/me")
@@ -198,9 +206,10 @@ def automations_index() -> Dict[str, Any]:
 APP.include_router(form2json_router)
 
 # ------------------------------------------------------------------------------
-# Nota de segurança (dev)
+# Nota de segurança (prod)
 # ------------------------------------------------------------------------------
-# Em produção, trocar AUTH_MODE para OIDC e implementar:
-#   * /api/auth/login → redirecionar para o IdP (PKCE + code)
+# Em produção, trocar AUTH_MODE para "oidc" quando implementado e:
+#   * /api/auth/login → fluxo Authorization Code + PKCE
 #   * callback → validar ID Token via JWKS (OIDC_ISSUER / JWKS_URL) e criar sessão
 # Cookie de sessão: marcar como Secure e SameSite=None sob HTTPS.
+# ------------------------------------------------------------------------------

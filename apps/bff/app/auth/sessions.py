@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from uuid import UUID
 from typing import List, Optional, Dict, Any
 
 import psycopg
@@ -124,18 +125,24 @@ def revoke_my_session(session_id: str, request: Request) -> Response:
     """
     Revoga uma sessão do próprio usuário. Idempotente.
     - 204: revogada (ou já estava revogada).
-    - 404: sessão não pertence ao usuário.
+    - 404: sessão não pertence ao usuário ou ID inválido.
     """
     user_id = _require_current_session(request)
     current_id = request.session.get("db_session_id") if hasattr(request, "session") else None
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
 
+    # Validação defensiva do path param para evitar 500 por UUID inválido
+    try:
+        sid = str(UUID(session_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="session not found")
+
     with _pg_conn() as conn, conn.cursor() as cur:
         # Garante ownership
         cur.execute(
             "SELECT 1 FROM auth_sessions WHERE id = %s AND user_id = %s",
-            (session_id, user_id),
+            (sid, user_id),
         )
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="session not found")
@@ -143,7 +150,7 @@ def revoke_my_session(session_id: str, request: Request) -> Response:
         # Revoga (idempotente)
         cur.execute(
             "UPDATE auth_sessions SET revoked_at = now() WHERE id = %s AND revoked_at IS NULL",
-            (session_id,),
+            (sid,),
         )
 
         # Auditoria
@@ -152,15 +159,15 @@ def revoke_my_session(session_id: str, request: Request) -> Response:
             actor_user_id=str(user_id),
             action="auth.session.revoke",
             obj_type="session",
-            obj_id=str(session_id),
+            obj_id=sid,
             message="Revogação de sessão via API",
-            metadata={"current": bool(current_id and str(current_id) == str(session_id))},
+            metadata={"current": bool(current_id and str(current_id) == sid)},
             ip=ip,
             ua=ua,
         )
 
     # Auto-logout opcional se revogou a sessão atual
-    if AUTH_REVOKE_AUTO_LOGOUT_CURRENT and current_id and str(current_id) == str(session_id):
+    if AUTH_REVOKE_AUTO_LOGOUT_CURRENT and current_id and str(current_id) == sid:
         try:
             request.session.clear()  # SessionMiddleware vai zerar o cookie
         except Exception:
