@@ -29,7 +29,6 @@ CPF_RE = re.compile(r"^\d{11}$")
 def _pg_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not configured")
-    # Conexões curtas e simples (autocommit). Podemos evoluir para pool depois.
     return psycopg.connect(DATABASE_URL, autocommit=True)
 
 
@@ -41,7 +40,6 @@ def _normalize_identifier(identifier: str) -> Dict[str, Optional[str]]:
     ident = (identifier or "").strip()
     if CPF_RE.fullmatch(ident):
         return {"cpf": ident, "email": None}
-    # e-mail: deixamos o banco (citext) tratar case-insensitive; aqui só trimamos
     return {"cpf": None, "email": ident}
 
 
@@ -83,7 +81,6 @@ def _insert_login_attempt(
             """,
             (user_id, identifier, success, reason, ip, ua),
         )
-    # Garantia de persistência imediata mesmo se autocommit não estiver ativo
     try:
         conn.commit()
     except Exception:
@@ -159,6 +156,7 @@ class LoginOut(BaseModel):
     roles: List[str] = Field(default_factory=list)
     unidades: List[str] = Field(default_factory=list)
     auth_mode: str
+    is_superuser: bool = False  # <- inclui no response_model para evitar extra
 
 
 # ---------------------------- Routes ----------------------------
@@ -179,7 +177,6 @@ def register_user(payload: RegisterIn, request: Request):
         raise HTTPException(status_code=400, detail="Falha ao processar a senha.")
 
     with _pg_conn() as conn, conn.cursor() as cur:
-        # Checagens explícitas para mensagens 409 claras
         if payload.email:
             cur.execute("SELECT id FROM users WHERE email = %s", (payload.email,))
             if cur.fetchone():
@@ -198,8 +195,17 @@ def register_user(payload: RegisterIn, request: Request):
             (str(user_id), payload.cpf, payload.email, payload.name, pwd_hash),
         )
 
-        _insert_audit(conn, actor_user_id=str(user_id), action="user.register", obj_type="user", obj_id=str(user_id),
-                      message="Registro de usuário (local)", metadata={}, ip=ip, ua=ua)
+        _insert_audit(
+            conn,
+            actor_user_id=str(user_id),
+            action="user.register",
+            obj_type="user",
+            obj_id=str(user_id),
+            message="Registro de usuário (local)",
+            metadata={},
+            ip=ip,
+            ua=ua,
+        )
 
         return RegisterOut(id=user_id, name=payload.name, email=payload.email, cpf=payload.cpf, status="active")
 
@@ -220,7 +226,6 @@ def login_user(payload: LoginIn, request: Request):
     email, cpf = ident["email"], ident["cpf"]
 
     with _pg_conn() as conn, conn.cursor() as cur:
-        # Rate limit por identificador/IP (falhas recentes)
         if _rate_limited(conn, payload.identifier, ip):
             _insert_login_attempt(conn, None, payload.identifier, False, "rate_limited", ip, ua)
             raise HTTPException(status_code=429, detail="Muitas tentativas. Tente novamente mais tarde.")
@@ -231,19 +236,16 @@ def login_user(payload: LoginIn, request: Request):
             cur.execute("""SELECT id, cpf, email, name, password_hash, status, is_superuser FROM users WHERE cpf = %s""", (cpf,))
         row = cur.fetchone()
 
-        # Not found
         if not row:
             _insert_login_attempt(conn, None, payload.identifier, False, "not_found", ip, ua)
             raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
         user_id, u_cpf, u_email, u_name, pwd_hash, status, is_superuser = row
 
-        # Status check
         if status != "active":
             _insert_login_attempt(conn, str(user_id), payload.identifier, False, f"status_{status}", ip, ua)
             raise HTTPException(status_code=403, detail=f"Usuário {status}.")
 
-        # Password verification (modo dev especial para dev@local)
         ok = False
         if u_email == "dev@local" and ENV == "dev" and AUTH_DEV_ALLOW_ANY_PASSWORD:
             ok = True
@@ -260,7 +262,7 @@ def login_user(payload: LoginIn, request: Request):
             _insert_login_attempt(conn, str(user_id), payload.identifier, False, "bad_credentials", ip, ua)
             raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
-        # Success → registrar sessão
+        # Session
         sess_id = uuid.uuid4()
         ttl = timedelta(days=REMEMBER_ME_TTL_DAYS) if payload.remember_me else timedelta(hours=SESSION_TTL_HOURS)
         expires = _now() + ttl
@@ -274,7 +276,10 @@ def login_user(payload: LoginIn, request: Request):
 
         roles = _load_roles(conn, user_id)
 
-        # Compat: session para o front (mantida em cookie)
+        # HARDENING: superuser recebe 'admin' (bypass RBAC)
+        if is_superuser and "admin" not in roles:
+            roles = ["admin", *roles]
+
         user_payload = {
             "cpf": u_cpf,
             "nome": u_name,
@@ -282,15 +287,23 @@ def login_user(payload: LoginIn, request: Request):
             "roles": roles or ["user"],
             "unidades": ["AGEPAR"],
             "auth_mode": "local",
+            "is_superuser": bool(is_superuser),
         }
         request.session["user"] = user_payload
         request.session["db_session_id"] = str(sess_id)
 
-        # registra tentativa bem-sucedida
         _insert_login_attempt(conn, str(user_id), payload.identifier, True, "ok", ip, ua)
-
-        _insert_audit(conn, actor_user_id=user_id, action="auth.login", obj_type="user", obj_id=str(user_id),
-                      message="Login (local)", metadata={}, ip=ip, ua=ua)
+        _insert_audit(
+            conn,
+            actor_user_id=str(user_id),
+            action="auth.login",
+            obj_type="user",
+            obj_id=str(user_id),
+            message="Login (local)",
+            metadata={},
+            ip=ip,
+            ua=ua,
+        )
 
         return LoginOut(**user_payload)
 
@@ -303,7 +316,6 @@ def logout_user(request: Request):
 
     with _pg_conn() as conn:
         actor_id = None
-        # Revoga a sessão no banco e tenta descobrir o user_id associado
         if db_sess_id:
             with conn.cursor() as cur:
                 cur.execute(
@@ -313,10 +325,9 @@ def logout_user(request: Request):
                 row = cur.fetchone()
                 if row:
                     actor_id = row[0]
-        # Auditoria com actor_user_id (pode ser None se não houver sessão no banco)
         _insert_audit(
             conn,
-            actor_user_id=actor_id,
+            actor_user_id=str(actor_id) if actor_id else None,
             action="auth.logout",
             obj_type="user",
             obj_id=None,
@@ -326,6 +337,5 @@ def logout_user(request: Request):
             ua=ua,
         )
 
-    # Limpa a sessão compatível com o front
     request.session.clear()
     return Response(status_code=204)

@@ -100,6 +100,7 @@ export type User = {
   unidades: string[];
   /** Mecanismo de auth atual. "mock" é legado e só deve aparecer em DEV. */
   auth_mode?: AuthMode;
+  is_superuser?: boolean;
 };
 
 /* =============================================================================
@@ -186,12 +187,15 @@ export function userCanSeeBlock(user: User | null, block: Block): boolean {
   if (block.hidden) return false;
 
   const required = block.requiredRoles ?? [];
-  if (required.length === 0) return true; // público
+  if (required.length === 0) return true;
 
-  if (!user || !user.roles?.length) return false;
+  if (!user) return false;
+  const userRoles = new Set((user.roles || []).map(r => r.trim().toLowerCase()));
 
-  const userRoles = new Set(user.roles.map((r) => r.trim().toLowerCase()));
-  return required.some((r) => userRoles.has(r.trim().toLowerCase()));
+  // bypass para admin/superuser
+  if (user.is_superuser || userRoles.has("admin")) return true;
+
+  return required.some(r => userRoles.has(r.trim().toLowerCase()));
 }
 
 /** Helper para identificar sessão mock (legado), útil para banners/avisos em DEV. */
