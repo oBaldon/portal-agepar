@@ -41,6 +41,14 @@ function RequireRoles({
 }
 
 /* ============================================================================
+ * Gate para páginas públicas (login/registrar) quando já autenticado
+ * ==========================================================================*/
+function AuthPageGate({ user, children }: { user: User | null; children: ReactNode }) {
+  if (user) return <Navigate to="/inicio" replace />;
+  return <>{children}</>;
+}
+
+/* ============================================================================
  * Componente utilitário para <iframe/> com altura ajustada ao header
  * ==========================================================================*/
 function IframeBlock({ src }: { src: string }) {
@@ -101,9 +109,13 @@ export default function App() {
     })();
   }, [user]);
 
-  // Se terminou de carregar, redireciona / ou /login para /inicio
+  // Se terminou de carregar, redireciona /, /login ou /registrar para /inicio
   useEffect(() => {
-    if (user && catalog && (loc.pathname === "/login" || loc.pathname === "/")) {
+    if (
+      user &&
+      catalog &&
+      (loc.pathname === "/login" || loc.pathname === "/registrar" || loc.pathname === "/")
+    ) {
       nav("/inicio", { replace: true });
     }
   }, [user, catalog, loc.pathname, nav]);
@@ -231,9 +243,23 @@ export default function App() {
 
       {/* Rotas */}
       <Routes>
-        {/* Públicas */}
-        <Route path="/login" element={<LazyLogin />} />
-        <Route path="/registrar" element={<LazyRegister />} />
+        {/* Públicas com gate: não monta se já estiver logado */}
+        <Route
+          path="/login"
+          element={
+            <AuthPageGate user={user}>
+              <LazyLogin />
+            </AuthPageGate>
+          }
+        />
+        <Route
+          path="/registrar"
+          element={
+            <AuthPageGate user={user}>
+              <LazyRegister />
+            </AuthPageGate>
+          }
+        />
         <Route path="/403" element={<Forbidden />} />
 
         {/* Home com cards agrupados por categorias (RBAC aplicado no componente) */}

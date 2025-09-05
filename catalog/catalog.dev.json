@@ -7,7 +7,8 @@
 
   "categories": [
     { "id": "cat1", "label": "Compras", "icon": "ShoppingCart" },
-    { "id": "cat2", "label": "Categoria 2", "icon": "ShieldCheck" },
+    { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck" },
+    { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck" },
     { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical" }
   ],
 
@@ -27,6 +28,34 @@
       "tags": ["exemplo"]
     },
     {
+      "name": "dfd",
+      "displayName": "Documento de Formalização de Demanda",
+      "version": "0.0.0",
+      "categoryId": "cat1",
+      "ui": { "type": "iframe", "url": "/api/demo?view=dfd" },
+      "navigation": [
+        { "label": "Documento de Formalização de Demanda", "path": "/dfd", "icon": "FileJson" }
+      ],
+      "routes": [
+        { "path": "/dfd", "kind": "iframe" }
+      ],
+      "tags": ["utilitário"]
+    },
+    {
+      "name": "pca",
+      "displayName": "Plano de Contratações Anual",
+      "version": "0.0.0",
+      "categoryId": "cat1",
+      "ui": { "type": "iframe", "url": "/api/demo?view=pca" },
+      "navigation": [
+        { "label": "Plano de Contratações Anual", "path": "/pca", "icon": "FileJson" }
+      ],
+      "routes": [
+        { "path": "/pca", "kind": "iframe" }
+      ],
+      "tags": ["utilitário"]
+    },
+    {
       "name": "form2json",
       "displayName": "Formulário para JSON",
       "version": "1.0.0",
@@ -38,13 +67,14 @@
       "routes": [
         { "path": "/form2json", "kind": "iframe" }
       ],
-      "tags": ["utilitário"]
+      "tags": ["utilitário"],
+      "hidden": true
     },
 
     {
       "name": "automacao2",
       "displayName": "Automação 2",
-      "version": "1.0.0",
+      "version": "0.0.0",
       "categoryId": "cat2",
       "ui": { "type": "iframe", "url": "/api/demo?view=automacao2" },
       "navigation": [
@@ -52,6 +82,20 @@
       ],
       "routes": [
         { "path": "/automacao-2", "kind": "iframe" }
+      ],
+      "tags": ["exemplo", "piloto"]
+    },
+    {
+      "name": "automacao3",
+      "displayName": "Automação 3",
+      "version": "0.0.0",
+      "categoryId": "cat3",
+      "ui": { "type": "iframe", "url": "/api/demo?view=automacao3" },
+      "navigation": [
+        { "label": "Automação 3", "path": "/automacao-3", "icon": "Workflow" }
+      ],
+      "routes": [
+        { "path": "/automacao-3", "kind": "iframe" }
       ],
       "tags": ["exemplo", "piloto"]
     },
@@ -67,7 +111,8 @@
       "routes": [
         { "path": "/possibilidades", "kind": "iframe" }
       ],
-      "tags": ["idéias", "exploração"]
+      "tags": ["idéias", "exploração"],
+      "hidden": true
     }
   ]
 }
