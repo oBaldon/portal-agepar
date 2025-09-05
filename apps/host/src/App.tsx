@@ -23,6 +23,15 @@ import AccountSessions from "@/pages/AccountSessions";
 import Forbidden from "@/pages/Forbidden";
 import { useAuth } from "@/auth/AuthProvider";
 
+/* ---------------------------------------------------------------------------
+ * Ícones de categorias
+ * -------------------------------------------------------------------------*/
+// import * as Icons from "lucide-react";
+// function CatIcon({ name, className }: { name?: string; className?: string }) {
+//   const Ico = name ? (Icons as any)[name] : null;
+//   return Ico ? <Ico className={className} aria-hidden="true" /> : null;
+// }
+
 /* ============================================================================
  * Guard RBAC de rotas dos blocos
  * ==========================================================================*/
@@ -49,7 +58,7 @@ function AuthPageGate({ user, children }: { user: User | null; children: ReactNo
 }
 
 /* ============================================================================
- * Componente utilitário para <iframe/> com altura ajustada ao header
+ * IframeBlock — altura compensando o header
  * ==========================================================================*/
 function IframeBlock({ src }: { src: string }) {
   return (
@@ -109,17 +118,6 @@ export default function App() {
     })();
   }, [user]);
 
-  // Se terminou de carregar, redireciona /, /login ou /registrar para /inicio
-  useEffect(() => {
-    if (
-      user &&
-      catalog &&
-      (loc.pathname === "/login" || loc.pathname === "/registrar" || loc.pathname === "/")
-    ) {
-      nav("/inicio", { replace: true });
-    }
-  }, [user, catalog, loc.pathname, nav]);
-
   // Resolve elemento de rota por bloco
   const routeElementFor = (block: Block, r: BlockRoute) => {
     if (r.kind === "iframe" && block.ui.type === "iframe") {
@@ -163,7 +161,7 @@ export default function App() {
   const initials =
     user?.nome?.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AG";
 
-  // Mostra apenas categorias que têm ao menos um bloco visível ao usuário
+  // Mostra apenas categorias com ao menos um bloco visível ao usuário
   const visibleCategories = (catalog?.categories ?? []).filter((cat) =>
     (catalog?.blocks ?? []).some(
       (b) => b.categoryId === cat.id && !b.hidden && userCanSeeBlock(user, b)
@@ -196,6 +194,12 @@ export default function App() {
               </NavLink>
               {visibleCategories.map((cat) => (
                 <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
+                  {/* Quando icon com lucide-react, descomente o bloco abaixo
+                  <span className="inline-flex items-center gap-1.5">
+                    <CatIcon name={cat.icon} className="h-4 w-4" />
+                    {cat.label}
+                  </span>
+                  */}
                   {cat.label}
                 </NavLink>
               ))}
@@ -262,7 +266,7 @@ export default function App() {
         />
         <Route path="/403" element={<Forbidden />} />
 
-        {/* Home com cards agrupados por categorias (RBAC aplicado no componente) */}
+        {/* Home com cards agrupados por categorias */}
         <Route path="/inicio" element={<HomeDashboard catalog={catalog} user={user} />} />
 
         {/* Página de listagem por categoria */}
