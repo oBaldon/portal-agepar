@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Link,
   NavLink,
@@ -10,7 +10,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import { pingEProtocolo } from "@/lib/api";
+import { configureApiHandlers, pingEProtocolo } from "@/lib/api";
 import { loadCatalog } from "@/lib/catalog";
 
 import type { Catalog, Block, BlockRoute, User } from "@/types";
@@ -20,7 +20,25 @@ import NotFound from "@/pages/NotFound";
 import HomeDashboard from "@/pages/HomeDashboard";
 import CategoryView from "@/pages/CategoryView";
 import AccountSessions from "@/pages/AccountSessions";
+import Forbidden from "@/pages/Forbidden";
 import { useAuth } from "@/auth/AuthProvider";
+
+/* ============================================================================
+ * Guard RBAC de rotas dos blocos
+ * ==========================================================================*/
+function RequireRoles({
+  user,
+  block,
+  children,
+}: {
+  user: User | null;
+  block: Block;
+  children: ReactNode;
+}) {
+  const allowed = useMemo(() => userCanSeeBlock(user, block), [user, block]);
+  if (!allowed) return <Navigate to="/403" replace />;
+  return <>{children}</>;
+}
 
 /* ============================================================================
  * Componente utilitário para <iframe/> com altura ajustada ao header
@@ -54,9 +72,20 @@ export default function App() {
   const nav = useNavigate();
   const loc = useLocation();
 
-  // -----------------------------------------
+  // Interceptadores globais: 401/403
+  useEffect(() => {
+    configureApiHandlers({
+      onUnauthorized: () => {
+        void doLogout();
+        nav("/login?reason=session_expired", { replace: true });
+      },
+      onForbidden: () => {
+        nav("/403", { replace: true });
+      },
+    });
+  }, [doLogout, nav]);
+
   // Carrega catálogo após autenticação
-  // -----------------------------------------
   useEffect(() => {
     if (!user) {
       setCatalog(null);
@@ -72,19 +101,14 @@ export default function App() {
     })();
   }, [user]);
 
-  // -------------------------------------------------------------
-  // Se estiver no /login ou / quando catálogo terminar de carregar,
-  // vá para a home (/inicio)
-  // -------------------------------------------------------------
+  // Se terminou de carregar, redireciona / ou /login para /inicio
   useEffect(() => {
     if (user && catalog && (loc.pathname === "/login" || loc.pathname === "/")) {
       nav("/inicio", { replace: true });
     }
   }, [user, catalog, loc.pathname, nav]);
 
-  // ----------------------------------------
   // Resolve elemento de rota por bloco
-  // ----------------------------------------
   const routeElementFor = (block: Block, r: BlockRoute) => {
     if (r.kind === "iframe" && block.ui.type === "iframe") {
       return <IframeBlock src={block.ui.url} />;
@@ -104,26 +128,20 @@ export default function App() {
     return <NotFound />;
   };
 
-  // -------------------------
   // Logout (via AuthProvider)
-  // -------------------------
   const onLogout = async () => {
     await doLogout();
     setCatalog(null);
     nav("/login");
   };
 
-  // ------------------------------------------------------------
-  // Proteção de rota: permite /login e /registrar sem auth
-  // ------------------------------------------------------------
-  const publicPaths = new Set<string>(["/login", "/registrar"]);
+  // Proteção de rota: permite /login, /registrar e /403 sem auth
+  const publicPaths = new Set<string>(["/login", "/registrar", "/403"]);
   if (!loading && !user && !publicPaths.has(loc.pathname)) {
     return <Navigate to="/login" replace />;
   }
 
-  // ------------------------------------------------------------
   // Helpers de UI (Navbar)
-  // ------------------------------------------------------------
   const activeCls = ({ isActive }: { isActive: boolean }) =>
     [
       "px-3 py-1.5 rounded-md text-sm transition",
@@ -213,11 +231,10 @@ export default function App() {
 
       {/* Rotas */}
       <Routes>
-        {/* Login */}
+        {/* Públicas */}
         <Route path="/login" element={<LazyLogin />} />
-
-        {/* Registro */}
         <Route path="/registrar" element={<LazyRegister />} />
+        <Route path="/403" element={<Forbidden />} />
 
         {/* Home com cards agrupados por categorias (RBAC aplicado no componente) */}
         <Route path="/inicio" element={<HomeDashboard catalog={catalog} user={user} />} />
@@ -231,10 +248,18 @@ export default function App() {
         {/* Página de sessões da conta */}
         <Route path="/conta/sessoes" element={<AccountSessions />} />
 
-        {/* Rotas dos blocos do catálogo (iframe/react) */}
+        {/* Rotas dos blocos do catálogo (com guard RBAC) */}
         {catalog?.blocks?.map((b) =>
           b.routes?.map((r) => (
-            <Route key={`${b.name}:${r.path}`} path={r.path} element={routeElementFor(b, r)} />
+            <Route
+              key={`${b.name}:${r.path}`}
+              path={r.path}
+              element={
+                <RequireRoles user={user} block={b}>
+                  {routeElementFor(b, r)}
+                </RequireRoles>
+              }
+            />
           ))
         )}
 

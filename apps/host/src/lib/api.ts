@@ -3,13 +3,52 @@ import type { User } from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
-async function j<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
+/* =========================
+ * Interceptadores globais
+ * ========================= */
+let onUnauthorized: ((status: number) => void) | null = null;
+let onForbidden: (() => void) | null = null;
+
+/** Permite ao app registrar handlers globais para 401/403. */
+export function configureApiHandlers(opts: {
+  onUnauthorized?: (status: number) => void;
+  onForbidden?: () => void;
+} = {}) {
+  if (opts.onUnauthorized) onUnauthorized = opts.onUnauthorized;
+  if (opts.onForbidden) onForbidden = opts.onForbidden;
+}
+
+/** Extrai mensagem amigável do corpo de erro (FastAPI). */
+async function extractErrorMessage(res: Response): Promise<string> {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    try {
+      const data = await res.json();
+      if (typeof data?.detail === "string") return data.detail;
+      if (Array.isArray(data?.detail)) {
+        // casos de validação do Pydantic: pegue a primeira mensagem
+        return data.detail[0]?.msg || JSON.stringify(data.detail);
+      }
+      return JSON.stringify(data);
+    } catch {}
   }
+  return await res.text().catch(() => "");
+}
+
+/** Garante `res.ok`; dispara callbacks globais em 401/403 antes de lançar erro. */
+async function ensureOk(res: Response): Promise<void> {
+  if (res.ok) return;
+  if (res.status === 401 && onUnauthorized) onUnauthorized(401);
+  if (res.status === 403 && onForbidden) onForbidden();
+  const msg = await extractErrorMessage(res);
+  throw new Error(`HTTP ${res.status}: ${msg || res.statusText}`);
+}
+
+async function j<T>(res: Response): Promise<T> {
+  await ensureOk(res);
   return (await res.json()) as T;
 }
+
 
 /* =========================
  * Auth (real, server-side)
@@ -29,10 +68,7 @@ export async function logout(): Promise<void> {
     method: "POST",
     credentials: "include",
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
-  }
+  await ensureOk(res);
 }
 
 /** Login real (POST /api/auth/login) */
@@ -105,10 +141,7 @@ export async function revokeSession(id: string): Promise<void> {
     method: "POST",
     credentials: "include",
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
-  }
+  await ensureOk(res);
 }
 
 /* =========================
@@ -167,7 +200,7 @@ export async function downloadSubmission(kind: string, id: string) {
     method: "POST",
     credentials: "include",
   });
-  if (!r.ok) throw new Error(`${kind} download: ${r.status}`);
+  await ensureOk(r);
   const blob = await r.blob();
   const cd = r.headers.get("content-disposition") || "";
   const m = /filename="?([^"]+)"?/.exec(cd);
