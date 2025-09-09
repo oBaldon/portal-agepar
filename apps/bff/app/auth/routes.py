@@ -21,6 +21,10 @@ ENV = os.getenv("ENV", "dev")
 AUTH_DEV_ALLOW_ANY_PASSWORD = os.getenv("AUTH_DEV_ALLOW_ANY_PASSWORD", "1") in ("1", "true", "True")
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "8"))
 REMEMBER_ME_TTL_DAYS = int(os.getenv("REMEMBER_ME_TTL_DAYS", "30"))
+AUTH_RATE_LIMIT_SCOPE = os.getenv("AUTH_RATE_LIMIT_SCOPE", "both")  # both|identifier|ip|off
+AUTH_RATE_LIMIT_WINDOW_MINUTES = int(os.getenv("AUTH_RATE_LIMIT_WINDOW_MINUTES", "15"))
+AUTH_RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv("AUTH_RATE_LIMIT_MAX_ATTEMPTS", "5"))
+
 
 ph = PasswordHasher()  # Argon2id
 CPF_RE = re.compile(r"^\d{11}$")
@@ -102,18 +106,43 @@ def _load_roles(conn, user_id: str) -> List[str]:
         return [r[0] for r in rows] if rows else []
 
 
-def _rate_limited(conn, identifier: str, ip: Optional[str], window_minutes: int = 15, max_attempts: int = 5) -> bool:
+def _rate_limited(conn, identifier: str, ip: Optional[str],
+                  window_minutes: int = AUTH_RATE_LIMIT_WINDOW_MINUTES,
+                  max_attempts: int = AUTH_RATE_LIMIT_MAX_ATTEMPTS) -> bool:
+    scope = AUTH_RATE_LIMIT_SCOPE  # both|identifier|ip|off
+    if scope == "off":
+        return False
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT count(*)
-            FROM login_attempts
-            WHERE at >= now() - (%s || ' minutes')::interval
-              AND success = false
-              AND (login_identifier = %s OR (ip IS NOT NULL AND ip = %s))
-            """,
-            (window_minutes, identifier, ip),
-        )
+        if scope == "identifier":
+            cur.execute(
+                """
+                SELECT count(*) FROM login_attempts
+                WHERE at >= now() - (%s || ' minutes')::interval
+                  AND success = false
+                  AND login_identifier = %s
+                """,
+                (window_minutes, identifier),
+            )
+        elif scope == "ip":
+            cur.execute(
+                """
+                SELECT count(*) FROM login_attempts
+                WHERE at >= now() - (%s || ' minutes')::interval
+                  AND success = false
+                  AND ip = %s
+                """,
+                (window_minutes, ip),
+            )
+        else:  # both
+            cur.execute(
+                """
+                SELECT count(*) FROM login_attempts
+                WHERE at >= now() - (%s || ' minutes')::interval
+                  AND success = false
+                  AND (login_identifier = %s OR (ip IS NOT NULL AND ip = %s))
+                """,
+                (window_minutes, identifier, ip),
+            )
         (count,) = cur.fetchone()
         return (count or 0) >= max_attempts
 

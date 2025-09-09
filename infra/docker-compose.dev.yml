@@ -11,6 +11,9 @@ services:
       SESSION_SECRET: dev-secret
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       CATALOG_FILE: /catalog/catalog.dev.json
+      AUTH_RATE_LIMIT_SCOPE: identifier   # ou "off" em dev
+      AUTH_RATE_LIMIT_WINDOW_MINUTES: "10"
+      AUTH_RATE_LIMIT_MAX_ATTEMPTS: "7"
     volumes:
       - ../apps/bff:/app
       - ../catalog:/catalog:ro
