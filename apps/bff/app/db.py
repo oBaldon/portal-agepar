@@ -153,3 +153,16 @@ def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any
                 json.dumps(meta, ensure_ascii=False),
             ),
         )
+
+def list_audits(kind: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+    q = "SELECT * FROM audits WHERE 1=1"
+    params: Tuple[Any, ...] = ()
+    if kind:
+        q += " AND kind = ?"
+        params += (kind,)
+    q += " ORDER BY at DESC LIMIT ? OFFSET ?"
+    params += (limit, offset)
+    with _conn() as con:
+        cur = con.execute(q, params)
+        rows = [dict(r) for r in cur.fetchall()]
+        return rows

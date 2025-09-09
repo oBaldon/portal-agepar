@@ -29,17 +29,20 @@
     },
     {
       "name": "dfd",
-      "displayName": "Documento de Formalização de Demanda",
-      "version": "0.0.0",
+      "displayName": "DFD — Documento de Formalização da Demanda",
+      "version": "1.0.0",
       "categoryId": "cat1",
-      "ui": { "type": "iframe", "url": "/api/demo?view=dfd" },
+      "description": "Gerar o Documento de Formalização da Demanda, em PDF, com rastreabilidade.",
+      "ui": { "type": "iframe", "url": "/api/automations/dfd/ui" },
       "navigation": [
-        { "label": "Documento de Formalização de Demanda", "path": "/dfd", "icon": "FileJson" }
+        { "label": "DFD — Formalização da Demanda", "path": "/dfd", "icon": "FileText" }
       ],
       "routes": [
         { "path": "/dfd", "kind": "iframe" }
       ],
-      "tags": ["utilitário"]
+      "tags": ["compras", "documentos"],
+      "requiredRoles": ["automations.dfd"],
+      "order": 10
     },
     {
       "name": "pca",

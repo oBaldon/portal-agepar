@@ -29,6 +29,7 @@ ENV/
 # SQLite database (automations, BFF, etc.)
 *.db
 *.db*
+data/
 
 # ----------------------
 # Environment files

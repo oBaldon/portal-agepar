@@ -36,6 +36,7 @@ nav:
   - Automações:
       - Sobre as automações: automacoes/index.md
       - Formulário → JSON: automacoes/form2json.md
+      - DFD — Documento de Formalização da Demanda: automacoes/dfd.md
   - Ajuda:
       - Perguntas frequentes (FAQ): ajuda/perguntas-frequentes.md
       - Segurança & privacidade: ajuda/seguranca-privacidade.md

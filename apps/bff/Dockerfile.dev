@@ -8,6 +8,15 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Habilitar conversões DOC/DOCX/PDF com LibreOffice
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libreoffice-writer \
+      fonts-liberation \
+      fonts-dejavu-core \
+      fonts-dejavu-extra \
+ && rm -rf /var/lib/apt/lists/*
+
 # Código do BFF
 COPY app ./app
 COPY run_dev.sh ./run_dev.sh
