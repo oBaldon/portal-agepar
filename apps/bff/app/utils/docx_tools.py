@@ -1,3 +1,4 @@
+# app/utils/docx_tools.py
 from __future__ import annotations
 from typing import Dict, Any, List
 from datetime import datetime
@@ -90,7 +91,11 @@ def _mk_p(text: str) -> ET.Element:
     return p
 
 
-def _append_body_paragraphs_xml_et(document_xml_bytes: bytes, exemplos: list[tuple[str, str]]) -> bytes:
+def _append_body_paragraphs_xml_et(
+    document_xml_bytes: bytes,
+    exemplos: list[tuple[str, str]],
+    intro_lines: list[str] | None = None,
+) -> bytes:
     """Acrescenta parágrafos simples ao <w:body>."""
     root = ET.fromstring(document_xml_bytes)
     body = root.find(_w("body"))
@@ -103,6 +108,16 @@ def _append_body_paragraphs_xml_et(document_xml_bytes: bytes, exemplos: list[tup
     insert_idx = children.index(sectpr) if sectpr is not None else len(children)
 
     elems: list[ET.Element] = []
+
+    # 0) Introdução (se houver)
+    if intro_lines:
+        for line in intro_lines:
+            elems.append(_mk_p(line))
+        # linha em branco ao final da introdução, se última linha não for vazia
+        if intro_lines and intro_lines[-1].strip():
+            elems.append(ET.Element(_w("p")))
+
+    # 1) Blocos Exemplo 1/2/3 (label + texto)
     first = True
     for label, value in exemplos:
         if not first:
@@ -145,10 +160,20 @@ def _patch_header_xml_text(xml: str, numero: str, assunto: str, data_fmt: str) -
 def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: str) -> None:
     """Copia o DOCX e aplica:
        - patch nos headers (número/assunto/data),
-       - injeção de parágrafos simples no corpo (Exemplo 1/2/3)."""
+       - injeção de INTRO + parágrafos Exemplo 1/2/3 no corpo."""
     numero = str(context.get("numero") or "")
     assunto = str(context.get("assunto") or "Documento de Formalização de Demanda")
     data_fmt = _date_br(context.get("data") or datetime.utcnow().date().isoformat())
+
+    # Ano do PCA pode vir como pca_ano (interno) ou pcaAno (externo)
+    ano_pca = str(context.get("pca_ano") or context.get("pcaAno") or "").strip()
+
+    # Introdução solicitada
+    intro_lines = [
+        "À Diretoria de Administração-Financeira",
+        "",  # linha em branco
+        f"Encaminha-se, o presente Documento de Formalização de Demanda - DFD, para fins de inclusão no Plano de Contratação Anual - PCA do exercício {ano_pca}, nos seguintes termos:",
+    ]
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
         tmp_name = tmp.name
@@ -174,14 +199,14 @@ def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: 
 
                 zout.writestr(name, data)
 
-            # 2) Escreve o corpo uma única vez
+            # 2) Escreve o corpo uma única vez (INTRO + exemplos)
             if doc_xml is not None:
                 exemplos = [
                     ("Exemplo 1", context.get("exemplo1") or ""),
                     ("Exemplo 2", context.get("exemplo2") or ""),
                     ("Exemplo 3", context.get("exemplo3") or ""),
                 ]
-                doc_xml2 = _append_body_paragraphs_xml_et(doc_xml, exemplos)
+                doc_xml2 = _append_body_paragraphs_xml_et(doc_xml, exemplos, intro_lines=intro_lines)
                 zout.writestr("word/document.xml", doc_xml2)
 
         os.makedirs(os.path.dirname(out_path), exist_ok=True)

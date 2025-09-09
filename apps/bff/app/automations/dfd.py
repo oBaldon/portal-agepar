@@ -33,7 +33,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "1.6.0"
+DFD_VERSION = "1.7.0"
 REQUIRED_ROLES = ("automations.dfd",)
 
 # Diretório com os modelos DOCX por diretoria
@@ -93,6 +93,7 @@ class DfdIn(BaseModel):
     modelo_slug: str = Field(..., alias="modeloSlug")  # diretoria (nome da pasta)
     numero: str  # nº do memorando
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
+    pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")  # 4 dígitos
 
     # Três campos de texto livres (exemplos)
     exemplo1: str = Field("", max_length=4000)
@@ -107,6 +108,7 @@ SCHEMA = {
         {"name": "modeloSlug", "type": "select", "label": "Diretoria"},
         {"name": "numero", "type": "text", "label": "Nº do Memorando"},
         {"name": "assunto", "type": "text", "label": "Assunto"},
+        {"name": "pcaAno", "type": "text", "label": "Ano de execução do PCA"},
         {"name": "exemplo1", "type": "textarea", "label": "Exemplo 1"},
         {"name": "exemplo2", "type": "textarea", "label": "Exemplo 2"},
         {"name": "exemplo3", "type": "textarea", "label": "Exemplo 3"},
@@ -119,6 +121,8 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "modelo_slug": {"label": "Diretoria"},  # nome interno pydantic
     "numero": {"label": "Nº do Memorando"},
     "assunto": {"label": "Assunto", "max_length": MAX_ASSUNTO_LEN, "min_length": 1},
+    "pcaAno": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
+    "pca_ano": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
     "exemplo1": {"label": "Exemplo 1", "max_length": 4000},
     "exemplo2": {"label": "Exemplo 2", "max_length": 4000},
     "exemplo3": {"label": "Exemplo 3", "max_length": 4000},
@@ -130,7 +134,6 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
     msgs: List[str] = []
     for err in ve.errors():
         loc = err.get("loc") or ()
-        # campo no topo do JSON (ex.: 'exemplo1' ou 'modeloSlug')
         field_key = str(loc[-1]) if loc else "campo"
         info = FIELD_INFO.get(field_key) or FIELD_INFO.get(
             field_key.replace("modelo_slug", "modeloSlug"), {}
@@ -146,12 +149,17 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
         elif typ == "string_too_short" and "min_length" in ctx:
             minimum = ctx["min_length"]
             msgs.append(f"Campo '{label}' deve ter pelo menos {minimum} caractere(s).")
+        elif typ == "string_pattern_mismatch" and "pattern" in ctx:
+            # Ex.: pcaAno
+            if field_key in ("pcaAno", "pca_ano"):
+                msgs.append(f"Campo '{label}' deve conter 4 dígitos (ex.: 2025).")
+            else:
+                msgs.append(f"Campo '{label}' não está no formato esperado.")
         elif typ == "string_type":
             msgs.append(f"Campo '{label}' deve ser texto.")
         elif typ == "missing":
             msgs.append(f"Campo '{label}' é obrigatório.")
         else:
-            # fallback com a mensagem original do pydantic
             msgs.append(f"Campo '{label}': {msg}")
     return msgs
 
@@ -243,6 +251,7 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "diretoria": raw["modeloSlug"],
             "numero": raw["numero"],
             "assunto": raw["assunto"],
+            "pca_ano": raw["pcaAno"],          # usado no texto introdutório
             "data": today_iso,
             "exemplo1": raw.get("exemplo1") or "",
             "exemplo2": raw.get("exemplo2") or "",
@@ -309,6 +318,7 @@ async def submit_dfd(
         "modeloSlug": none_if_empty(body.get("modeloSlug")),
         "numero": (body.get("numero") or "").strip(),
         "assunto": (body.get("assunto") or "").strip(),
+        "pcaAno": (body.get("pcaAno") or "").strip(),
         "exemplo1": (body.get("exemplo1") or "").strip(),
         "exemplo2": (body.get("exemplo2") or "").strip(),
         "exemplo3": (body.get("exemplo3") or "").strip(),
@@ -468,12 +478,15 @@ async def dfd_ui(request: Request):
             </div>
             <div class="col">
               <label>Nº do memorando</label>
-              <input name="numero" required />
+              <input name="numero" placeholder="Ex.: 0XX/202X" required />
             </div>
           </div>
 
           <label>Assunto</label>
-          <input name="assunto" placeholder="Ex.: Documento de Formalização de Demanda" required />
+          <input name="assunto" placeholder="Ex.: DFD - PCA 2026 - (Objeto a ser adquirido/contratado)" required />
+
+          <label>Ano de execução do PCA</label>
+          <input name="pcaAno" placeholder="Ex.: 2025" pattern="\\d{4}" required />
 
           <label>Exemplo 1</label>
           <textarea name="exemplo1"></textarea>
