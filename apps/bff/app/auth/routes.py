@@ -25,6 +25,10 @@ AUTH_RATE_LIMIT_SCOPE = os.getenv("AUTH_RATE_LIMIT_SCOPE", "both")  # both|ident
 AUTH_RATE_LIMIT_WINDOW_MINUTES = int(os.getenv("AUTH_RATE_LIMIT_WINDOW_MINUTES", "15"))
 AUTH_RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv("AUTH_RATE_LIMIT_MAX_ATTEMPTS", "5"))
 
+# Roles padrão vindas do ambiente (ex.: "user,automations.dfd")
+AUTH_DEFAULT_ROLES: List[str] = [
+    r.strip() for r in os.getenv("AUTH_DEFAULT_ROLES", "").split(",") if r.strip()
+]
 
 ph = PasswordHasher()  # Argon2id
 CPF_RE = re.compile(r"^\d{11}$")
@@ -147,6 +151,14 @@ def _rate_limited(conn, identifier: str, ip: Optional[str],
         return (count or 0) >= max_attempts
 
 
+# -------- helpers de roles --------
+def _merge_default_roles(roles: Optional[List[str]]) -> List[str]:
+    """Mescla as roles do usuário com AUTH_DEFAULT_ROLES, remove duplicatas e ordena."""
+    merged = set(roles or [])
+    merged.update(AUTH_DEFAULT_ROLES)
+    return sorted(merged)
+
+
 # ---------------------------- Schemas ----------------------------
 
 class RegisterIn(BaseModel):
@@ -185,7 +197,7 @@ class LoginOut(BaseModel):
     roles: List[str] = Field(default_factory=list)
     unidades: List[str] = Field(default_factory=list)
     auth_mode: str
-    is_superuser: bool = False  # <- inclui no response_model para evitar extra
+    is_superuser: bool = False  # <- incluído no response_model para evitar extra
 
 
 # ---------------------------- Routes ----------------------------
@@ -303,17 +315,23 @@ def login_user(payload: LoginIn, request: Request):
             (str(sess_id), user_id, expires, ip, ua),
         )
 
-        roles = _load_roles(conn, user_id)
+        # Roles do banco + roles padrão de ambiente
+        roles_db = _load_roles(conn, user_id)
+        roles = _merge_default_roles(roles_db)
 
         # HARDENING: superuser recebe 'admin' (bypass RBAC)
         if is_superuser and "admin" not in roles:
-            roles = ["admin", *roles]
+            roles = sorted(set(roles + ["admin"]))
+
+        # Fallback se vazio
+        if not roles:
+            roles = ["user"]
 
         user_payload = {
             "cpf": u_cpf,
             "nome": u_name,
             "email": u_email,
-            "roles": roles or ["user"],
+            "roles": roles,
             "unidades": ["AGEPAR"],
             "auth_mode": "local",
             "is_superuser": bool(is_superuser),

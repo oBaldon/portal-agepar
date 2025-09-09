@@ -33,7 +33,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "1.7.0"
+DFD_VERSION = "1.8.0"
 REQUIRED_ROLES = ("automations.dfd",)
 
 # Diretório com os modelos DOCX por diretoria
@@ -84,7 +84,7 @@ def _get_model_path(slug: str) -> Optional[str]:
 
 
 # ---------------------- Models ----------------------
-MAX_ASSUNTO_LEN = 200
+MAX_ASSUNTO_LEN = 200  # agora representa o OBJETO digitado
 
 class DfdIn(BaseModel):
     """Campos mínimos para o MVP do DFD."""
@@ -92,8 +92,12 @@ class DfdIn(BaseModel):
 
     modelo_slug: str = Field(..., alias="modeloSlug")  # diretoria (nome da pasta)
     numero: str  # nº do memorando
+
+    # O usuário digita apenas o OBJETO; o assunto final é montado pelo sistema.
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
-    pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")  # 4 dígitos
+
+    # Ano de execução do PCA (4 dígitos)
+    pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")
 
     # Três campos de texto livres (exemplos)
     exemplo1: str = Field("", max_length=4000)
@@ -107,7 +111,7 @@ SCHEMA = {
     "fields": [
         {"name": "modeloSlug", "type": "select", "label": "Diretoria"},
         {"name": "numero", "type": "text", "label": "Nº do Memorando"},
-        {"name": "assunto", "type": "text", "label": "Assunto"},
+        {"name": "assunto", "type": "text", "label": "Objeto"},
         {"name": "pcaAno", "type": "text", "label": "Ano de execução do PCA"},
         {"name": "exemplo1", "type": "textarea", "label": "Exemplo 1"},
         {"name": "exemplo2", "type": "textarea", "label": "Exemplo 2"},
@@ -120,7 +124,7 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "modeloSlug": {"label": "Diretoria"},
     "modelo_slug": {"label": "Diretoria"},  # nome interno pydantic
     "numero": {"label": "Nº do Memorando"},
-    "assunto": {"label": "Assunto", "max_length": MAX_ASSUNTO_LEN, "min_length": 1},
+    "assunto": {"label": "Objeto", "max_length": MAX_ASSUNTO_LEN, "min_length": 1},
     "pcaAno": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
     "pca_ano": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
     "exemplo1": {"label": "Exemplo 1", "max_length": 4000},
@@ -150,7 +154,6 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
             minimum = ctx["min_length"]
             msgs.append(f"Campo '{label}' deve ter pelo menos {minimum} caractere(s).")
         elif typ == "string_pattern_mismatch" and "pattern" in ctx:
-            # Ex.: pcaAno
             if field_key in ("pcaAno", "pca_ano"):
                 msgs.append(f"Campo '{label}' deve conter 4 dígitos (ex.: 2025).")
             else:
@@ -247,11 +250,16 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         base = f"dfd_{raw['modeloSlug'].lower()}_{numero_safe}"
         today_iso = datetime.utcnow().date().isoformat()
 
+        # Monta ASSUNTO final: "DFD - PCA <ano> - <objeto>"
+        objeto = (raw.get("assunto") or "").strip()
+        pca_ano = (raw.get("pcaAno") or "").strip()
+        assunto_final = f"DFD - PCA {pca_ano} - {objeto}"
+
         ctx = {
             "diretoria": raw["modeloSlug"],
             "numero": raw["numero"],
-            "assunto": raw["assunto"],
-            "pca_ano": raw["pcaAno"],          # usado no texto introdutório
+            "assunto": assunto_final,  # usado no cabeçalho/timbre
+            "pca_ano": pca_ano,        # usado no texto introdutório do corpo
             "data": today_iso,
             "exemplo1": raw.get("exemplo1") or "",
             "exemplo2": raw.get("exemplo2") or "",
@@ -261,6 +269,7 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         # Log de placeholders (apenas informativo)
         placeholders = get_docx_placeholders(tpl_path)
         logger.info("[DFD] Placeholders detectados (%d): %s", len(placeholders), placeholders)
+        logger.info("[DFD] Assunto final: %s", assunto_final)
 
         docx_out = f"{out_dir}/{sid}.docx"
         render_docx_template(tpl_path, ctx, docx_out)
@@ -317,6 +326,7 @@ async def submit_dfd(
     raw = {
         "modeloSlug": none_if_empty(body.get("modeloSlug")),
         "numero": (body.get("numero") or "").strip(),
+        # usuário digita apenas o OBJETO
         "assunto": (body.get("assunto") or "").strip(),
         "pcaAno": (body.get("pcaAno") or "").strip(),
         "exemplo1": (body.get("exemplo1") or "").strip(),
@@ -482,8 +492,9 @@ async def dfd_ui(request: Request):
             </div>
           </div>
 
-          <label>Assunto</label>
-          <input name="assunto" placeholder="Ex.: DFD - PCA 2026 - (Objeto a ser adquirido/contratado)" required />
+          <label>Objeto</label>
+          <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
+          <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [objeto]</code>.</div>
 
           <label>Ano de execução do PCA</label>
           <input name="pcaAno" placeholder="Ex.: 2025" pattern="\\d{4}" required />
@@ -575,7 +586,7 @@ async def dfd_ui(request: Request):
         }
 
         if (row.status === 'done') {
-          statusEl.textContent = 'Pronto! Você pode baixar abaixo.';
+          statusEl.textContent = 'Pronto! Download do arquivo abaixo.';
           const div = document.createElement('div');
           div.className = 'item';
 

@@ -1,7 +1,8 @@
+# apps/bff/app/main.py
 from __future__ import annotations
 
 import json
-from app.automations.dfd import DFD_VERSION as DFD_VER
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.automations.dfd import DFD_VERSION as DFD_VER
 # ---- Automations infra / routers ----
 from app.db import init_db
 from app.automations.form2json import router as form2json_router
@@ -20,11 +22,11 @@ from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
 from app.auth.sessions import router as auth_sessions_router
 
-
 # ------------------------------------------------------------------------------
 # Configuração (envs)
 # ------------------------------------------------------------------------------
 ENV = os.getenv("ENV", "dev")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 # Agora o padrão é "local" (login real). O mock vira legado e fica desativado.
 AUTH_MODE = os.getenv("AUTH_MODE", "local")  # valores: "local" (real), futuramente "oidc"
@@ -32,13 +34,24 @@ AUTH_LEGACY_MOCK = os.getenv("AUTH_LEGACY_MOCK", "0").lower() in ("1", "true", "
 
 EP_MODE = os.getenv("EP_MODE", "mock")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret")
-CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 CATALOG_FILE = Path(os.getenv("CATALOG_FILE", "/catalog/catalog.dev.json"))
 
 # Placeholders para OIDC (não usados por enquanto)
 OIDC_ISSUER = os.getenv("OIDC_ISSUER", "")
 OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID", "")
 OIDC_JWKS_URL = os.getenv("OIDC_JWKS_URL", "")
+
+# Roles padrão para sessão mock (mantém consistência com rotas reais)
+def _auth_default_roles() -> list[str]:
+    return [r.strip() for r in os.getenv("AUTH_DEFAULT_ROLES", "").split(",") if r.strip()]
+
+# ------------------------------------------------------------------------------
+# Logging básico (respeita LOG_LEVEL)
+# ------------------------------------------------------------------------------
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+logger = logging.getLogger(__name__)
+logger.info("Starting BFF (ENV=%s, AUTH_MODE=%s, LEGACY_MOCK=%s, LOG_LEVEL=%s)", ENV, AUTH_MODE, AUTH_LEGACY_MOCK, LOG_LEVEL)
 
 # ------------------------------------------------------------------------------
 # App
@@ -80,6 +93,8 @@ APP.include_router(auth_sessions_router) # /api/auth/sessions[...]
 def _startup() -> None:
     # Inicializa o banco (SQLite) usado pelas automações (submissions/audits)
     init_db()
+    logger.info("DB initialized")
+    logger.info("DFD engine version: %s", DFD_VER)
 
 # ------------------------------------------------------------------------------
 # Helpers
@@ -100,6 +115,16 @@ def _require_user(req: Request) -> Dict[str, Any]:
 def health() -> Dict[str, str]:
     return {"status": "ok"}
 
+@APP.get("/version")
+def version() -> Dict[str, Any]:
+    return {
+        "app": APP.version,
+        "env": ENV,
+        "dfd_version": DFD_VER,
+        "auth_mode": AUTH_MODE,
+        "ep_mode": EP_MODE,
+    }
+
 # ------------------------------------------------------------------------------
 # MOCK legado (opcional): habilite somente em DEV e quando realmente precisar
 # Sete AUTH_LEGACY_MOCK=1 para expor o GET /api/auth/login com params.
@@ -113,21 +138,30 @@ if AUTH_LEGACY_MOCK:
         email: Optional[str] = Query(None),
         roles: Optional[str] = Query(None),      # csv
         unidades: Optional[str] = Query(None),   # csv
+        superuser: Optional[bool] = Query(False),
     ) -> Dict[str, Any]:
         """
         [LEGADO/DEV] Cria sessão mock a partir de query params.
         Só é exposto quando AUTH_LEGACY_MOCK=1.
+        Mescla roles com AUTH_DEFAULT_ROLES para ficar consistente com o login real.
         """
+        roles_csv = [r.strip() for r in (roles or "user").split(",") if r.strip()]
+        roles_merged = sorted(set(roles_csv + _auth_default_roles()))
+        if superuser and "admin" not in roles_merged:
+            roles_merged = sorted(set(roles_merged + ["admin"]))
+
         user = {
             "cpf": cpf or "00000000000",
             "nome": nome or "Usuário de Teste",
             "email": email or "teste@example.com",
-            "roles": [r.strip() for r in (roles or "user").split(",") if r.strip()],
+            "roles": roles_merged,
             "unidades": [u.strip() for u in (unidades or "AGEPAR").split(",") if u.strip()],
             "auth_mode": "mock",
+            "is_superuser": bool(superuser),
         }
         request.session["user"] = user
         # Não cria sessão no banco — uso apenas temporário em DEV.
+        logger.info("[LEGACY_MOCK] Sessão criada para %s (roles=%s)", user["nome"], ",".join(user["roles"]))
         return user
 
 @APP.get("/api/me")
@@ -208,6 +242,7 @@ def automations_index() -> Dict[str, Any]:
 # ------------------------------------------------------------------------------
 APP.include_router(form2json_router)
 APP.include_router(dfd_router)
+
 # ------------------------------------------------------------------------------
 # Nota de segurança (prod)
 # ------------------------------------------------------------------------------

@@ -115,7 +115,7 @@
         { "path": "/possibilidades", "kind": "iframe" }
       ],
       "tags": ["idéias", "exploração"],
-      "hidden": true
+      "requiredRoles": ["admin"]
     }
   ]
 }
