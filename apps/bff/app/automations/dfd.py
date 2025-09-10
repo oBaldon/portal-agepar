@@ -526,7 +526,7 @@ async def dfd_ui(request: Request):
   input, textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
   textarea { min-height: 100px; resize: vertical; }
   .row { display:flex; gap: 12px; }
-  .col { flex:1; }
+  .col { flex:1; min-width: 0; }
   .actions { display:flex; gap: 12px; align-items:center; }
   .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
@@ -541,37 +541,101 @@ async def dfd_ui(request: Request):
   .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 8px; background:#fff; }
   .item .meta { margin-bottom:8px; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+
+  /* help / tooltip */
+  .inline-help { display:inline-flex; align-items:center; position:relative; margin-left:6px; }
+  .inline-help .help {
+    width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a;
+    border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center;
+    padding:0; cursor:pointer;
+  }
+  .inline-help .help:hover { background:#dbeafe; border-color:#93c5fd; }
+  .inline-help .help:focus-visible { outline:2px solid #93c5fd; outline-offset:2px; }
+  .inline-help .tip {
+    position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px;
+    background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px;
+    box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none;
+    opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease;
+  }
+  .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
+  .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
 </style>
+
 <div class="wrap">
   <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
   <div class="card">
     <form id="f">
       <div class="row">
         <div class="col">
-          <label>Diretoria</label>
+          <label>
+            Diretoria
+            <span class="inline-help">
+              <button type="button" class="help" aria-label="Ajuda sobre Diretoria">!</button>
+              <span class="tip">Selecione o timbre/cabeçalho correspondente. As opções vêm de <code>/templates/dfd_models</code>.</span>
+            </span>
+          </label>
           <select name="modeloSlug" id="modeloSlug" required>
             <option value="">-- Selecionar --</option>
           </select>
           <div class="note">Carrega pastas de /templates/dfd_models.</div>
         </div>
+
         <div class="col">
-          <label>Nº do memorando</label>
+          <label>
+            Nº do memorando
+            <span class="inline-help">
+              <button type="button" class="help" aria-label="Ajuda sobre Nº do memorando">!</button>
+              <span class="tip">Use o padrão da sua unidade (ex.: <code>012/2025</code>). Esse número aparece no cabeçalho.</span>
+            </span>
+          </label>
           <input name="numero" placeholder="Ex.: 0XX/202X" required />
         </div>
       </div>
 
-      <label>Objeto</label>
+      <label>
+        Objeto
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button>
+          <span class="tip">Digite apenas o objeto (ex.: <em>Aquisição de software X</em>). O assunto final será montado como <code>DFD - PCA [ano] - [objeto]</code>.</span>
+        </span>
+      </label>
       <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
       <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [objeto]</code>.</div>
 
-      <label>Ano de execução do PCA</label>
+      <label>
+        Ano de execução do PCA
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">!</button>
+          <span class="tip">Informe 4 dígitos (ex.: <code>2025</code>). É usado no cabeçalho e no texto introdutório.</span>
+        </span>
+      </label>
       <input name="pcaAno" placeholder="Ex.: 2025" pattern="\\d{4}" required />
 
-      <label>Exemplo 1</label>
+      <label>
+        Exemplo 1
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Exemplo 1">!</button>
+          <span class="tip">Campo livre. Cada quebra de linha será respeitada no documento final.</span>
+        </span>
+      </label>
       <textarea name="exemplo1"></textarea>
-      <label>Exemplo 2</label>
+
+      <label>
+        Exemplo 2
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Exemplo 2">!</button>
+          <span class="tip">Campo livre. Utilize para detalhar justificativas, escopo, etc.</span>
+        </span>
+      </label>
       <textarea name="exemplo2"></textarea>
-      <label>Exemplo 3</label>
+
+      <label>
+        Exemplo 3
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Exemplo 3">!</button>
+          <span class="tip">Campo livre. Pode ser usado para referências, prazos, anexos relacionados.</span>
+        </span>
+      </label>
       <textarea name="exemplo3"></textarea>
 
       <div class="actions" style="margin-top:16px">
@@ -724,7 +788,6 @@ async def dfd_ui(request: Request):
           alert('Não foi possível baixar o DOCX.');
         }
       };
-
       buttons.appendChild(btnDocx);
 
       div.appendChild(meta);
