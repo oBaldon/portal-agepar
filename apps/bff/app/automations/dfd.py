@@ -511,201 +511,234 @@ async def dfd_ui(request: Request):
 
     # HTML simples, sem f-string (para não conflitar com {{ }} do JS/CSS)
     html = """<!doctype html>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>DFD — Documento de Formalização da Demanda (MVP)</title>
-    <style>
-      :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
-      * { box-sizing: border-box; }
-      body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; background:var(--bg); color:var(--fg); }
-      .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
-      h1 { font-size: 20px; margin: 0 0 12px; }
-      .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
-      label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
-      input, textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; }
-      textarea { min-height: 100px; resize: vertical; }
-      .row { display:flex; gap: 12px; }
-      .col { flex:1; }
-      .actions { display:flex; gap: 12px; align-items:center; }
-      .btn { background: var(--pri); color:#fff; border:none; border-radius: 10px; padding: 10px 16px; cursor:pointer; }
-      .btn.secondary { background: #334155; }
-      .btn[disabled] { opacity:.6; cursor: not-allowed; }
-      .note { font-size:12px; color:var(--muted); }
-      .status { margin-top:12px; font-size:13px; }
-      .list { margin-top: 24px; }
-      .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 8px; background:#fff; }
-      .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; }
-      .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
-    </style>
-    <div class="wrap">
-      <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
-      <div class="card">
-        <form id="f">
-          <div class="row">
-            <div class="col">
-              <label>Diretoria</label>
-              <select name="modeloSlug" id="modeloSlug" required>
-                <option value="">-- Selecionar --</option>
-              </select>
-              <div class="note">Carrega pastas de /templates/dfd_models.</div>
-            </div>
-            <div class="col">
-              <label>Nº do memorando</label>
-              <input name="numero" placeholder="Ex.: 0XX/202X" required />
-            </div>
-          </div>
-
-          <label>Objeto</label>
-          <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
-          <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [objeto]</code>.</div>
-
-          <label>Ano de execução do PCA</label>
-          <input name="pcaAno" placeholder="Ex.: 2025" pattern="\\d{4}" required />
-
-          <label>Exemplo 1</label>
-          <textarea name="exemplo1"></textarea>
-          <label>Exemplo 2</label>
-          <textarea name="exemplo2"></textarea>
-          <label>Exemplo 3</label>
-          <textarea name="exemplo3"></textarea>
-
-          <div class="actions" style="margin-top:16px">
-            <button class="btn" id="submitBtn">Gerar DFD</button>
-            <span class="status" id="status"></span>
-          </div>
-        </form>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DFD — Documento de Formalização da Demanda (MVP)</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+  label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  input, textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+  textarea { min-height: 100px; resize: vertical; }
+  .row { display:flex; gap: 12px; }
+  .col { flex:1; }
+  .actions { display:flex; gap: 12px; align-items:center; }
+  .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
+  .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.secondary:hover { background:#f8fafc; }
+  .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
+  .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+  .note { font-size:12px; color:var(--muted); }
+  .status { margin-top:12px; font-size:13px; }
+  .list { margin-top: 24px; }
+  .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 8px; background:#fff; }
+  .item .meta { margin-bottom:8px; }
+  .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+</style>
+<div class="wrap">
+  <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
+  <div class="card">
+    <form id="f">
+      <div class="row">
+        <div class="col">
+          <label>Diretoria</label>
+          <select name="modeloSlug" id="modeloSlug" required>
+            <option value="">-- Selecionar --</option>
+          </select>
+          <div class="note">Carrega pastas de /templates/dfd_models.</div>
+        </div>
+        <div class="col">
+          <label>Nº do memorando</label>
+          <input name="numero" placeholder="Ex.: 0XX/202X" required />
+        </div>
       </div>
 
-      <div class="list" id="subs"></div>
-    </div>
+      <label>Objeto</label>
+      <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
+      <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [objeto]</code>.</div>
 
-    <script>
-      const f = document.getElementById('f');
-      const statusEl = document.getElementById('status');
-      const subsEl = document.getElementById('subs');
-      const submitBtn = document.getElementById('submitBtn');
-      const modeloSel = document.getElementById('modeloSlug');
+      <label>Ano de execução do PCA</label>
+      <input name="pcaAno" placeholder="Ex.: 2025" pattern="\\d{4}" required />
 
-      async function loadModels(){
-        try {
-          const r = await fetch('./models');
-          if (!r.ok) return;
-          const data = await r.json();
-          const items = (data && data.items) || [];
-          items.forEach(m => {
-            const opt = document.createElement('option');
-            opt.value = m.slug;
-            opt.textContent = m.slug;
-            modeloSel.appendChild(opt);
-          });
-        } catch(e) {}
+      <label>Exemplo 1</label>
+      <textarea name="exemplo1"></textarea>
+      <label>Exemplo 2</label>
+      <textarea name="exemplo2"></textarea>
+      <label>Exemplo 3</label>
+      <textarea name="exemplo3"></textarea>
+
+      <div class="actions" style="margin-top:16px">
+        <button class="btn" id="submitBtn">Gerar DFD</button>
+        <span class="status" id="status"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="list" id="subs"></div>
+</div>
+
+<script>
+  const f = document.getElementById('f');
+  const statusEl = document.getElementById('status');
+  const subsEl = document.getElementById('subs');
+  const submitBtn = document.getElementById('submitBtn');
+  const modeloSel = document.getElementById('modeloSlug');
+
+  async function loadModels(){
+    try {
+      const r = await fetch('./models');
+      if (!r.ok) return;
+      const data = await r.json();
+      const items = (data && data.items) || [];
+      items.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.slug;
+        opt.textContent = m.slug;
+        modeloSel.appendChild(opt);
+      });
+    } catch(e) {}
+  }
+
+  function formToPayload(form) {
+    const data = new FormData(form);
+    const obj = Object.fromEntries(data.entries());
+    return obj;
+  }
+
+  async function submit(evt) {
+    evt.preventDefault();
+    submitBtn.disabled = true;
+    statusEl.textContent = 'Enviando...';
+
+    const payload = formToPayload(f);
+
+    const res = await fetch('./submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      let msg = (data && data.message) ? data.message : String(res.status);
+      const details = (data && data.details && data.details.errors);
+      if (Array.isArray(details) && details.length) {
+        msg += ' — ' + details.join(' | ');
       }
+      statusEl.textContent = 'Erro: ' + msg;
+      submitBtn.disabled = false;
+      return;
+    }
 
-      function formToPayload(form) {
-        const data = new FormData(form);
-        const obj = Object.fromEntries(data.entries());
-        return obj;
-      }
+    statusEl.textContent = 'Fila criada, aguardando processamento...';
+    const sid = data.submissionId;
+    let tries = 0;
+    let row = null;
+    while (tries < 120) {
+      await new Promise(r => setTimeout(r, 1000));
+      const r = await fetch('./submissions/' + sid);
+      row = await r.json();
+      if (row.status === 'done' || row.status === 'error') break;
+      tries++;
+    }
+    if (!row) {
+      statusEl.textContent = 'Falha ao acompanhar processamento.';
+      submitBtn.disabled = false;
+      return;
+    }
 
-      async function submit(evt) {
-        evt.preventDefault();
-        submitBtn.disabled = true;
-        statusEl.textContent = 'Enviando...';
+    if (row.status === 'done') {
+      statusEl.textContent = 'Pronto! Download do arquivo abaixo.';
+      const div = document.createElement('div');
+      div.className = 'item';
 
-        const payload = formToPayload(f);
+      const d = JSON.parse(row.result || '{}');
 
-        const res = await fetch('./submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          let msg = (data && data.message) ? data.message : String(res.status);
-          const details = (data && data.details && data.details.errors);
-          if (Array.isArray(details) && details.length) {
-            msg += ' — ' + details.join(' | ');
-          }
-          statusEl.textContent = 'Erro: ' + msg;
-          submitBtn.disabled = false;
-          return;
-        }
+      // exibe nome sem extensão
+      const displayName = (() => {
+        const n = (d.filename || d.filename_pdf || d.filename_docx || '').trim();
+        const i = n.lastIndexOf('.');
+        return i > 0 ? n.slice(0, i) : n;
+      })();
 
-        statusEl.textContent = 'Fila criada, aguardando processamento...';
-        const sid = data.submissionId;
-        let tries = 0;
-        let row = null;
-        while (tries < 120) {
-          await new Promise(r => setTimeout(r, 1000));
-          const r = await fetch('./submissions/' + sid);
-          row = await r.json();
-          if (row.status === 'done' || row.status === 'error') break;
-          tries++;
-        }
-        if (!row) {
-          statusEl.textContent = 'Falha ao acompanhar processamento.';
-          submitBtn.disabled = false;
-          return;
-        }
+      const meta = document.createElement('div');
+      meta.className = 'meta';
 
-        if (row.status === 'done') {
-          statusEl.textContent = 'Pronto! Download do arquivo abaixo.';
-          const div = document.createElement('div');
-          div.className = 'item';
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = 'done';
 
-          const d = JSON.parse(row.result || '{}');
+      const when = new Date(d.generated_at || Date.now()).toLocaleString();
+      const title = document.createElement('span');
+      title.textContent = ` ${displayName} — ${when}`;
 
-          const meta = document.createElement('div');
-          meta.innerHTML = '<span class="badge">done</span> ' + (d.filename || '') + ' — ' + (new Date().toLocaleString());
-          meta.style.marginBottom = '8px';
+      meta.appendChild(badge);
+      meta.appendChild(title);
 
-          const buttons = document.createElement('div');
-          buttons.className = 'btn-row';
+      const buttons = document.createElement('div');
+      buttons.className = 'btn-row';
 
-          // Botão PDF (só se existir PDF)
-          if (d.filename_pdf && d.file_path_pdf) {
-            const btnPdf = document.createElement('button');
-            btnPdf.className = 'btn';
-            btnPdf.textContent = 'Baixar PDF';
-            btnPdf.onclick = async () => {
-              const dl = await fetch('./submissions/' + sid + '/download/pdf', { method: 'POST' });
-              const blob = await dl.blob();
-              const a = document.createElement('a');
-              a.href = URL.createObjectURL(blob);
-              a.download = (d.filename_pdf || ('dfd_' + sid + '.pdf'));
-              a.click();
-              URL.revokeObjectURL(a.href);
-            };
-            buttons.appendChild(btnPdf);
-          }
-
-          // Botão DOCX (sempre deve existir)
-          const btnDocx = document.createElement('button');
-          btnDocx.className = 'btn secondary';
-          btnDocx.textContent = 'Baixar DOCX';
-          btnDocx.onclick = async () => {
-            const dl = await fetch('./submissions/' + sid + '/download/docx', { method: 'POST' });
+      // Botão PDF (se existir)
+      if (d.filename_pdf && d.file_path_pdf) {
+        const btnPdf = document.createElement('button');
+        btnPdf.className = 'btn';
+        btnPdf.textContent = 'Baixar PDF';
+        btnPdf.onclick = async () => {
+          try {
+            const dl = await fetch('./submissions/' + sid + '/download/pdf', { method: 'POST' });
+            if (!dl.ok) throw new Error('Falha no download (PDF)');
             const blob = await dl.blob();
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = (d.filename_docx || ('dfd_' + sid + '.docx'));
+            a.download = (d.filename_pdf || ('dfd_' + sid + '.pdf'));
             a.click();
             URL.revokeObjectURL(a.href);
-          };
-
-          buttons.appendChild(btnDocx);
-
-          div.appendChild(meta);
-          div.appendChild(buttons);
-          subsEl.prepend(div);
-        } else {
-          statusEl.textContent = 'Erro ao gerar: ' + (row.error || 'desconhecido');
-        }
-        submitBtn.disabled = false;
+          } catch (e) {
+            alert('Não foi possível baixar o PDF.');
+          }
+        };
+        buttons.appendChild(btnPdf);
       }
 
-      loadModels();
-      f.addEventListener('submit', submit);
-    </script>
-    """
+      // Botão DOCX (sempre deve existir)
+      const btnDocx = document.createElement('button');
+      btnDocx.className = 'btn secondary';
+      btnDocx.textContent = 'Baixar DOCX';
+      btnDocx.onclick = async () => {
+        try {
+          const dl = await fetch('./submissions/' + sid + '/download/docx', { method: 'POST' });
+          if (!dl.ok) throw new Error('Falha no download (DOCX)');
+          const blob = await dl.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = (d.filename_docx || ('dfd_' + sid + '.docx'));
+          a.click();
+          URL.revokeObjectURL(a.href);
+        } catch (e) {
+          alert('Não foi possível baixar o DOCX.');
+        }
+      };
+
+      buttons.appendChild(btnDocx);
+
+      div.appendChild(meta);
+      div.appendChild(buttons);
+      subsEl.prepend(div);
+    } else {
+      statusEl.textContent = 'Erro ao gerar: ' + (row.error || 'desconhecido');
+    }
+    submitBtn.disabled = false;
+  }
+
+  loadModels();
+  f.addEventListener('submit', submit);
+</script>
+"""
+
     return HTMLResponse(html)
