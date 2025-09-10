@@ -182,7 +182,7 @@ export default function App() {
               A
             </div>
             <div className="font-semibold tracking-tight">
-              Portal <span className="text-sky-700">AGEPAR</span>
+              Plataforma <span className="text-sky-700">AGEPAR</span>
             </div>
           </Link>
 

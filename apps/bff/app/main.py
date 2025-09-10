@@ -195,7 +195,7 @@ def demo_home() -> HTMLResponse:
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Portal AGEPAR — Demo</title>
+    <title>Plataforma AGEPAR — Demo</title>
     <style>
       html,body { height:100%; margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial; }
       .wrap { height:100%; display:flex; align-items:center; justify-content:center; background: #0ea5e9; color:#fff; }
@@ -207,7 +207,7 @@ def demo_home() -> HTMLResponse:
   <body>
     <div class="wrap">
       <div class="card">
-        <h1>Bem-vindo ao Portal AGEPAR (demo)</h1>
+        <h1>Bem-vindo à Plataforma AGEPAR (demo)</h1>
         <p>Este conteúdo está servido pelo BFF e embutido via &lt;iframe&gt;.</p>
       </div>
     </div>
