@@ -33,7 +33,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "1.8.0"
+DFD_VERSION = "1.9.0"
 REQUIRED_ROLES = ("automations.dfd",)
 
 # Diretório com os modelos DOCX por diretoria
@@ -271,6 +271,7 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         logger.info("[DFD] Placeholders detectados (%d): %s", len(placeholders), placeholders)
         logger.info("[DFD] Assunto final: %s", assunto_final)
 
+        # Gera DOCX
         docx_out = f"{out_dir}/{sid}.docx"
         render_docx_template(tpl_path, ctx, docx_out)
         try:
@@ -279,19 +280,27 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             size_docx = -1
         logger.info("[DFD] DOCX gerado | path=%s | size=%d", docx_out, size_docx)
 
+        # Tenta PDF
         pdf_out = f"{out_dir}/{sid}.pdf"
         filename_docx = f"{base}_{today_iso}.docx"
         filename_pdf = f"{base}_{today_iso}.pdf"
 
-        file_path = docx_out
-        filename = filename_docx
-        if convert_docx_to_pdf(docx_out, pdf_out):
-            file_path = pdf_out
-            filename = filename_pdf
+        pdf_ok = convert_docx_to_pdf(docx_out, pdf_out)
+
+        # Compat primário (mantém rota antiga funcionando)
+        file_path = pdf_out if pdf_ok else docx_out
+        filename = filename_pdf if pdf_ok else filename_docx
 
         result = {
+            # primários (retrocompat)
             "file_path": file_path,
             "filename": filename,
+            # novos campos explícitos
+            "file_path_docx": docx_out,
+            "filename_docx": filename_docx,
+            "file_path_pdf": pdf_out if pdf_ok else None,
+            "filename_pdf": filename_pdf if pdf_ok else None,
+            # meta
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "engine": f"{KIND}@{DFD_VERSION}",
         }
@@ -383,6 +392,7 @@ async def download_result(
     sid: str,
     user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
 ):
+    """Rota antiga: baixa o arquivo “primário” (PDF se existir, senão DOCX)."""
     try:
         row = get_submission(sid)
     except Exception as e:
@@ -414,6 +424,57 @@ async def download_result(
         )
     except Exception as e:
         logger.exception("download error")
+        return err_json(500, code="download_error", message="Falha ao preparar o download.", details=str(e))
+
+
+@router.post("/submissions/{sid}/download/{fmt}")
+async def download_result_fmt(
+    sid: str,
+    fmt: str,
+    user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
+):
+    """Novo: baixa especificamente PDF ou DOCX."""
+    if fmt not in ("pdf", "docx"):
+        return err_json(400, code="bad_request", message="Formato inválido. Use 'pdf' ou 'docx'.")
+
+    try:
+        row = get_submission(sid)
+    except Exception as e:
+        logger.exception("get_submission (download fmt) failed")
+        return err_json(500, code="storage_error", message="Falha ao consultar submissão.", details=str(e))
+
+    if not row:
+        return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
+    if row.get("actor_cpf") != user.get("cpf"):
+        return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+    if row.get("status") != "done":
+        return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
+
+    try:
+        result = json.loads(row.get("result") or "{}")
+        if fmt == "pdf":
+            file_path = result.get("file_path_pdf") or None
+            filename = result.get("filename_pdf") or None
+            if not file_path or not filename:
+                return err_json(409, code="not_available", message="PDF não disponível para esta submissão.")
+        else:
+            file_path = result.get("file_path_docx") or result.get("file_path")  # fallback
+            filename = result.get("filename_docx") or (result.get("filename") or f"dfd_{sid}.docx")
+
+        if not file_path or not os.path.exists(file_path):
+            return err_json(410, code="file_not_found", message="Arquivo não está mais disponível.", details={"sid": sid, "fmt": fmt})
+
+        with open(file_path, "rb") as f:
+            data = f.read()
+
+        media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        return StreamingResponse(
+            BytesIO(data),
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        logger.exception("download fmt error")
         return err_json(500, code="download_error", message="Falha ao preparar o download.", details=str(e))
 
 
@@ -467,12 +528,14 @@ async def dfd_ui(request: Request):
       .col { flex:1; }
       .actions { display:flex; gap: 12px; align-items:center; }
       .btn { background: var(--pri); color:#fff; border:none; border-radius: 10px; padding: 10px 16px; cursor:pointer; }
+      .btn.secondary { background: #334155; }
       .btn[disabled] { opacity:.6; cursor: not-allowed; }
       .note { font-size:12px; color:var(--muted); }
       .status { margin-top:12px; font-size:13px; }
       .list { margin-top: 24px; }
       .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 8px; background:#fff; }
       .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; }
+      .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
     </style>
     <div class="wrap">
       <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
@@ -594,23 +657,46 @@ async def dfd_ui(request: Request):
 
           const meta = document.createElement('div');
           meta.innerHTML = '<span class="badge">done</span> ' + (d.filename || '') + ' — ' + (new Date().toLocaleString());
-          meta.style.marginBottom = '8px'; // espaço entre nome e botão
+          meta.style.marginBottom = '8px';
 
-          const btn = document.createElement('button');
-          btn.className = 'btn';
-          btn.textContent = 'Baixar arquivo';
-          btn.onclick = async () => {
-            const dl = await fetch('./submissions/' + sid + '/download', { method: 'POST' });
+          const buttons = document.createElement('div');
+          buttons.className = 'btn-row';
+
+          // Botão PDF (só se existir PDF)
+          if (d.filename_pdf && d.file_path_pdf) {
+            const btnPdf = document.createElement('button');
+            btnPdf.className = 'btn';
+            btnPdf.textContent = 'Baixar PDF';
+            btnPdf.onclick = async () => {
+              const dl = await fetch('./submissions/' + sid + '/download/pdf', { method: 'POST' });
+              const blob = await dl.blob();
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = (d.filename_pdf || ('dfd_' + sid + '.pdf'));
+              a.click();
+              URL.revokeObjectURL(a.href);
+            };
+            buttons.appendChild(btnPdf);
+          }
+
+          // Botão DOCX (sempre deve existir)
+          const btnDocx = document.createElement('button');
+          btnDocx.className = 'btn secondary';
+          btnDocx.textContent = 'Baixar DOCX';
+          btnDocx.onclick = async () => {
+            const dl = await fetch('./submissions/' + sid + '/download/docx', { method: 'POST' });
             const blob = await dl.blob();
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = (d.filename || ('dfd_' + sid));
+            a.download = (d.filename_docx || ('dfd_' + sid + '.docx'));
             a.click();
             URL.revokeObjectURL(a.href);
           };
 
+          buttons.appendChild(btnDocx);
+
           div.appendChild(meta);
-          div.appendChild(btn);
+          div.appendChild(buttons);
           subsEl.prepend(div);
         } else {
           statusEl.textContent = 'Erro ao gerar: ' + (row.error || 'desconhecido');
