@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import type { Catalog, Block } from "@/types";
+import { userCanSeeBlock } from "@/types";
+import { useAuth } from "@/auth/AuthProvider";
 
-/** Pega o path “principal” do bloco (prefere navigation[0].path, cai pra routes[0].path). */
+/** Caminho “principal” do bloco (prefere navigation[0].path, cai pra routes[0].path). */
 function primaryPathOf(block: Block): string | null {
   const nav0 = block.navigation?.[0]?.path;
   const rt0 = block.routes?.[0]?.path;
@@ -10,36 +12,33 @@ function primaryPathOf(block: Block): string | null {
 }
 
 /**
- * Página de categoria:
+ * Página da categoria:
  * - Lê o :id da URL
  * - Busca a categoria por id no catálogo
- * - Lista os blocos cujo block.categoryId === id (ignorando hidden)
+ * - Lista APENAS os blocos visíveis para o usuário atual (RBAC), ignorando hidden
+ * - Preserva a ordem dos blocos exatamente como vem no catálogo (sem sort manual)
  */
 export default function CategoryView({ catalog }: { catalog: Catalog | null }) {
-  // Na rota, use "/categoria/:id" → aqui lemos "id"
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
+  const { user } = useAuth(); // <- pega o usuário autenticado (tem roles, is_superuser, etc.)
 
-  // Carregando catálogo?
-  if (!catalog) return <div className="p-6">Carregando catálogo…</div>;
+  if (!catalog) {
+    return <div className="p-6">Carregando catálogo…</div>;
+  }
 
-  // Procura a categoria pelo "id"
   const category = useMemo(
     () => catalog.categories?.find((c) => c.id === id),
     [catalog, id]
   );
 
-  // Filtra blocos dessa categoria; ignora blocos "hidden"; ordena por "order" e nome
+  // Filtra os blocos desta categoria aplicando RBAC (userCanSeeBlock)
   const blocks = useMemo(() => {
-    const all = (catalog.blocks || []).filter(
-      (b) => b.categoryId === id && !b.hidden
+    return (catalog.blocks || []).filter(
+      (b) => b.categoryId === id && userCanSeeBlock(user ?? null, b)
     );
-    return all.sort((a, b) => {
-      const ao = a.order ?? 9999;
-      const bo = b.order ?? 9999;
-      return ao - bo || a.displayName.localeCompare(b.displayName);
-    });
-  }, [catalog, id]);
+    // OBS: Sem sort extra — mantemos a ordem já definida no JSON do catálogo
+  }, [catalog, id, user]);
 
   if (!category) {
     return (
@@ -62,7 +61,7 @@ export default function CategoryView({ catalog }: { catalog: Catalog | null }) {
       </div>
 
       {blocks.length === 0 ? (
-        <div className="text-slate-600">Nenhuma automação nesta categoria.</div>
+        <div className="text-slate-600">Nenhuma automação disponível nesta categoria para o seu perfil.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {blocks.map((b) => {
@@ -74,13 +73,15 @@ export default function CategoryView({ catalog }: { catalog: Catalog | null }) {
                 disabled={disabled}
                 onClick={() => to && nav(to)}
                 className={[
-                  "group text-left rounded-2xl border p-4 bg-white shadow-sm hover:shadow-md transition w-full",
-                  disabled ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-0.5",
+                  "group text-left rounded-2xl border p-4 bg-white shadow-sm transition w-full",
+                  disabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:shadow-md hover:-translate-y-0.5",
                 ].join(" ")}
-                title={b.description || b.displayName}
+                title={b.description || b.displayName || b.name}
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-base font-medium">{b.displayName}</div>
+                  <div className="text-base font-medium">{b.displayName || b.name}</div>
                   <span
                     className={[
                       "text-[10px] font-semibold uppercase rounded-full px-2 py-0.5",
@@ -92,14 +93,17 @@ export default function CategoryView({ catalog }: { catalog: Catalog | null }) {
                     {b.ui.type}
                   </span>
                 </div>
+
                 <div className="mt-1 text-sm text-slate-500">
                   v{b.version} • {b.name}
                 </div>
+
                 {b.description && (
                   <div className="mt-2 text-sm text-slate-600 line-clamp-2">
                     {b.description}
                   </div>
                 )}
+
                 <div className="mt-4">
                   <span className="inline-flex items-center text-sm font-medium text-sky-700 group-hover:underline">
                     {disabled ? "Indisponível" : "Ir para automação →"}
