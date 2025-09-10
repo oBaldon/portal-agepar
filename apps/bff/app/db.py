@@ -72,6 +72,7 @@ def init_db() -> None:
         cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_kind_created ON submissions (kind, created_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_actor_cpf_created ON submissions (actor_cpf, created_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS ix_audits_at ON audits (at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_actor_email_created ON submissions (actor_email, created_at DESC)")
 
 
 def insert_submission(sub: Dict[str, Any]) -> None:
@@ -117,6 +118,7 @@ def get_submission(id: str) -> Optional[Dict[str, Any]]:
 def list_submissions(
     kind: Optional[str] = None,
     actor_cpf: Optional[str] = None,
+    actor_email: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
 ) -> List[Dict[str, Any]]:
@@ -125,16 +127,20 @@ def list_submissions(
     if kind:
         q += " AND kind = ?"
         params += (kind,)
-    if actor_cpf:
+    # Prioriza CPF; se não houver, cai para e-mail
+    if actor_cpf is not None:
         q += " AND actor_cpf = ?"
         params += (actor_cpf,)
+    elif actor_email is not None:
+        q += " AND actor_email = ?"
+        params += (actor_email,)
     q += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
     params += (limit, offset)
 
     with _conn() as con:
         cur = con.execute(q, params)
-        rows = [dict(r) for r in cur.fetchall()]
-        return rows
+        return [dict(r) for r in cur.fetchall()]
+
 
 
 def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any]) -> None:

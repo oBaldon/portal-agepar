@@ -86,6 +86,7 @@ def _get_model_path(slug: str) -> Optional[str]:
 # ---------------------- Models ----------------------
 MAX_ASSUNTO_LEN = 200  # agora representa o OBJETO digitado
 
+
 class DfdIn(BaseModel):
     """Campos mínimos para o MVP do DFD."""
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
@@ -191,12 +192,32 @@ async def list_my_submissions(
     limit: int = 50,
     offset: int = 0,
 ):
+    # 1) Identidade do usuário: prioriza CPF; se não houver, usa e-mail.
+    cpf = (user.get("cpf") or "").strip() or None
+    email = (user.get("email") or "").strip() or None
+
+    # 2) Se não houver CPF nem e-mail, não prossegue (evita listar tudo por engano).
+    if not cpf and not email:
+        return err_json(
+            422,
+            code="identity_missing",
+            message="Não foi possível identificar o usuário para filtrar as submissões (sem CPF e e-mail). Faça login novamente."
+        )
+
     try:
-        rows = list_submissions(kind=KIND, actor_cpf=user.get("cpf"), limit=limit, offset=offset)
+        # 3) Busca filtrando por CPF; se não houver CPF, cai para e-mail.
+        rows = list_submissions(
+            kind=KIND,
+            actor_cpf=cpf,
+            actor_email=None if cpf else email,
+            limit=limit,
+            offset=offset,
+        )
         return {"items": rows, "limit": limit, "offset": offset}
     except Exception as e:
         logger.exception("list_submissions storage error")
         return err_json(500, code="storage_error", message="Falha ao consultar submissões.", details=str(e))
+
 
 
 @router.get("/submissions/{sid}")
@@ -303,6 +324,8 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             # meta
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "engine": f"{KIND}@{DFD_VERSION}",
+            # opcionalmente, persistimos o assunto final para a tela de histórico
+            "assunto": assunto_final,
         }
         update_submission(sid, status="done", result=json.dumps(result, ensure_ascii=False), error=None)
         add_audit(KIND, "completed", actor, {"sid": sid, "filename": filename})
@@ -521,6 +544,7 @@ async def dfd_ui(request: Request):
   body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
   .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
   h1 { font-size: 20px; margin: 0 0 12px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
   .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
   label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
   input, textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
@@ -533,6 +557,7 @@ async def dfd_ui(request: Request):
   .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
   .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
   .btn.secondary:hover { background:#f8fafc; }
+  .btn.small { padding: 8px 12px; font-size: 12px; }
   .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
   .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
   .note { font-size:12px; color:var(--muted); }
@@ -562,7 +587,11 @@ async def dfd_ui(request: Request):
 </style>
 
 <div class="wrap">
-  <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
+  <div class="header">
+    <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
+    <a class="btn secondary small" href="/api/automations/dfd/ui/history" rel="noopener">Meus DFDs</a>
+  </div>
+
   <div class="card">
     <form id="f">
       <div class="row">
@@ -803,5 +832,275 @@ async def dfd_ui(request: Request):
   f.addEventListener('submit', submit);
 </script>
 """
+    return HTMLResponse(html)
 
+
+@router.get("/ui/history")
+@router.get("/ui/history/")
+async def dfd_history_ui(request: Request):
+    # Reaproveita o guard de RBAC para esta página também
+    checker = require_roles_any(*REQUIRED_ROLES)
+    try:
+        checker(request)
+    except HTTPException as he:
+        status = he.status_code
+        msg = "Faça login para acessar esta automação." if status == 401 else "Você não tem permissão para acessar esta automação."
+        html_err = f"""<!doctype html><meta charset="utf-8"/><title>Acesso</title>
+        <div style="font-family:system-ui;padding:24px">
+          <h1 style="margin:0 0 8px">{status}</h1>
+          <p style="color:#334155">{msg}</p>
+        </div>"""
+        return HTMLResponse(html_err, status_code=status)
+
+    html = """<!doctype html>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Histórico — Meus DFDs</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 12px 0 14px; }
+  .toolbar input, .toolbar select { padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+  .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.ghost { background:transparent; color:#334155; border:1px solid #cbd5e1; }
+  .btn.small { padding:8px 12px; font-size:12px; }
+  .btn[disabled] { opacity:.6; cursor:not-allowed; }
+  table { width:100%; border-collapse: collapse; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; vertical-align: top; }
+  th { font-size:12px; color:#475569; text-transform: uppercase; letter-spacing:.02em; }
+  .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; }
+  .badge.err { background:#fee2e2; color:#991b1b; }
+  .badge.warn{ background:#fef3c7; color:#92400e; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .muted { color:#64748b; }
+</style>
+
+<div class="wrap">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <h1>Histórico — Meus DFDs</h1>
+    <a href="../ui" class="btn secondary small">← Voltar ao formulário</a>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div class="toolbar">
+      <input id="q" placeholder="Buscar por nº do memorando, objeto, assunto…" style="flex:1; min-width:220px;" />
+      <select id="sort">
+        <option value="date_desc">Mais recentes</option>
+        <option value="date_asc">Mais antigos</option>
+        <option value="numero_asc">Número (A→Z)</option>
+        <option value="numero_desc">Número (Z→A)</option>
+      </select>
+      <button id="refresh" class="btn ghost">Recarregar</button>
+      <button id="more" class="btn secondary">Carregar mais</button>
+    </div>
+
+    <div style="overflow:auto;">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th style="width:160px">Data</th>
+            <th style="width:160px">Nº Memorando</th>
+            <th>Assunto</th>
+            <th style="width:120px">Status</th>
+            <th style="width:220px">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="empty" class="muted" style="display:none; padding:8px 0;">Nenhuma submissão encontrada.</div>
+  </div>
+</div>
+
+<script>
+  const tbody = document.getElementById('tbody');
+  const emptyEl = document.getElementById('empty');
+  const q = document.getElementById('q');
+  const sortSel = document.getElementById('sort');
+  const btnMore = document.getElementById('more');
+  const btnRefresh = document.getElementById('refresh');
+
+  let items = [];     // acumulado do servidor
+  let filtered = [];  // filtrado + ordenado
+  let offset = 0;
+  const limit = 20;
+  let loading = false;
+  let end = false;    // recebeu menos que limit
+
+  function parseJSON(s, fallback) {
+    try { return JSON.parse(s || ""); } catch { return fallback; }
+  }
+  function buildAssuntoFrom(row) {
+    // tenta result.assunto; cai para payload: objeto + pcaAno; senão vazio
+    const result = parseJSON(row.result || "{}", {});
+    if (result && result.assunto) return result.assunto;
+    const payload = parseJSON(row.payload || "{}", {});
+    const obj = payload.assunto || "";
+    const ano = payload.pcaAno || payload.pca_ano || "";
+    return (obj && ano) ? (`DFD - PCA ${ano} - ${obj}`) : (obj || "");
+  }
+  function rowDate(row) {
+    const result = parseJSON(row.result || "{}", {});
+    const when = result.generated_at || row.updated_at || row.created_at;
+    return when ? new Date(when) : new Date();
+  }
+  function rowNumero(row) {
+    const payload = parseJSON(row.payload || "{}", {});
+    return payload.numero || "";
+  }
+
+  function renderTable() {
+    tbody.innerHTML = "";
+    if (filtered.length === 0) {
+      emptyEl.style.display = "";
+      return;
+    }
+    emptyEl.style.display = "none";
+
+    for (const row of filtered) {
+      const tr = document.createElement("tr");
+
+      // Data
+      const tdDate = document.createElement("td");
+      tdDate.textContent = rowDate(row).toLocaleString();
+      tr.appendChild(tdDate);
+
+      // Número
+      const tdNum = document.createElement("td");
+      tdNum.textContent = rowNumero(row);
+      tr.appendChild(tdNum);
+
+      // Assunto
+      const tdAss = document.createElement("td");
+      tdAss.textContent = buildAssuntoFrom(row);
+      tr.appendChild(tdAss);
+
+      // Status
+      const tdSt = document.createElement("td");
+      const st = row.status || "queued";
+      const badge = document.createElement("span");
+      badge.className = "badge" + (st === "error" ? " err" : (st !== "done" ? " warn" : ""));
+      badge.textContent = st;
+      tdSt.appendChild(badge);
+      tr.appendChild(tdSt);
+
+      // Ações
+      const tdAct = document.createElement("td");
+      const btns = document.createElement("div");
+      btns.className = "btn-row";
+
+      if (st === "done") {
+        const d = parseJSON(row.result || "{}", {});
+        if (d.filename_pdf && d.file_path_pdf) {
+          const bPdf = document.createElement("button");
+          bPdf.className = "btn small";
+          bPdf.textContent = "PDF";
+          bPdf.onclick = async () => {
+            const r = await fetch('../submissions/' + row.id + '/download/pdf', { method: 'POST' });
+            if (!r.ok) return alert('Falha no download (PDF).');
+            const blob = await r.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = d.filename_pdf || ('dfd_' + row.id + '.pdf');
+            a.click();
+            URL.revokeObjectURL(a.href);
+          };
+          btns.appendChild(bPdf);
+        }
+        const bDocx = document.createElement("button");
+        bDocx.className = "btn secondary small";
+        bDocx.textContent = "DOCX";
+        bDocx.onclick = async () => {
+          const r = await fetch('../submissions/' + row.id + '/download/docx', { method: 'POST' });
+          if (!r.ok) return alert('Falha no download (DOCX).');
+          const blob = await r.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = (d.filename_docx || ('dfd_' + row.id + '.docx'));
+          a.click();
+          URL.revokeObjectURL(a.href);
+        };
+        btns.appendChild(bDocx);
+      } else {
+        const span = document.createElement("span");
+        span.className = "muted";
+        span.textContent = "Processando…";
+        btns.appendChild(span);
+      }
+
+      tdAct.appendChild(btns);
+      tr.appendChild(tdAct);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function applyFilterAndSort() {
+    const term = (q.value || "").trim().toLowerCase();
+    const sorter = sortSel.value;
+
+    // filtro
+    filtered = items.filter(row => {
+      const num = rowNumero(row).toLowerCase();
+      const ass = buildAssuntoFrom(row).toLowerCase();
+      return !term || num.includes(term) || ass.includes(term);
+    });
+
+    // ordenação
+    filtered.sort((a, b) => {
+      if (sorter === "date_desc" || sorter === "date_asc") {
+        const da = rowDate(a).getTime();
+        const db = rowDate(b).getTime();
+        return sorter === "date_desc" ? (db - da) : (da - db);
+      }
+      const na = rowNumero(a);
+      const nb = rowNumero(b);
+      return sorter === "numero_desc"
+        ? nb.localeCompare(na, 'pt-BR', { numeric: true, sensitivity: 'base' })
+        : na.localeCompare(nb, 'pt-BR', { numeric: true, sensitivity: 'base' });
+    });
+
+    renderTable();
+  }
+
+  async function fetchPage({ reset=false } = {}) {
+    if (loading || end) return;
+    loading = true;
+    try {
+      if (reset) {
+        items = [];
+        offset = 0;
+        end = false;
+      }
+      const r = await fetch(`../submissions?limit=${limit}&offset=${offset}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      const rows = (data && data.items) || [];
+      items = items.concat(rows);
+      offset += rows.length;
+      if (rows.length < limit) end = true;
+      applyFilterAndSort();
+      btnMore.disabled = end;
+      btnMore.textContent = end ? "Fim da lista" : "Carregar mais";
+    } finally {
+      loading = false;
+    }
+  }
+
+  // eventos
+  btnMore.addEventListener('click', (e) => { e.preventDefault(); fetchPage(); });
+  btnRefresh.addEventListener('click', (e) => { e.preventDefault(); fetchPage({ reset:true }); });
+  q.addEventListener('input', () => { applyFilterAndSort(); });
+  sortSel.addEventListener('change', () => { applyFilterAndSort(); });
+
+  // init
+  fetchPage({ reset:true });
+</script>
+"""
     return HTMLResponse(html)
