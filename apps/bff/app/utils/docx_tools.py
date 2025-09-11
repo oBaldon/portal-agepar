@@ -195,8 +195,8 @@ def _append_body_sections_xml_et(
     Monta o corpo com a organização e o tom do DFD antigo, aplicado aos novos campos:
       - Introdução
       - Diretoria demandante
-      - Objeto (multilinha)
       - Alinhamento com o Planejamento Estratégico (multilinha)
+      - Objeto (multilinha)
       - Itens (1..N) com sub-blocos:
           * Descrição sucinta do objeto
           * Justificativa da necessidade
@@ -233,16 +233,8 @@ def _append_body_sections_xml_et(
     if dire:
         elems.append(_mk_label_value("Diretoria demandante", dire))
         elems.append(ET.Element(_w("p")))
-
-    # 2) Objeto
-    obj = str(context.get("objeto") or "").strip()
-    if obj:
-        elems.append(_mk_p(text="Objeto", bold=True))
-        for line in _split_lines(obj):
-            elems.append(_mk_p(text=line, indent_level=1))
-        elems.append(ET.Element(_w("p")))
-
-    # 3) Alinhamento com o Planejamento Estratégico
+    
+    # 2) Alinhamento com o Planejamento Estratégico
     alin = str(context.get("alinhamento_pe") or "").strip()
     if alin:
         elems.append(_mk_p(text="Alinhamento com o Planejamento Estratégico", bold=True))
@@ -250,10 +242,18 @@ def _append_body_sections_xml_et(
             elems.append(_mk_p(text=line, indent_level=1))
         elems.append(ET.Element(_w("p")))
 
+    # 3) Objeto
+    obj = str(context.get("objeto") or "").strip()
+    if obj:
+        elems.append(_mk_p(text="Objeto", bold=True))
+        for line in _split_lines(obj):
+            elems.append(_mk_p(text=line, indent_level=1))
+        elems.append(ET.Element(_w("p")))
+
     # 4) Itens
     itens = context.get("itens") or []
     if isinstance(itens, list) and itens:
-        elems.append(_mk_p(text="Itens", bold=True))
+        #elems.append(_mk_p(text="Itens", bold=True))
         elems.append(ET.Element(_w("p")))
 
         for i, it in enumerate(itens, start=1):

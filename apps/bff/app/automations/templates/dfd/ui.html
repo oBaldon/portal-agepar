@@ -65,7 +65,6 @@
           <select name="modeloSlug" id="modeloSlug" required>
             <option value="">-- Selecionar --</option>
           </select>
-          <div class="note">Timbre do documento.</div>
         </div>
 
         <div class="col">
@@ -86,7 +85,7 @@
         </span>
       </label>
       <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
-      <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [assunto]</code>.</div>
+      <!-- <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [assunto]</code>.</div> -->
 
       <label>Ano de execução do PCA
         <span class="inline-help">
@@ -107,6 +106,16 @@
       <select name="diretoriaDemandante" id="diretoriaDemandante" required>
         <option value="">-- Selecionar --</option>
       </select>
+      
+      <label>Alinhamento com o <em>Planejamento Estratégico</em>
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button>
+          <span class="tip">Explique como a demanda se conecta a objetivos/indicadores estratégicos da organização.</span>
+        </span>
+      </label>
+      <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico"></textarea>
+
+      <hr class="hr" />
 
       <label>Objeto
         <span class="inline-help">
@@ -115,16 +124,6 @@
         </span>
       </label>
       <textarea name="objeto" id="objeto" placeholder="Ex.: Licenças do sistema Z" required></textarea>
-
-      <hr class="hr" />
-
-      <label>Alinhamento com o <em>Planejamento Estratégico</em>
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button>
-          <span class="tip">Explique como a demanda se conecta a objetivos/indicadores estratégicos da organização.</span>
-        </span>
-      </label>
-      <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico"></textarea>
 
       <hr class="hr" />
 
@@ -210,6 +209,12 @@
       o.textContent = v;
       dirDemSel.appendChild(o);
     });
+  }
+
+  function smoothScrollTo(el) {
+    if (!el) return;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' });
   }
 
   // ------- Itens (dinâmico) -------
@@ -440,8 +445,8 @@
       assunto: f.assunto.value || "",
       pcaAno: f.pcaAno.value || "",
       diretoriaDemandante: f.diretoriaDemandante.value || "",
-      objeto: f.objeto.value || "",
-      alinhamentoPE: f.alinhamentoPE.value || ""
+      alinhamentoPE: f.alinhamentoPE.value || "",
+      objeto: f.objeto.value || ""
     };
     const items = Array.from(itemsEl.children).map(div => {
       const pick = (sel) => div.querySelector(sel);
@@ -470,7 +475,7 @@
     evt.preventDefault();
     submitBtn.disabled = true;
     statusEl.textContent = 'Enviando...';
-
+    smoothScrollTo(subsEl);
     ensureOneItem();
     const payload = formToPayload();
 
@@ -487,6 +492,7 @@
         msg += ' — ' + details.join(' | ');
       }
       statusEl.textContent = 'Erro: ' + msg;
+      smoothScrollTo(statusEl);
       submitBtn.disabled = false;
       return;
     }
@@ -586,8 +592,12 @@
       div.appendChild(meta);
       div.appendChild(buttons);
       subsEl.prepend(div);
+      smoothScrollTo(div);
+      const firstBtn = div.querySelector('button');
+      if (firstBtn) firstBtn.focus();
     } else {
       statusEl.textContent = 'Erro ao gerar: ' + (row.error || 'desconhecido');
+      smoothScrollTo(statusEl);
     }
     submitBtn.disabled = false;
   }

@@ -218,8 +218,8 @@ class DfdIn(BaseModel):
 
     # Identificação
     diretoria_demandante: str = Field(..., alias="diretoriaDemandante")
-    objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
     alinhamento_pe: Optional[str] = Field("", alias="alinhamentoPE", max_length=MAX_TEXTO_LONGO)
+    objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
 
     # Itens
     items: List[Item] = Field(..., min_length=1)
@@ -247,8 +247,8 @@ SCHEMA = {
         {"name": "assunto", "type": "text", "label": "Assunto"},
         {"name": "pcaAno", "type": "text", "label": "Ano de execução do PCA"},
         {"name": "diretoriaDemandante", "type": "select", "label": "Diretoria demandante"},
-        {"name": "objeto", "type": "textarea", "label": "Objeto"},
         {"name": "alinhamentoPE", "type": "textarea", "label": "Alinhamento com o Planejamento Estratégico"},
+        {"name": "objeto", "type": "textarea", "label": "Objeto"},
         {"name": "items", "type": "array", "label": "Itens"},
     ],
 }
@@ -263,9 +263,9 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "pca_ano": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
     "diretoriaDemandante": {"label": "Diretoria demandante"},
     "diretoria_demandante": {"label": "Diretoria demandante"},
-    "objeto": {"label": "Objeto", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
     "alinhamentoPE": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
     "alinhamento_pe": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
+    "objeto": {"label": "Objeto", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
     # Itens (nomes finais vêm no último elemento do caminho do erro)
     "descricao": {"label": "Descrição sucinta do objeto"},
     "justificativa": {"label": "Justificativa para aquisição ou contratação"},
@@ -450,8 +450,8 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "data": today_iso,
             # novos campos
             "diretoria_demandante": raw.get("diretoriaDemandante") or "",
-            "objeto": raw.get("objeto") or "",
             "alinhamento_pe": raw.get("alinhamentoPE") or "",
+            "objeto": raw.get("objeto") or "",
             "itens": itens_out,
             "total_geral": round(total_geral, 2),
         }
@@ -533,8 +533,8 @@ async def submit_dfd(
         "assunto": (body.get("assunto") or "").strip(),
         "pcaAno": (body.get("pcaAno") or "").strip(),
         "diretoriaDemandante": none_if_empty(body.get("diretoriaDemandante")),
-        "objeto": (body.get("objeto") or "").strip(),
         "alinhamentoPE": (body.get("alinhamentoPE") or "").strip(),
+        "objeto": (body.get("objeto") or "").strip(),
         "items": body.get("items") or [],
     }
     if not raw["modeloSlug"]:
