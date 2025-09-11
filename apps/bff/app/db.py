@@ -14,11 +14,18 @@ if not DATABASE_URL:
 
 # ----------------------------- conexões -----------------------------
 def _pg():
-    # autocommit=True para manter o comportamento dos helpers
+    """
+    Abre uma conexão Postgres com autocommit (uso simples por helper).
+    Observação: se precisar de pool/conexão persistente, mover para um pool global.
+    """
     return psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row)
 
 # ----------------------------- schema -------------------------------
 def init_db() -> None:
+    """
+    Cria tabelas e índices idempotentes (IF NOT EXISTS).
+    Inclui índices compostos otimizados para consultas por kind+ator.
+    """
     sql = """
     CREATE TABLE IF NOT EXISTS submissions (
       id           TEXT PRIMARY KEY,
@@ -45,12 +52,21 @@ def init_db() -> None:
       meta       JSONB
     );
 
+    -- Índices básicos
     CREATE INDEX IF NOT EXISTS ix_submissions_created_at            ON submissions (created_at DESC);
     CREATE INDEX IF NOT EXISTS ix_submissions_kind_created          ON submissions (kind, created_at DESC);
     CREATE INDEX IF NOT EXISTS ix_submissions_actor_cpf_created     ON submissions (actor_cpf, created_at DESC);
     CREATE INDEX IF NOT EXISTS ix_submissions_actor_email_created   ON submissions (actor_email, created_at DESC);
+
+    -- Índices compostos (consultas típicas: kind + ator + ordenação)
+    CREATE INDEX IF NOT EXISTS ix_submissions_kind_actor_cpf_created
+      ON submissions (kind, actor_cpf, created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_submissions_kind_actor_email_created
+      ON submissions (kind, actor_email, created_at DESC);
+
     CREATE INDEX IF NOT EXISTS ix_automation_audits_at ON automation_audits (at DESC);
 
+    -- Trigger de atualização de updated_at
     CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
     BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;
 
@@ -64,7 +80,7 @@ def init_db() -> None:
 
 # ----------------------------- utils --------------------------------
 def _to_json_value(v: Any) -> Optional[Json]:
-    """Aceita dict/list/str JSON; retorna psycopg.Json ou None."""
+    """Aceita dict/list/str JSON; retorna psycopg.Json ou None (para colunas JSONB)."""
     if v is None:
         return None
     if isinstance(v, (dict, list)):
@@ -73,7 +89,7 @@ def _to_json_value(v: Any) -> Optional[Json]:
         try:
             return Json(json.loads(v))
         except Exception:
-            # Em casos raros, se vier string já JSON válida, o cast do Postgres assume
+            # Em casos raros, manter como string JSON (será serializada com aspas)
             return Json(v)
     return Json(v)
 
@@ -129,7 +145,10 @@ def list_submissions(
     limit: int = 50,
     offset: int = 0,
 ) -> List[Dict[str, Any]]:
-    # Segurança: exige um identificador de ator para não vazar dados
+    """
+    Lista submissões do ator autenticado. Segurança: exige CPF ou e-mail.
+    Em geral chamamos com kind=... para telas por automação.
+    """
     if not actor_cpf and not actor_email:
         raise RuntimeError("Identificador do ator ausente (cpf/email).")
 

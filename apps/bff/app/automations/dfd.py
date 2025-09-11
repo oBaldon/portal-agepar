@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from starlette.responses import StreamingResponse, HTMLResponse
-from pydantic import BaseModel, Field, ConfigDict, ValidationError
+from pydantic import BaseModel, Field, ConfigDict, ValidationError, field_validator, model_validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from uuid import uuid4
@@ -33,10 +33,10 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "1.9.0"
+DFD_VERSION = "2.0.0"
 REQUIRED_ROLES = ("automations.dfd",)
 
-# Diretório com os modelos DOCX por diretoria
+# Diretório com os modelos DOCX por diretoria (timbre)
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
 
 # Diretório com os HTMLs desta automação
@@ -53,7 +53,7 @@ def err_json(status: int, **payload):
 
 
 def _to_obj(x, default=None):
-    """Aceita dict/list/str/bytes; retorna dict/list. Evita quebrar entre SQLite e Postgres."""
+    """Aceita dict/list/str/bytes; retorna dict/list (robusto a SQLite/Postgres)."""
     if x is None:
         return {} if default is None else default
     if isinstance(x, (dict, list)):
@@ -116,6 +116,7 @@ def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
         (not owner_cpf and owner_email and u_email and owner_email == u_email)
     )
 
+
 def _read_html(name: str) -> str:
     """Carrega um arquivo HTML de TPL_DIR."""
     path = TPL_DIR / name
@@ -123,54 +124,161 @@ def _read_html(name: str) -> str:
         return f.read()
 
 
-# ---------------------- Models ----------------------
-MAX_ASSUNTO_LEN = 200  # agora representa o OBJETO digitado
+# ---------------------- Models & Validation ----------------------
+MAX_ASSUNTO_LEN = 200
+MAX_TEXTO_LONGO = 8000
+
+ALLOWED_UNIDADES = {
+    "Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro",
+    "Metro cúbico","Metro linear","Metro quadrado","Milheiro","Miligrama","Mililitro","Outras Unidades de Medidas",
+    "Par","Quilograma","Quilograma do peso drenado","Quilômetro","Rolo","Teste","Tubo","Unidade Internacional","Unitário"
+}
+ALLOWED_PRIORIDADE = {
+    "Alto, quando a impossibilidade de contratação provoca interrupção de processo crítico ou estratégico.",
+    "Médio, quando a impossibilidade de contratação provoca atraso de processo crítico ou estratégico.",
+    "Baixo, quando a impossibilidade de contratação provoca interrupção ou atraso de processo não crítico.",
+    "Muito baixo, quando a continuidade do processo é possível mediante o emprego de uma solução de contorno."
+}
+ALLOWED_SIMNAO = {"Sim", "Não"}
+MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
+REGEX_DATA_PRETENDIDA = re.compile(
+    r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$"
+)
+
+
+class Item(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    descricao: str = Field("", max_length=MAX_TEXTO_LONGO)
+    justificativa: str = Field("", max_length=MAX_TEXTO_LONGO)
+    unidadeMedida: str
+    quantidade: int = Field(0, ge=0)
+    valorUnitario: float = Field(0.0, ge=0.0)
+    valorTotal: Optional[float] = Field(None, ge=0.0)
+    grauPrioridade: str
+    dataPretendida: str
+    haDependencia: str
+    dependenciaQual: Optional[str] = Field(default=None, max_length=MAX_TEXTO_LONGO)
+    riscosNaoContratacao: str = Field("", max_length=MAX_TEXTO_LONGO)
+    renovacaoContrato: str
+
+    @field_validator("unidadeMedida")
+    @classmethod
+    def _valid_um(cls, v: str) -> str:
+        if v and v in ALLOWED_UNIDADES:
+            return v
+        raise ValueError("Unidade de medida inválida.")
+
+    @field_validator("grauPrioridade")
+    @classmethod
+    def _valid_prioridade(cls, v: str) -> str:
+        if v and v in ALLOWED_PRIORIDADE:
+            return v
+        raise ValueError("Grau de prioridade inválido.")
+
+    @field_validator("haDependencia", "renovacaoContrato")
+    @classmethod
+    def _valid_simnao(cls, v: str) -> str:
+        if v and v in ALLOWED_SIMNAO:
+            return v
+        raise ValueError("Valor deve ser 'Sim' ou 'Não'.")
+
+    @field_validator("dataPretendida")
+    @classmethod
+    def _valid_data_fmt(cls, v: str) -> str:
+        if not v:
+            raise ValueError("Informe a data pretendida no formato 'mês de AAAA'.")
+        if not REGEX_DATA_PRETENDIDA.match(v.strip()):
+            raise ValueError("Use o formato 'mês de AAAA' (em minúsculas).")
+        return v
+
+    @model_validator(mode="after")
+    def _normalize_compute(self):
+        # Dependência: se Sim, exige 'dependenciaQual'
+        if self.haDependencia == "Sim" and not (self.dependenciaQual or "").strip():
+            raise ValueError("Campo 'Se Sim, qual?' é obrigatório quando há dependência.")
+        # Valor total sempre recalculado
+        try:
+            qt = int(self.quantidade or 0)
+            vu = float(self.valorUnitario or 0.0)
+        except Exception:
+            qt, vu = 0, 0.0
+        self.valorTotal = round(qt * vu, 2)
+        return self
 
 
 class DfdIn(BaseModel):
-    """Campos mínimos para o MVP do DFD."""
+    """Modelo de entrada do DFD (alinhado à UI atual)."""
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    modelo_slug: str = Field(..., alias="modeloSlug")  # diretoria (nome da pasta)
-    numero: str  # nº do memorando
-
-    # O usuário digita apenas o OBJETO; o assunto final é montado pelo sistema.
-    assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
-
-    # Ano de execução do PCA (4 dígitos)
+    # Cabeçalho
+    modelo_slug: str = Field(..., alias="modeloSlug")  # pasta do timbre
+    numero: str
+    assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)  # compõe o assunto final
     pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")
 
-    # Três campos de texto livres (exemplos)
-    exemplo1: str = Field("", max_length=4000)
-    exemplo2: str = Field("", max_length=4000)
-    exemplo3: str = Field("", max_length=4000)
+    # Identificação
+    diretoria_demandante: str = Field(..., alias="diretoriaDemandante")
+    objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
+    alinhamento_pe: Optional[str] = Field("", alias="alinhamentoPE", max_length=MAX_TEXTO_LONGO)
+
+    # Itens
+    items: List[Item] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def _valid_relacoes(self):
+        # Confere se todas as datas pretendidas usam o mesmo ano do PCA
+        ano = (self.pca_ano or "").strip()
+        for i, it in enumerate(self.items):
+            m = REGEX_DATA_PRETENDIDA.match((it.dataPretendida or "").strip())
+            if not m:
+                raise ValueError(f"Item {i+1}: Data pretendida inválida.")
+            ano_item = m.group(2)
+            if ano_item != ano:
+                raise ValueError(f"Item {i+1}: Data pretendida deve estar no ano do PCA ({ano}).")
+        return self
 
 
 SCHEMA = {
     "title": "DFD — Documento de Formalização da Demanda (MVP)",
     "version": DFD_VERSION,
     "fields": [
-        {"name": "modeloSlug", "type": "select", "label": "Diretoria"},
+        {"name": "modeloSlug", "type": "select", "label": "Timbre"},
         {"name": "numero", "type": "text", "label": "Nº do Memorando"},
-        {"name": "assunto", "type": "text", "label": "Objeto"},
+        {"name": "assunto", "type": "text", "label": "Assunto"},
         {"name": "pcaAno", "type": "text", "label": "Ano de execução do PCA"},
-        {"name": "exemplo1", "type": "textarea", "label": "Exemplo 1"},
-        {"name": "exemplo2", "type": "textarea", "label": "Exemplo 2"},
-        {"name": "exemplo3", "type": "textarea", "label": "Exemplo 3"},
+        {"name": "diretoriaDemandante", "type": "select", "label": "Diretoria demandante"},
+        {"name": "objeto", "type": "textarea", "label": "Objeto"},
+        {"name": "alinhamentoPE", "type": "textarea", "label": "Alinhamento com o Planejamento Estratégico"},
+        {"name": "items", "type": "array", "label": "Itens"},
     ],
 }
 
-# Mapeamento amigável de campos → rótulos/limites (para mensagens de validação)
+# Mapeamento amigável de campos → rótulos (para mensagens de validação)
 FIELD_INFO: Dict[str, Dict[str, Any]] = {
-    "modeloSlug": {"label": "Diretoria"},
-    "modelo_slug": {"label": "Diretoria"},  # nome interno pydantic
+    "modeloSlug": {"label": "Timbre"},
+    "modelo_slug": {"label": "Timbre"},
     "numero": {"label": "Nº do Memorando"},
-    "assunto": {"label": "Objeto", "max_length": MAX_ASSUNTO_LEN, "min_length": 1},
+    "assunto": {"label": "Assunto", "max_length": MAX_ASSUNTO_LEN, "min_length": 1},
     "pcaAno": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
     "pca_ano": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
-    "exemplo1": {"label": "Exemplo 1", "max_length": 4000},
-    "exemplo2": {"label": "Exemplo 2", "max_length": 4000},
-    "exemplo3": {"label": "Exemplo 3", "max_length": 4000},
+    "diretoriaDemandante": {"label": "Diretoria demandante"},
+    "diretoria_demandante": {"label": "Diretoria demandante"},
+    "objeto": {"label": "Objeto", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "alinhamentoPE": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
+    "alinhamento_pe": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
+    # Itens (nomes finais vêm no último elemento do caminho do erro)
+    "descricao": {"label": "Descrição sucinta do objeto"},
+    "justificativa": {"label": "Justificativa para aquisição ou contratação"},
+    "unidadeMedida": {"label": "Unidade de medida do item a ser adquirido ou contratado"},
+    "quantidade": {"label": "Quantidade a ser adquirida ou contratada"},
+    "valorUnitario": {"label": "Estimativa preliminar de valor unitário da contratação (R$)"},
+    "valorTotal": {"label": "Estimativa preliminar de valor total da contratação (auto)"},
+    "grauPrioridade": {"label": "Grau de prioridade da contratação"},
+    "dataPretendida": {"label": "Data pretendida para compra/contratação"},
+    "haDependencia": {"label": "Há vínculo ou dependência com outra contratação?"},
+    "dependenciaQual": {"label": "Se 'Sim', qual?"},
+    "riscosNaoContratacao": {"label": "Riscos da não contratação"},
+    "renovacaoContrato": {"label": "Renovação de contrato"},
 }
 
 
@@ -204,6 +312,7 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
         elif typ == "missing":
             msgs.append(f"Campo '{label}' é obrigatório.")
         else:
+            # Para erros de model_validator (ex.: datas e dependência):
             msgs.append(f"Campo '{label}': {msg}")
     return msgs
 
@@ -313,10 +422,25 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         base = f"dfd_{raw['modeloSlug'].lower()}_{numero_safe}"
         today_iso = datetime.utcnow().date().isoformat()
 
-        # Monta ASSUNTO final: "DFD - PCA <ano> - <objeto>"
-        objeto = (raw.get("assunto") or "").strip()
+        # Monta ASSUNTO final: "DFD - PCA <ano> - <assunto>"
+        assunto_bruto = (raw.get("assunto") or "").strip()
         pca_ano = (raw.get("pcaAno") or "").strip()
-        assunto_final = f"DFD - PCA {pca_ano} - {objeto}"
+        assunto_final = f"DFD - PCA {pca_ano} - {assunto_bruto}"
+
+        # Normaliza itens e total geral (confere total no backend)
+        itens_in = list(raw.get("items") or [])
+        itens_out: List[Dict[str, Any]] = []
+        total_geral = 0.0
+        for i, it in enumerate(itens_in, start=1):
+            try:
+                item = Item(**it)  # revalida item com regras de negócio
+            except ValidationError as ve:
+                # Erro amigável por item
+                update_submission(sid, status="error", error=f"Item {i}: {ve.errors()}")
+                add_audit(KIND, "failed", actor, {"sid": sid, "error": f"item {i} invalid"})
+                return
+            total_geral += float(item.valorTotal or 0.0)
+            itens_out.append(item.model_dump())
 
         ctx = {
             "diretoria": raw["modeloSlug"],
@@ -324,14 +448,20 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "assunto": assunto_final,  # usado no cabeçalho/timbre
             "pca_ano": pca_ano,        # usado no texto introdutório do corpo
             "data": today_iso,
-            "exemplo1": raw.get("exemplo1") or "",
-            "exemplo2": raw.get("exemplo2") or "",
-            "exemplo3": raw.get("exemplo3") or "",
+            # novos campos
+            "diretoria_demandante": raw.get("diretoriaDemandante") or "",
+            "objeto": raw.get("objeto") or "",
+            "alinhamento_pe": raw.get("alinhamentoPE") or "",
+            "itens": itens_out,
+            "total_geral": round(total_geral, 2),
         }
 
         # Log de placeholders (apenas informativo)
-        placeholders = get_docx_placeholders(tpl_path)
-        logger.info("[DFD] Placeholders detectados (%d): %s", len(placeholders), placeholders)
+        try:
+            placeholders = get_docx_placeholders(tpl_path)
+            logger.info("[DFD] Placeholders detectados (%d): %s", len(placeholders), placeholders)
+        except Exception:
+            pass
         logger.info("[DFD] Assunto final: %s", assunto_final)
 
         # Gera DOCX
@@ -366,7 +496,7 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             # meta
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "engine": f"{KIND}@{DFD_VERSION}",
-            # opcionalmente, persistimos o assunto final para a tela de histórico
+            # opcional: assunto final para histórico
             "assunto": assunto_final,
         }
         update_submission(sid, status="done", result=result, error=None)
@@ -400,22 +530,21 @@ async def submit_dfd(
     raw = {
         "modeloSlug": none_if_empty(body.get("modeloSlug")),
         "numero": (body.get("numero") or "").strip(),
-        # usuário digita apenas o OBJETO
         "assunto": (body.get("assunto") or "").strip(),
         "pcaAno": (body.get("pcaAno") or "").strip(),
-        "exemplo1": (body.get("exemplo1") or "").strip(),
-        "exemplo2": (body.get("exemplo2") or "").strip(),
-        "exemplo3": (body.get("exemplo3") or "").strip(),
+        "diretoriaDemandante": none_if_empty(body.get("diretoriaDemandante")),
+        "objeto": (body.get("objeto") or "").strip(),
+        "alinhamentoPE": (body.get("alinhamentoPE") or "").strip(),
+        "items": body.get("items") or [],
     }
     if not raw["modeloSlug"]:
-        return err_json(422, code="validation_error", message="Diretoria é obrigatória.")
+        return err_json(422, code="validation_error", message="Timbre é obrigatório.")
     if not raw["numero"]:
         return err_json(422, code="validation_error", message="Número do memorando é obrigatório.")
 
     try:
         payload = DfdIn(**raw)
     except ValidationError as ve:
-        # Mensagens detalhadas por campo
         friendly = _format_validation_errors(ve)
         logger.info("[DFD] validation_error: %s", friendly)
         return err_json(422, code="validation_error", message="Erro de validação nos campos.", details={"errors": friendly})
@@ -431,7 +560,6 @@ async def submit_dfd(
         "actor_cpf": user.get("cpf"),
         "actor_nome": user.get("nome"),
         "actor_email": user.get("email"),
-        # passa dict; o db.py (Postgres) persiste como JSONB
         "payload": payload.model_dump(by_alias=True, exclude_none=True),
         "status": "queued",
         "result": None,
@@ -579,7 +707,6 @@ async def dfd_ui(request: Request):
         </div>"""
         return HTMLResponse(html_err, status_code=status)
 
-    # HTML simples, sem f-string (para não conflitar com {{ }} do JS/CSS)
     html = _read_html("ui.html")
     return HTMLResponse(html)
 

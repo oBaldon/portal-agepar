@@ -25,6 +25,7 @@
   .badge.warn{ background:#fef3c7; color:#92400e; }
   .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
   .muted { color:#64748b; }
+  .subline { color:#64748b; font-size:12px; margin-top:4px; }
 </style>
 
 <div class="wrap">
@@ -35,7 +36,7 @@
 
   <div class="card" style="margin-top:12px;">
     <div class="toolbar">
-      <input id="q" placeholder="Buscar por nº do memorando, objeto, assunto…" style="flex:1; min-width:220px;" />
+      <input id="q" placeholder="Buscar por nº do memorando, objeto, assunto, diretoria, ano PCA…" style="flex:1; min-width:260px;" />
       <select id="sort">
         <option value="date_desc">Mais recentes</option>
         <option value="date_asc">Mais antigos</option>
@@ -88,23 +89,40 @@
     if (typeof x === 'object') return x; // já é JSON (Postgres)
     return fallback;
   }
+  function escapeHTML(s){ return String(s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  function payloadOf(row){ return parseJSON(row.payload || "{}", {}); }
+  function resultOf(row){ return parseJSON(row.result || "{}", {}); }
+
   function buildAssuntoFrom(row) {
-    // tenta result.assunto; cai para payload: objeto + pcaAno; senão vazio
-    const result = parseJSON(row.result || "{}", {});
-    if (result && result.assunto) return result.assunto;
-    const payload = parseJSON(row.payload || "{}", {});
-    const obj = payload.assunto || "";
-    const ano = payload.pcaAno || payload.pca_ano || "";
-    return (obj && ano) ? (`DFD - PCA ${ano} - ${obj}`) : (obj || "");
+    // tenta result.assunto; fallback: "DFD - PCA [ano] - [assunto]"
+    const res = resultOf(row);
+    if (res && res.assunto) return res.assunto;
+    const p = payloadOf(row);
+    const assunto = p.assunto || "";
+    const ano = p.pcaAno || p.pca_ano || "";
+    return (assunto && ano) ? (`DFD - PCA ${ano} - ${assunto}`) : (assunto || "");
+  }
+  function buildObjetoFrom(row) {
+    const p = payloadOf(row);
+    return p.objeto || "";
+  }
+  function buildDiretoriaFrom(row) {
+    const p = payloadOf(row);
+    return p.diretoriaDemandante || p.diretoria_demandante || "";
+  }
+  function rowPcaAno(row){
+    const p = payloadOf(row);
+    return p.pcaAno || p.pca_ano || "";
   }
   function rowDate(row) {
-    const result = parseJSON(row.result || "{}", {});
-    const when = result.generated_at || row.updated_at || row.created_at;
+    const res = resultOf(row);
+    const when = res.generated_at || row.updated_at || row.created_at;
     return when ? new Date(when) : new Date();
   }
   function rowNumero(row) {
-    const payload = parseJSON(row.payload || "{}", {});
-    return payload.numero || "";
+    const p = payloadOf(row);
+    return p.numero || "";
   }
 
   function renderTable() {
@@ -128,9 +146,13 @@
       tdNum.textContent = rowNumero(row);
       tr.appendChild(tdNum);
 
-      // Assunto
+      // Assunto + sublinha (objeto / diretoria)
       const tdAss = document.createElement("td");
-      tdAss.textContent = buildAssuntoFrom(row);
+      const assuntoFinal = buildAssuntoFrom(row);
+      const objeto = buildObjetoFrom(row);
+      const dir = buildDiretoriaFrom(row);
+      tdAss.innerHTML = `<div>${escapeHTML(assuntoFinal)}</div>` +
+                        ((objeto || dir) ? `<div class="subline">${escapeHTML(objeto)}${dir ? ' — ' + escapeHTML(dir) : ''}</div>` : '');
       tr.appendChild(tdAss);
 
       // Status
@@ -148,7 +170,7 @@
       btns.className = "btn-row";
 
       if (st === "done") {
-        const d = parseJSON(row.result || "{}", {});
+        const d = resultOf(row);
         if (d.filename_pdf && d.file_path_pdf) {
           const bPdf = document.createElement("button");
           bPdf.type = "button";
@@ -199,11 +221,14 @@
     const term = (q.value || "").trim().toLowerCase();
     const sorter = sortSel.value;
 
-    // filtro
+    // filtro: nº, assunto, objeto, diretoria, ano PCA
     filtered = items.filter(row => {
       const num = rowNumero(row).toLowerCase();
       const ass = buildAssuntoFrom(row).toLowerCase();
-      return !term || num.includes(term) || ass.includes(term);
+      const obj = buildObjetoFrom(row).toLowerCase();
+      const dir = buildDiretoriaFrom(row).toLowerCase();
+      const ano = String(rowPcaAno(row) || "").toLowerCase();
+      return !term || num.includes(term) || ass.includes(term) || obj.includes(term) || dir.includes(term) || ano.includes(term);
     });
 
     // ordenação

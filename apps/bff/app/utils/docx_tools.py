@@ -79,8 +79,30 @@ def _xml_escape(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _fmt_money(v) -> str:
+    """Formata dinheiro em pt-BR: R$ 1.234,56."""
+    try:
+        n = float(v or 0.0)
+    except Exception:
+        n = 0.0
+    # separador milhar "." e decimal ","
+    inteiro, frac = f"{n:0.2f}".split(".")
+    inteiro_grp = []
+    while inteiro:
+        inteiro_grp.append(inteiro[-3:])
+        inteiro = inteiro[:-3]
+    inteiro_fmt = ".".join(reversed(inteiro_grp))
+    return f"R$ {inteiro_fmt},{frac}"
+
+
+def _split_lines(text: str) -> List[str]:
+    if not text:
+        return [""]
+    return str(text).splitlines() or [""]
+
+
 # -------------------------------------------------------------------
-# Manipulação do corpo do documento
+# Manipulação do corpo do documento (fallback DFD v2)
 # -------------------------------------------------------------------
 def _mk_p(text: str) -> ET.Element:
     p = ET.Element(_w("p"))
@@ -91,12 +113,20 @@ def _mk_p(text: str) -> ET.Element:
     return p
 
 
-def _append_body_paragraphs_xml_et(
+def _append_body_sections_xml_et(
     document_xml_bytes: bytes,
-    exemplos: list[tuple[str, str]],
-    intro_lines: list[str] | None = None,
+    context: Dict[str, Any],
+    intro_lines: List[str] | None = None,
 ) -> bytes:
-    """Acrescenta parágrafos simples ao <w:body>."""
+    """
+    Acrescenta seções simples ao <w:body> para o DFD v2:
+      - Introdução
+      - Diretoria demandante
+      - Objeto (multilinha)
+      - Alinhamento com o Planejamento Estratégico (multilinha)
+      - Itens (lista de itens com campos)
+      - Total geral
+    """
     root = ET.fromstring(document_xml_bytes)
     body = root.find(_w("body"))
     if body is None:
@@ -107,27 +137,94 @@ def _append_body_paragraphs_xml_et(
     sectpr = next((c for c in children if c.tag == _w("sectPr")), None)
     insert_idx = children.index(sectpr) if sectpr is not None else len(children)
 
-    elems: list[ET.Element] = []
+    elems: List[ET.Element] = []
 
     # 0) Introdução (se houver)
     if intro_lines:
         for line in intro_lines:
             elems.append(_mk_p(line))
-        # linha em branco ao final da introdução, se última linha não for vazia
         if intro_lines and intro_lines[-1].strip():
-            elems.append(ET.Element(_w("p")))
-
-    # 1) Blocos Exemplo 1/2/3 (label + texto)
-    first = True
-    for label, value in exemplos:
-        if not first:
             elems.append(ET.Element(_w("p")))  # linha em branco
-        first = False
-        elems.append(_mk_p(label))
-        txt = (value or "").splitlines() or [""]
-        for line in txt:
-            elems.append(_mk_p(line))
 
+    # 1) Diretoria demandante
+    dire = str(context.get("diretoria_demandante") or "").strip()
+    if dire:
+        elems.append(_mk_p(f"Diretoria demandante: {dire}"))
+        elems.append(ET.Element(_w("p")))
+
+    # 2) Objeto
+    obj = str(context.get("objeto") or "").strip()
+    if obj:
+        elems.append(_mk_p("Objeto:"))
+        for line in _split_lines(obj):
+            elems.append(_mk_p(f"  {line}"))
+        elems.append(ET.Element(_w("p")))
+
+    # 3) Alinhamento com o Planejamento Estratégico
+    alin = str(context.get("alinhamento_pe") or "").strip()
+    if alin:
+        elems.append(_mk_p("Alinhamento com o Planejamento Estratégico:"))
+        for line in _split_lines(alin):
+            elems.append(_mk_p(f"  {line}"))
+        elems.append(ET.Element(_w("p")))
+
+    # 4) Itens
+    itens = context.get("itens") or []
+    if isinstance(itens, list) and itens:
+        elems.append(_mk_p("Itens:"))
+        elems.append(ET.Element(_w("p")))
+        for i, it in enumerate(itens, start=1):
+            elems.append(_mk_p(f"Item #{i}"))
+            desc = (it.get("descricao") or "").strip()
+            just = (it.get("justificativa") or "").strip()
+            um = (it.get("unidadeMedida") or "").strip()
+            qtd = it.get("quantidade")
+            vu = it.get("valorUnitario")
+            vt = it.get("valorTotal")
+            grau = (it.get("grauPrioridade") or "").strip()
+            data = (it.get("dataPretendida") or "").strip()
+            dep = (it.get("haDependencia") or "").strip()
+            depq = (it.get("dependenciaQual") or "").strip()
+            riscos = (it.get("riscosNaoContratacao") or "").strip()
+            renov = (it.get("renovacaoContrato") or "").strip()
+
+            if desc:
+                elems.append(_mk_p("  Descrição:"))
+                for line in _split_lines(desc):
+                    elems.append(_mk_p(f"    {line}"))
+            if just:
+                elems.append(_mk_p("  Justificativa:"))
+                for line in _split_lines(just):
+                    elems.append(_mk_p(f"    {line}"))
+
+            if um:
+                elems.append(_mk_p(f"  Unidade de medida: {um}"))
+            if qtd is not None:
+                elems.append(_mk_p(f"  Quantidade: {qtd}"))
+            elems.append(_mk_p(f"  Valor unitário: {_fmt_money(vu)}"))
+            elems.append(_mk_p(f"  Valor total: {_fmt_money(vt)}"))
+            if grau:
+                elems.append(_mk_p(f"  Grau de prioridade: {grau}"))
+            if data:
+                elems.append(_mk_p(f"  Data pretendida: {data}"))
+            if dep:
+                elems.append(_mk_p(f"  Há dependência: {dep}"))
+                if dep == "Sim" and depq:
+                    elems.append(_mk_p(f"  Dependência (qual): {depq}"))
+            if riscos:
+                elems.append(_mk_p("  Riscos da não contratação:"))
+                for line in _split_lines(riscos):
+                    elems.append(_mk_p(f"    {line}"))
+            if renov:
+                elems.append(_mk_p(f"  Renovação de contrato: {renov}"))
+            elems.append(ET.Element(_w("p")))  # linha em branco entre itens
+
+    # 5) Total geral
+    if itens:
+        total_geral = context.get("total_geral")
+        elems.append(_mk_p(f"Total geral da contratação (soma dos itens): {_fmt_money(total_geral)}"))
+
+    # Inserção no corpo
     for off, el in enumerate(elems):
         body.insert(insert_idx + off, el)
 
@@ -155,12 +252,12 @@ def _patch_header_xml_text(xml: str, numero: str, assunto: str, data_fmt: str) -
 
 
 # -------------------------------------------------------------------
-# Renderização preservando timbre
+# Renderização preservando timbre (fallback para DFD v2)
 # -------------------------------------------------------------------
 def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: str) -> None:
     """Copia o DOCX e aplica:
        - patch nos headers (número/assunto/data),
-       - injeção de INTRO + parágrafos Exemplo 1/2/3 no corpo."""
+       - injeção de INTRO + seções do DFD v2 no corpo."""
     numero = str(context.get("numero") or "")
     assunto = str(context.get("assunto") or "Documento de Formalização de Demanda")
     data_fmt = _date_br(context.get("data") or datetime.utcnow().date().isoformat())
@@ -199,14 +296,9 @@ def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: 
 
                 zout.writestr(name, data)
 
-            # 2) Escreve o corpo uma única vez (INTRO + exemplos)
+            # 2) Escreve o corpo uma única vez (INTRO + seções DFD v2)
             if doc_xml is not None:
-                exemplos = [
-                    ("Exemplo 1", context.get("exemplo1") or ""),
-                    ("Exemplo 2", context.get("exemplo2") or ""),
-                    ("Exemplo 3", context.get("exemplo3") or ""),
-                ]
-                doc_xml2 = _append_body_paragraphs_xml_et(doc_xml, exemplos, intro_lines=intro_lines)
+                doc_xml2 = _append_body_sections_xml_et(doc_xml, context, intro_lines=intro_lines)
                 zout.writestr("word/document.xml", doc_xml2)
 
         os.makedirs(os.path.dirname(out_path), exist_ok=True)

@@ -51,12 +51,16 @@ def _auth_default_roles() -> list[str]:
 # ------------------------------------------------------------------------------
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
-logger.info("Starting BFF (ENV=%s, AUTH_MODE=%s, LEGACY_MOCK=%s, LOG_LEVEL=%s)", ENV, AUTH_MODE, AUTH_LEGACY_MOCK, LOG_LEVEL)
+logger.info(
+    "Starting BFF (ENV=%s, AUTH_MODE=%s, LEGACY_MOCK=%s, LOG_LEVEL=%s, EP_MODE=%s)",
+    ENV, AUTH_MODE, AUTH_LEGACY_MOCK, LOG_LEVEL, EP_MODE
+)
+logger.info("CORS_ORIGINS=%s | CATALOG_FILE=%s", ",".join(CORS_ORIGINS), str(CATALOG_FILE))
 
 # ------------------------------------------------------------------------------
 # App
 # ------------------------------------------------------------------------------
-APP = FastAPI(title="Portal AGEPAR BFF", version="0.2.0", docs_url="/docs", redoc_url="/redoc")
+APP = FastAPI(title="Portal AGEPAR BFF", version="0.3.0", docs_url="/docs", redoc_url="/redoc")
 
 # CORS primeiro (fica mais interno após os próximos add_middleware)
 APP.add_middleware(
@@ -91,9 +95,9 @@ APP.include_router(auth_sessions_router) # /api/auth/sessions[...]
 # ------------------------------------------------------------------------------
 @APP.on_event("startup")
 def _startup() -> None:
-    # Inicializa o banco (SQLite) usado pelas automações (submissions/audits)
+    # Inicializa o banco (Postgres) usado pelas automações (submissions/audits)
     init_db()
-    logger.info("DB initialized")
+    logger.info("DB initialized (Postgres)")
     logger.info("DFD engine version: %s", DFD_VER)
 
 # ------------------------------------------------------------------------------
@@ -122,7 +126,10 @@ def version() -> Dict[str, Any]:
         "env": ENV,
         "dfd_version": DFD_VER,
         "auth_mode": AUTH_MODE,
+        "auth_legacy_mock": AUTH_LEGACY_MOCK,
         "ep_mode": EP_MODE,
+        "cors_origins": CORS_ORIGINS,
+        "catalog_file": str(CATALOG_FILE),
     }
 
 # ------------------------------------------------------------------------------
@@ -242,6 +249,7 @@ def automations_index() -> Dict[str, Any]:
 # ------------------------------------------------------------------------------
 APP.include_router(form2json_router)
 APP.include_router(dfd_router)
+APP.include_router(snake_router)  # já incluído acima; manter por clareza (idempotente)
 
 # ------------------------------------------------------------------------------
 # Nota de segurança (prod)

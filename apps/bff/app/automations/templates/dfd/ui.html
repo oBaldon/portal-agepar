@@ -23,62 +23,53 @@
   .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
   .btn.secondary:hover { background:#f8fafc; }
   .btn.small { padding: 8px 12px; font-size: 12px; }
+  .btn.danger { background:#b91c1c; }
   .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
   .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
   .note { font-size:12px; color:var(--muted); }
   .status { margin-top:12px; font-size:13px; }
   .list { margin-top: 24px; }
-  .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 8px; background:#fff; }
-  .item .meta { margin-bottom:8px; }
+  .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
+  .item .meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
-
-  /* help / tooltip */
   .inline-help { display:inline-flex; align-items:center; position:relative; margin-left:6px; }
-  .inline-help .help {
-    width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a;
-    border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center;
-    padding:0; cursor:pointer;
-  }
+  .inline-help .help { width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center; padding:0; cursor:pointer; }
   .inline-help .help:hover { background:#dbeafe; border-color:#93c5fd; }
   .inline-help .help:focus-visible { outline:2px solid #93c5fd; outline-offset:2px; }
-  .inline-help .tip {
-    position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px;
-    background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px;
-    box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none;
-    opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease;
-  }
+  .inline-help .tip { position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px; background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px; box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none; opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
   .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
   .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
+  .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+  input[disabled], textarea[disabled], select[disabled] {
+    background:#f1f5f9; color:#64748b; border-color:#e2e8f0; cursor:not-allowed;
+  }
+  input.readonly { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
 </style>
 
 <div class="wrap">
   <div class="header">
     <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
-    <a class="btn secondary small"
-   href="/api/automations/dfd/ui/history">Meus DFDs</a>
-
+    <a class="btn secondary small" href="/api/automations/dfd/ui/history">Meus DFDs</a>
   </div>
 
   <div class="card">
     <form id="f">
       <div class="row">
         <div class="col">
-          <label>
-            Diretoria
+          <label>Timbre
             <span class="inline-help">
-              <button type="button" class="help" aria-label="Ajuda sobre Diretoria">!</button>
-              <span class="tip">Selecione o timbre/cabeçalho correspondente. As opções vêm de <code>/templates/dfd_models</code>.</span>
+              <button type="button" class="help" aria-label="Ajuda sobre Timbre">!</button>
+              <span class="tip">Selecione o timbre/cabeçalho do documento.</span>
             </span>
           </label>
           <select name="modeloSlug" id="modeloSlug" required>
             <option value="">-- Selecionar --</option>
           </select>
-          <div class="note">Carrega pastas de /templates/dfd_models.</div>
+          <div class="note">Timbre do documento.</div>
         </div>
 
         <div class="col">
-          <label>
-            Nº do memorando
+          <label>Nº do memorando
             <span class="inline-help">
               <button type="button" class="help" aria-label="Ajuda sobre Nº do memorando">!</button>
               <span class="tip">Use o padrão da sua unidade (ex.: <code>012/2025</code>). Esse número aparece no cabeçalho.</span>
@@ -88,59 +79,63 @@
         </div>
       </div>
 
-      <label>
-        Objeto
+      <label>Assunto
         <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button>
-          <span class="tip">Digite apenas o objeto (ex.: <em>Aquisição de software X</em>). O assunto final será montado como <code>DFD - PCA [ano] - [objeto]</code>.</span>
+          <button type="button" class="help" aria-label="Ajuda sobre Assunto">!</button>
+          <span class="tip">Assunto exibido no cabeçalho e metadados. Ex.: <em>Aquisição de software X</em>.</span>
         </span>
       </label>
       <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
-      <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [objeto]</code>.</div>
+      <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [assunto]</code>.</div>
 
-      <label>
-        Ano de execução do PCA
+      <label>Ano de execução do PCA
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">!</button>
-          <span class="tip">Informe 4 dígitos (ex.: <code>2025</code>). É usado no cabeçalho e no texto introdutório.</span>
+          <span class="tip">Informe 4 dígitos (ex.: <code>2027</code>). Define os meses da “Data pretendida”.</span>
         </span>
       </label>
-      <input
-        name="pcaAno"
-        placeholder="Ex.: 2025"
-        inputmode="numeric"
-        minlength="4"
-        maxlength="4"
-        pattern="[0-9]{4}"
-        required
-        />
+      <input name="pcaAno" id="pcaAno" placeholder="Ex.: 2027" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}" required />
 
-      <label>
-        Exemplo 1
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Exemplo 1">!</button>
-          <span class="tip">Campo livre. Cada quebra de linha será respeitada no documento final.</span>
-        </span>
-      </label>
-      <textarea name="exemplo1"></textarea>
+      <!-- ======== Novos campos acima do Alinhamento ======== -->
 
-      <label>
-        Exemplo 2
+      <label>Diretoria demandante
         <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Exemplo 2">!</button>
-          <span class="tip">Campo livre. Utilize para detalhar justificativas, escopo, etc.</span>
+          <button type="button" class="help" aria-label="Ajuda sobre Diretoria demandante">!</button>
+          <span class="tip">Selecione a diretoria responsável pela demanda. (Lista pode ser integrada ao BFF em /options.)</span>
         </span>
       </label>
-      <textarea name="exemplo2"></textarea>
+      <select name="diretoriaDemandante" id="diretoriaDemandante" required>
+        <option value="">-- Selecionar --</option>
+      </select>
 
-      <label>
-        Exemplo 3
+      <label>Objeto
         <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Exemplo 3">!</button>
-          <span class="tip">Campo livre. Pode ser usado para referências, prazos, anexos relacionados.</span>
+          <button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button>
+          <span class="tip">Descreva o objeto da contratação (ex.: <em>Licenças do sistema Z</em>).</span>
         </span>
       </label>
-      <textarea name="exemplo3"></textarea>
+      <textarea name="objeto" id="objeto" placeholder="Ex.: Licenças do sistema Z" required></textarea>
+
+      <hr class="hr" />
+
+      <label>Alinhamento com o <em>Planejamento Estratégico</em>
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button>
+          <span class="tip">Explique como a demanda se conecta a objetivos/indicadores estratégicos da organização.</span>
+        </span>
+      </label>
+      <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico"></textarea>
+
+      <hr class="hr" />
+
+      <div class="row" style="align-items:center">
+        <h2 style="font-size:16px; margin:0">Itens</h2>
+        <div style="flex:1"></div>
+        <button type="button" class="btn small" id="addItemBtn">Adicionar item</button>
+      </div>
+      <div class="note">Adicione um ou mais itens. Cada item possui seus próprios campos.</div>
+
+      <div id="items"></div>
 
       <div class="actions" style="margin-top:16px">
         <button class="btn" id="submitBtn">Gerar DFD</button>
@@ -153,11 +148,44 @@
 </div>
 
 <script>
+  // ------- Constantes de listas (poderão vir do BFF depois) -------
+  const LISTS = {
+    unidadeMedida: [
+      "Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro","Metro cúbico","Metro linear","Metro quadrado","Milheiro","Miligrama","Mililitro","Outras Unidades de Medidas","Par","Quilograma","Quilograma do peso drenado","Quilômetro","Rolo","Teste","Tubo","Unidade Internacional","Unitário"
+    ],
+    grauPrioridade: [
+      "Alto, quando a impossibilidade de contratação provoca interrupção de processo crítico ou estratégico.",
+      "Médio, quando a impossibilidade de contratação provoca atraso de processo crítico ou estratégico.",
+      "Baixo, quando a impossibilidade de contratação provoca interrupção ou atraso de processo não crítico.",
+      "Muito baixo, quando a continuidade do processo é possível mediante o emprego de uma solução de contorno."
+    ],
+    simNao: ["Sim","Não"],
+    diretoriasDemandantes: [
+      "Diretoria de Planejamento",
+      "Diretoria Técnica",
+      "Diretoria Administrativa e Financeira",
+      "Diretoria de Tecnologia da Informação",
+      "Diretoria Jurídica",
+      "Diretoria de Comunicação"
+    ]
+  };
+
+  function mesesDoAno(ano){
+    const nomes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    if(!/^[0-9]{4}$/.test(String(ano||""))) return [];
+    return nomes.map(n => `${n} de ${ano}`); // sem "Registro de Preços"
+  }
+
+  // ------- Infra de UI -------
   const f = document.getElementById('f');
   const statusEl = document.getElementById('status');
   const subsEl = document.getElementById('subs');
   const submitBtn = document.getElementById('submitBtn');
   const modeloSel = document.getElementById('modeloSlug');
+  const pcaAnoEl = document.getElementById('pcaAno');
+  const addItemBtn = document.getElementById('addItemBtn');
+  const itemsEl = document.getElementById('items');
+  const dirDemSel = document.getElementById('diretoriaDemandante');
 
   async function loadModels(){
     try {
@@ -174,18 +202,277 @@
     } catch(e) {}
   }
 
-  function formToPayload(form) {
-    const data = new FormData(form);
-    const obj = Object.fromEntries(data.entries());
-    return obj;
+  function loadDiretoriasDemandantes(){
+    if (!dirDemSel) return;
+    LISTS.diretoriasDemandantes.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = v;
+      dirDemSel.appendChild(o);
+    });
   }
 
+  // ------- Itens (dinâmico) -------
+  let itemSeq = 0;
+
+  function buildSelect(options, placeholder="-- Selecionar --"){
+    const sel = document.createElement('select');
+    const opt0 = document.createElement('option');
+    opt0.value = "";
+    opt0.textContent = placeholder;
+    sel.appendChild(opt0);
+    options.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = v;
+      sel.appendChild(o);
+    });
+    return sel;
+  }
+
+  function helpIcon(text){
+    const span = document.createElement('span');
+    span.className = 'inline-help';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'help';
+    btn.setAttribute('aria-label','Ajuda');
+    btn.textContent = '!';
+    const tip = document.createElement('span');
+    tip.className = 'tip';
+    tip.textContent = text;
+    span.appendChild(btn);
+    span.appendChild(tip);
+    return span;
+  }
+
+  function createItem(){
+    const idx = itemSeq++;
+    const wrap = document.createElement('div');
+    wrap.className = 'item';
+    wrap.dataset.idx = idx;
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const title = document.createElement('div');
+    title.innerHTML = `<span class="badge">Item</span> <strong>#${idx+1}</strong>`;
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn small danger';
+    removeBtn.textContent = 'Remover';
+    removeBtn.onclick = () => { wrap.remove(); recomputeItemNumbers(); };
+    meta.appendChild(title);
+    meta.appendChild(removeBtn);
+
+    // Descrição
+    const lblDesc = document.createElement('label');
+    lblDesc.textContent = 'Descrição sucinta do objeto';
+    lblDesc.appendChild(helpIcon('Texto resumido do que será contratado/adquirido.'));
+    const txtDesc = document.createElement('textarea'); txtDesc.name = `items[${idx}][descricao]`;
+
+    // Justificativa
+    const lblJust = document.createElement('label');
+    lblJust.textContent = 'Justificativa para aquisição ou contratação';
+    lblJust.appendChild(helpIcon('Explique por que é necessário, problema atual e benefício esperado.'));
+    const txtJust = document.createElement('textarea'); txtJust.name = `items[${idx}][justificativa]`;
+
+    // Linha 1: Unidade, Quantidade, Valor Unitário, Valor Total
+    const row1 = document.createElement('div'); row1.className = 'row';
+
+    const colUM = document.createElement('div'); colUM.className='col';
+    const lblUM = document.createElement('label'); lblUM.textContent = 'Unidade de medida do item a ser adquirido ou contratado';
+    lblUM.appendChild(helpIcon('Escolha uma unidade padronizada. O campo não aceita texto livre.'));
+    const selUM = buildSelect(LISTS.unidadeMedida);
+    selUM.name = `items[${idx}][unidadeMedida]`;
+    colUM.appendChild(lblUM); colUM.appendChild(selUM);
+
+    const colQt = document.createElement('div'); colQt.className='col';
+    const lblQt = document.createElement('label'); lblQt.textContent = 'Quantidade a ser adquirida ou contratada';
+    lblQt.appendChild(helpIcon('Informe um número inteiro (sem casas decimais).'));
+    const inpQt = document.createElement('input'); inpQt.type='number'; inpQt.min='0'; inpQt.step='1'; inpQt.inputMode='numeric';
+    inpQt.name = `items[${idx}][quantidade]`;
+    colQt.appendChild(lblQt); colQt.appendChild(inpQt);
+
+    const colVU = document.createElement('div'); colVU.className='col';
+    const lblVU = document.createElement('label'); lblVU.textContent = 'Estimativa preliminar de valor unitário da contratação (R$)';
+    lblVU.appendChild(helpIcon('Digite o valor unitário em reais (use ponto como separador decimal).'));
+    const inpVU = document.createElement('input'); inpVU.type='number'; inpVU.min='0'; inpVU.step='0.01'; inpVU.inputMode='decimal';
+    inpVU.name = `items[${idx}][valorUnitario]`;
+    colVU.appendChild(lblVU); colVU.appendChild(inpVU);
+
+    const colVT = document.createElement('div'); colVT.className='col';
+    const lblVT = document.createElement('label'); lblVT.textContent = 'Estimativa preliminar de valor total da contratação (auto)';
+    lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário. Campo não editável.'));
+    const inpVT = document.createElement('input');
+    inpVT.type = 'text';                // evita setas de number
+    inpVT.readOnly = true;              // visualmente readonly
+    inpVT.disabled = true;              // não clicável / não focável
+    inpVT.tabIndex = -1;                // fora da navegação por tab
+    inpVT.classList.add('readonly');    // estilo acinzentado consistente
+    inpVT.name = `items[${idx}][valorTotal]`;
+    colVT.appendChild(lblVT); colVT.appendChild(inpVT);
+
+
+    row1.appendChild(colUM); row1.appendChild(colQt); row1.appendChild(colVU); row1.appendChild(colVT);
+
+    // Linha 2: Grau prioridade, Data pretendida
+    const row2 = document.createElement('div'); row2.className = 'row';
+
+    const colGP = document.createElement('div'); colGP.className='col';
+    const lblGP = document.createElement('label'); lblGP.textContent = 'Grau de prioridade da contratação';
+    lblGP.appendChild(helpIcon('Selecione o grau conforme impacto da não contratação.'));
+    const selGP = buildSelect(LISTS.grauPrioridade);
+    selGP.name = `items[${idx}][grauPrioridade]`;
+    colGP.appendChild(lblGP); colGP.appendChild(selGP);
+
+    const colDP = document.createElement('div'); colDP.className='col';
+    const lblDP = document.createElement('label'); lblDP.textContent = 'Data pretendida para compra/contratação';
+    lblDP.appendChild(helpIcon('Escolha o mês no formato “mês de [ano do PCA]”. A lista muda quando o ano do PCA é alterado.'));
+    const selDP = buildSelect(mesesDoAno(document.getElementById('pcaAno')?.value || ''));
+    selDP.name = `items[${idx}][dataPretendida]`;
+    colDP.appendChild(lblDP); colDP.appendChild(selDP);
+
+    row2.appendChild(colGP); row2.appendChild(colDP);
+
+    // Linha 3: Dependência (Sim/Não) + Qual
+    const row3 = document.createElement('div'); row3.className = 'row';
+
+    const colDep = document.createElement('div'); colDep.className='col';
+    const lblDep = document.createElement('label'); lblDep.textContent = 'Há vínculo ou dependência com outra contratação?';
+    lblDep.appendChild(helpIcon('Informe se este item depende de outra contratação para fazer sentido.'));
+    const selDep = buildSelect(LISTS.simNao);
+    selDep.name = `items[${idx}][haDependencia]`;
+    colDep.appendChild(lblDep); colDep.appendChild(selDep);
+
+    const colQual = document.createElement('div'); colQual.className='col';
+    const lblQual = document.createElement('label'); lblQual.textContent = "Se 'Sim', qual?";
+    lblQual.appendChild(helpIcon('Descreva a contratação da qual este item depende.'));
+    const inpQual = document.createElement('input'); inpQual.placeholder = 'Descreva a dependência'; inpQual.name = `items[${idx}][dependenciaQual]`;
+    colQual.appendChild(lblQual); colQual.appendChild(inpQual);
+
+    row3.appendChild(colDep); row3.appendChild(colQual);
+
+    // Linha 4: Riscos & Renovação
+    const row4 = document.createElement('div'); row4.className = 'row';
+
+    const colRisco = document.createElement('div'); colRisco.className='col';
+    const lblRisco = document.createElement('label'); lblRisco.textContent = 'Riscos da não contratação';
+    lblRisco.appendChild(helpIcon('Consequências de não realizar a contratação (impactos operacionais, legais, etc.).'));
+    const txtRisco = document.createElement('textarea'); txtRisco.name = `items[${idx}][riscosNaoContratacao]`;
+    colRisco.appendChild(lblRisco); colRisco.appendChild(txtRisco);
+
+    const colRen = document.createElement('div'); colRen.className='col';
+    const lblRen = document.createElement('label'); lblRen.textContent = 'Renovação de contrato';
+    lblRen.appendChild(helpIcon('Indique se se trata de renovação de contrato já existente.'));
+    const selRen = buildSelect(LISTS.simNao);
+    selRen.name = `items[${idx}][renovacaoContrato]`;
+    colRen.appendChild(lblRen); colRen.appendChild(selRen);
+
+    row4.appendChild(colRisco); row4.appendChild(colRen);
+
+    // Interações
+    function recalc(){
+      const q = parseFloat(inpQt.value || '0');
+      const vu = parseFloat(inpVU.value || '0');
+      const vt = (isFinite(q) && isFinite(vu)) ? (q * vu) : 0;
+      inpVT.value = (Math.round(vt * 100) / 100).toFixed(2);
+    }
+    inpQt.addEventListener('input', recalc);
+    inpVU.addEventListener('input', recalc);
+    recalc();
+
+    function toggleQual(){
+      const show = (selDep.value === 'Sim');
+      inpQual.disabled = !show;
+      inpQual.required = show;
+      inpQual.parentElement.style.opacity = show ? '1' : '.6';
+    }
+    selDep.addEventListener('change', toggleQual);
+    toggleQual();
+
+    // Montagem
+    wrap.appendChild(meta);
+    wrap.appendChild(lblDesc); wrap.appendChild(txtDesc);
+    wrap.appendChild(lblJust); wrap.appendChild(txtJust);
+    wrap.appendChild(row1);
+    wrap.appendChild(row2);
+    wrap.appendChild(row3);
+    wrap.appendChild(row4);
+    return wrap;
+  }
+
+  function recomputeItemNumbers(){
+    Array.from(itemsEl.children).forEach((div, i) => {
+      const meta = div.querySelector('.meta strong');
+      if (meta) meta.textContent = `#${i+1}`;
+    });
+  }
+
+  function ensureOneItem(){
+    if (itemsEl.children.length === 0) {
+      itemsEl.appendChild(createItem());
+    }
+  }
+
+  addItemBtn?.addEventListener('click', () => {
+    itemsEl.appendChild(createItem());
+    recomputeItemNumbers();
+  });
+
+  pcaAnoEl?.addEventListener('input', () => {
+    // Atualiza todos os combos de Data pretendida quando o ano mudar
+    const ano = pcaAnoEl.value;
+    const options = mesesDoAno(ano);
+    itemsEl.querySelectorAll('select[name$="[dataPretendida]"]').forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = '';
+      const rebuilt = buildSelect(options);
+      Array.from(rebuilt.children).forEach(c => sel.appendChild(c));
+      if (options.includes(current)) sel.value = current;
+    });
+  });
+
+  // ------- Serialização custom para incluir array de itens -------
+  function formToPayload(){
+    const header = {
+      modeloSlug: f.modeloSlug.value || "",
+      numero: f.numero.value || "",
+      assunto: f.assunto.value || "",
+      pcaAno: f.pcaAno.value || "",
+      diretoriaDemandante: f.diretoriaDemandante.value || "",
+      objeto: f.objeto.value || "",
+      alinhamentoPE: f.alinhamentoPE.value || ""
+    };
+    const items = Array.from(itemsEl.children).map(div => {
+      const pick = (sel) => div.querySelector(sel);
+      const num = (x) => { const v = parseFloat(x||'0'); return isFinite(v) ? v : 0; };
+      const dep = (pick('select[name$="[haDependencia]"]')?.value || "");
+      return {
+        descricao: pick('textarea[name$="[descricao]"]')?.value || "",
+        justificativa: pick('textarea[name$="[justificativa]"]')?.value || "",
+        unidadeMedida: pick('select[name$="[unidadeMedida]"]')?.value || "",
+        quantidade: Math.trunc(num(pick('input[name$="[quantidade]"]')?.value)),
+        valorUnitario: num(pick('input[name$="[valorUnitario]"]')?.value),
+        valorTotal: num(pick('input[name$="[valorTotal]"]')?.value),
+        grauPrioridade: pick('select[name$="[grauPrioridade]"]')?.value || "",
+        dataPretendida: pick('select[name$="[dataPretendida]"]')?.value || "",
+        haDependencia: dep,
+        dependenciaQual: dep === 'Sim' ? (pick('input[name$="[dependenciaQual]"]')?.value || "") : "",
+        riscosNaoContratacao: pick('textarea[name$="[riscosNaoContratacao]"]')?.value || "",
+        renovacaoContrato: pick('select[name$="[renovacaoContrato]"]')?.value || ""
+      };
+    });
+    return { ...header, items };
+  }
+
+  // ------- Submit -------
   async function submit(evt) {
     evt.preventDefault();
     submitBtn.disabled = true;
     statusEl.textContent = 'Enviando...';
 
-    const payload = formToPayload(f);
+    ensureOneItem();
+    const payload = formToPayload();
 
     const res = await fetch('./submit', {
       method: 'POST',
@@ -235,7 +522,6 @@
 
       const d = toObj(row.result);
 
-      // exibe nome sem extensão
       const displayName = (() => {
         const n = (d.filename || d.filename_pdf || d.filename_docx || '').trim();
         const i = n.lastIndexOf('.');
@@ -259,7 +545,6 @@
       const buttons = document.createElement('div');
       buttons.className = 'btn-row';
 
-      // Botão PDF (se existir)
       if (d.filename_pdf && d.file_path_pdf) {
         const btnPdf = document.createElement('button');
         btnPdf.type = 'button';
@@ -275,14 +560,11 @@
             a.download = (d.filename_pdf || ('dfd_' + sid + '.pdf'));
             a.click();
             URL.revokeObjectURL(a.href);
-          } catch (e) {
-            alert('Não foi possível baixar o PDF.');
-          }
+          } catch (e) { alert('Não foi possível baixar o PDF.'); }
         };
         buttons.appendChild(btnPdf);
       }
 
-      // Botão DOCX (sempre deve existir)
       const btnDocx = document.createElement('button');
       btnDocx.type = 'button';
       btnDocx.className = 'btn secondary';
@@ -297,9 +579,7 @@
           a.download = (d.filename_docx || ('dfd_' + sid + '.docx'));
           a.click();
           URL.revokeObjectURL(a.href);
-        } catch (e) {
-          alert('Não foi possível baixar o DOCX.');
-        }
+        } catch (e) { alert('Não foi possível baixar o DOCX.'); }
       };
       buttons.appendChild(btnDocx);
 
@@ -312,6 +592,12 @@
     submitBtn.disabled = false;
   }
 
-  loadModels();
+  function init(){
+    loadModels();
+    loadDiretoriasDemandantes();
+    ensureOneItem();
+  }
+
   f.addEventListener('submit', submit);
+  init();
 </script>
