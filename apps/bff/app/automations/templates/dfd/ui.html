@@ -35,7 +35,7 @@
   .inline-help { display:inline-flex; align-items:center; position:relative; margin-left:6px; }
   .inline-help .help { width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center; padding:0; cursor:pointer; }
   .inline-help .help:hover { background:#dbeafe; border-color:#93c5fd; }
-  .inline-help .help:focus-visible { outline:2px solid #93c5fd; outline-offset:2px; }
+  .inline-help .help:focus-visible { outline:2px solid #93c5fd; outline-offset: 2px; }
   .inline-help .tip { position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px; background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px; box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none; opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
   .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
   .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
@@ -85,7 +85,6 @@
         </span>
       </label>
       <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
-      <!-- <div class="note">O assunto final será montado automaticamente como <code>DFD - PCA [ano] - [assunto]</code>.</div> -->
 
       <label>Ano de execução do PCA
         <span class="inline-help">
@@ -95,7 +94,7 @@
       </label>
       <input name="pcaAno" id="pcaAno" placeholder="Ex.: 2027" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}" required />
 
-      <!-- ======== Novos campos acima do Alinhamento ======== -->
+      <!-- ======== Campos ======== -->
 
       <label>Diretoria demandante
         <span class="inline-help">
@@ -160,19 +159,18 @@
     ],
     simNao: ["Sim","Não"],
     diretoriasDemandantes: [
-      "Diretoria de Planejamento",
-      "Diretoria Técnica",
-      "Diretoria Administrativa e Financeira",
-      "Diretoria de Tecnologia da Informação",
-      "Diretoria Jurídica",
-      "Diretoria de Comunicação"
+      "Diretoria da Presidência - DP",
+      "Diretoria Administrativa e Financeira - DAF",
+      "Diretoria de Regulação Econômica - DRE",
+      "Diretoria de Fiscalização e Qualidade de Serviços - DFQS",
+      "Diretoria de Normas e Regulamentação - DNR",
     ]
   };
 
   function mesesDoAno(ano){
     const nomes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
     if(!/^[0-9]{4}$/.test(String(ano||""))) return [];
-    return nomes.map(n => `${n} de ${ano}`); // sem "Registro de Preços"
+    return nomes.map(n => `${n} de ${ano}`);
   }
 
   // ------- Infra de UI -------
@@ -260,7 +258,7 @@
     const meta = document.createElement('div');
     meta.className = 'meta';
     const title = document.createElement('div');
-    title.innerHTML = `<span class="badge">Item</span> <strong>#${idx+1}</strong>`;
+    title.innerHTML = `<span class="badge">Item</span> <strong class="item-number">#${idx+1}</strong>`;
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn small danger';
@@ -309,14 +307,13 @@
     const lblVT = document.createElement('label'); lblVT.textContent = 'Estimativa preliminar de valor total da contratação (auto)';
     lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário. Campo não editável.'));
     const inpVT = document.createElement('input');
-    inpVT.type = 'text';                // evita setas de number
-    inpVT.readOnly = true;              // visualmente readonly
-    inpVT.disabled = true;              // não clicável / não focável
-    inpVT.tabIndex = -1;                // fora da navegação por tab
-    inpVT.classList.add('readonly');    // estilo acinzentado consistente
+    inpVT.type = 'text';
+    inpVT.readOnly = true;
+    inpVT.disabled = true;
+    inpVT.tabIndex = -1;
+    inpVT.classList.add('readonly');
     inpVT.name = `items[${idx}][valorTotal]`;
     colVT.appendChild(lblVT); colVT.appendChild(inpVT);
-
 
     row1.appendChild(colUM); row1.appendChild(colQt); row1.appendChild(colVU); row1.appendChild(colVT);
 
@@ -408,14 +405,24 @@
 
   function recomputeItemNumbers(){
     Array.from(itemsEl.children).forEach((div, i) => {
-      const meta = div.querySelector('.meta strong');
-      if (meta) meta.textContent = `#${i+1}`;
+      // atualiza número visível
+      const numEl = div.querySelector('.item-number');
+      if (numEl) numEl.textContent = `#${i+1}`;
+      // atualiza data-idx
+      div.dataset.idx = String(i);
+      // reindexa names: items[<old>][field] -> items[i][field]
+      div.querySelectorAll('[name^="items["]').forEach(el => {
+        const old = el.name;
+        const newer = old.replace(/items\[\d+\]/, `items[${i}]`);
+        el.name = newer;
+      });
     });
   }
 
   function ensureOneItem(){
     if (itemsEl.children.length === 0) {
       itemsEl.appendChild(createItem());
+      recomputeItemNumbers();
     }
   }
 

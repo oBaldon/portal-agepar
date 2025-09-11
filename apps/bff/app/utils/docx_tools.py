@@ -362,7 +362,7 @@ def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: 
     ano_pca = str(context.get("pca_ano") or context.get("pcaAno") or "").strip()
 
     intro_lines = [
-        "À Diretoria de Administração-Financeira",
+        "À Diretoria de Administrativo-Financeira",
         "",
         f"Encaminha-se o presente Documento de Formalização da Demanda – DFD, para fins de inclusão no Plano de Contratações Anual – PCA do exercício {ano_pca}, nos seguintes termos:",
     ]
