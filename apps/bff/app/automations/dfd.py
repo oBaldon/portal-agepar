@@ -49,6 +49,25 @@ def err_json(status: int, **payload):
     )
 
 
+def _to_obj(x, default=None):
+    """Aceita dict/list/str/bytes; retorna dict/list. Evita quebrar entre SQLite e Postgres."""
+    if x is None:
+        return {} if default is None else default
+    if isinstance(x, (dict, list)):
+        return x
+    if isinstance(x, (bytes, bytearray)):
+        try:
+            return json.loads(x.decode("utf-8"))
+        except Exception:
+            return {} if default is None else default
+    if isinstance(x, str):
+        try:
+            return json.loads(x)
+        except Exception:
+            return {} if default is None else default
+    return {} if default is None else default
+
+
 def none_if_empty(v: Optional[str]) -> Optional[str]:
     if v is None:
         return None
@@ -81,6 +100,18 @@ def _get_model_path(slug: str) -> Optional[str]:
     if docx.exists():
         return str(docx)
     return None
+
+
+def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
+    """Permite acesso se CPF bater, ou se não houver CPF gravado mas o e-mail bater."""
+    u_cpf = (user.get("cpf") or "").strip() or None
+    u_email = (user.get("email") or "").strip() or None
+    owner_cpf = (row.get("actor_cpf") or "").strip() or None
+    owner_email = (row.get("actor_email") or "").strip() or None
+    return bool(
+        (owner_cpf and u_cpf and owner_cpf == u_cpf) or
+        (not owner_cpf and owner_email and u_email and owner_email == u_email)
+    )
 
 
 # ---------------------- Models ----------------------
@@ -219,7 +250,6 @@ async def list_my_submissions(
         return err_json(500, code="storage_error", message="Falha ao consultar submissões.", details=str(e))
 
 
-
 @router.get("/submissions/{sid}")
 async def get_my_submission(
     sid: str,
@@ -230,10 +260,13 @@ async def get_my_submission(
     except Exception as e:
         logger.exception("get_submission storage error")
         return err_json(500, code="storage_error", message="Falha ao consultar submissão.", details=str(e))
+
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
-    if row.get("actor_cpf") != user.get("cpf"):
+
+    if not _owns_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+
     return row
 
 
@@ -327,7 +360,7 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             # opcionalmente, persistimos o assunto final para a tela de histórico
             "assunto": assunto_final,
         }
-        update_submission(sid, status="done", result=json.dumps(result, ensure_ascii=False), error=None)
+        update_submission(sid, status="done", result=result, error=None)
         add_audit(KIND, "completed", actor, {"sid": sid, "filename": filename})
 
         try:
@@ -389,7 +422,8 @@ async def submit_dfd(
         "actor_cpf": user.get("cpf"),
         "actor_nome": user.get("nome"),
         "actor_email": user.get("email"),
-        "payload": json.dumps(payload.model_dump(by_alias=True, exclude_none=True), ensure_ascii=False),
+        # passa dict; o db.py (Postgres) persiste como JSONB
+        "payload": payload.model_dump(by_alias=True, exclude_none=True),
         "status": "queued",
         "result": None,
         "error": None,
@@ -424,13 +458,15 @@ async def download_result(
 
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
-    if row.get("actor_cpf") != user.get("cpf"):
+
+    if not _owns_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+
     if row.get("status") != "done":
         return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
 
     try:
-        result = json.loads(row.get("result") or "{}")
+        result = _to_obj(row.get("result"), {})
         file_path = result.get("file_path")
         filename = result.get("filename") or f"dfd_{sid}.pdf"
         if not file_path or not os.path.exists(file_path):
@@ -468,13 +504,15 @@ async def download_result_fmt(
 
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
-    if row.get("actor_cpf") != user.get("cpf"):
+
+    if not _owns_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+
     if row.get("status") != "done":
         return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
 
     try:
-        result = json.loads(row.get("result") or "{}")
+        result = _to_obj(row.get("result"), {})
         if fmt == "pdf":
             file_path = result.get("file_path_pdf") or None
             filename = result.get("filename_pdf") or None
@@ -751,7 +789,14 @@ async def dfd_ui(request: Request):
       const div = document.createElement('div');
       div.className = 'item';
 
-      const d = JSON.parse(row.result || '{}');
+      const toObj = (x) => {
+        if (!x) return {};
+        if (typeof x === 'string') { try { return JSON.parse(x); } catch { return {}; } }
+        if (typeof x === 'object') return x;
+        return {};
+      };
+
+      const d = toObj(row.result);
 
       // exibe nome sem extensão
       const displayName = (() => {
@@ -933,8 +978,13 @@ async def dfd_history_ui(request: Request):
   let loading = false;
   let end = false;    // recebeu menos que limit
 
-  function parseJSON(s, fallback) {
-    try { return JSON.parse(s || ""); } catch { return fallback; }
+  function parseJSON(x, fallback = {}) {
+    if (!x) return fallback;
+    if (typeof x === 'string') {
+      try { return JSON.parse(x); } catch { return fallback; }
+    }
+    if (typeof x === 'object') return x; // já é JSON (Postgres)
+    return fallback;
   }
   function buildAssuntoFrom(row) {
     // tenta result.assunto; cai para payload: objeto + pcaAno; senão vazio
@@ -942,7 +992,7 @@ async def dfd_history_ui(request: Request):
     if (result && result.assunto) return result.assunto;
     const payload = parseJSON(row.payload || "{}", {});
     const obj = payload.assunto || "";
-    const ano = payload.pcaAno || payload.pca_ano || "";
+       const ano = payload.pcaAno || payload.pca_ano || "";
     return (obj && ano) ? (`DFD - PCA ${ano} - ${obj}`) : (obj || "");
   }
   function rowDate(row) {

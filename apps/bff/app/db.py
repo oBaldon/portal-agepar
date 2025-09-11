@@ -1,119 +1,126 @@
+# app/db.py — versão Postgres (unifica storage das automações)
+from __future__ import annotations
 import os
-import sqlite3
 import json
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-DB_PATH = "/app/data/app.db"
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+import psycopg
+from psycopg.rows import dict_row
+from psycopg.types.json import Json
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL não configurada para Postgres")
 
-def _conn() -> sqlite3.Connection:
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
-    # Melhorias de confiabilidade/concorrência no SQLite
-    con.execute("PRAGMA journal_mode=WAL;")
-    con.execute("PRAGMA foreign_keys=ON;")
-    return con
+# ----------------------------- conexões -----------------------------
+def _pg():
+    # autocommit=True para manter o comportamento dos helpers
+    return psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row)
 
+# ----------------------------- schema -------------------------------
+def init_db() -> None:
+    sql = """
+    CREATE TABLE IF NOT EXISTS submissions (
+      id           TEXT PRIMARY KEY,
+      kind         TEXT NOT NULL,
+      version      TEXT NOT NULL,
+      actor_cpf    TEXT,
+      actor_nome   TEXT,
+      actor_email  TEXT,
+      payload      JSONB NOT NULL,
+      status       TEXT NOT NULL,
+      result       JSONB,
+      error        TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
 
-def _utcnow() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+    CREATE TABLE IF NOT EXISTS automation_audits (
+      id         BIGSERIAL PRIMARY KEY,
+      at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      actor_cpf  TEXT,
+      actor_nome TEXT,
+      kind       TEXT NOT NULL,
+      action     TEXT NOT NULL,
+      meta       JSONB
+    );
 
+    CREATE INDEX IF NOT EXISTS ix_submissions_created_at            ON submissions (created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_submissions_kind_created          ON submissions (kind, created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_submissions_actor_cpf_created     ON submissions (actor_cpf, created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_submissions_actor_email_created   ON submissions (actor_email, created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_automation_audits_at ON automation_audits (at DESC);
 
-def _as_text(v: Any) -> Optional[str]:
+    CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
+    BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_submissions_touch ON submissions;
+    CREATE TRIGGER trg_submissions_touch
+    BEFORE UPDATE ON submissions
+    FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
     """
-    Garante TEXT para armazenamento. Dict/list → JSON.
-    None permanece None.
-    """
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(sql)
+
+# ----------------------------- utils --------------------------------
+def _to_json_value(v: Any) -> Optional[Json]:
+    """Aceita dict/list/str JSON; retorna psycopg.Json ou None."""
     if v is None:
         return None
     if isinstance(v, (dict, list)):
-        return json.dumps(v, ensure_ascii=False)
-    return str(v)
+        return Json(v)
+    if isinstance(v, str):
+        try:
+            return Json(json.loads(v))
+        except Exception:
+            # Em casos raros, se vier string já JSON válida, o cast do Postgres assume
+            return Json(v)
+    return Json(v)
 
-
-def init_db() -> None:
-    with _conn() as con:
-        cur = con.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS submissions (
-              id TEXT PRIMARY KEY,
-              kind TEXT NOT NULL,
-              version TEXT NOT NULL,
-              actor_cpf TEXT,
-              actor_nome TEXT,
-              actor_email TEXT,
-              payload TEXT NOT NULL,
-              status TEXT NOT NULL,
-              result TEXT,
-              error TEXT,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL
-            )
-            """
-        )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS audits (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              at TEXT NOT NULL,
-              actor_cpf TEXT,
-              actor_nome TEXT,
-              kind TEXT NOT NULL,
-              action TEXT NOT NULL,
-              meta TEXT
-            )
-            """
-        )
-        # Índices úteis para consultas frequentes
-        cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_kind_created ON submissions (kind, created_at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_actor_cpf_created ON submissions (actor_cpf, created_at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS ix_audits_at ON audits (at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS ix_submissions_actor_email_created ON submissions (actor_email, created_at DESC)")
-
-
+# ----------------------------- API ----------------------------------
 def insert_submission(sub: Dict[str, Any]) -> None:
     sub = dict(sub)  # cópia defensiva
-    # Normaliza campos textuais/JSON
-    sub["payload"] = _as_text(sub.get("payload"))
-    sub["result"] = _as_text(sub.get("result"))
-    sub["error"] = _as_text(sub.get("error"))
-    # Garantia de timestamps
-    sub.setdefault("created_at", _utcnow())
-    sub.setdefault("updated_at", sub["created_at"])
-
-    with _conn() as con:
-        con.execute(
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
             """
             INSERT INTO submissions
-              (id, kind, version, actor_cpf, actor_nome, actor_email, payload, status, result, error, created_at, updated_at)
+              (id, kind, version, actor_cpf, actor_nome, actor_email, payload, status, result, error)
             VALUES
-              (:id, :kind, :version, :actor_cpf, :actor_nome, :actor_email, :payload, :status, :result, :error, :created_at, :updated_at)
+              (%(id)s, %(kind)s, %(version)s, %(actor_cpf)s, %(actor_nome)s, %(actor_email)s,
+               %(payload)s, %(status)s, %(result)s, %(error)s)
             """,
-            sub,
+            {
+                **sub,
+                "payload": _to_json_value(sub.get("payload") or {}),
+                "result": _to_json_value(sub.get("result")),
+            },
         )
-
 
 def update_submission(id: str, **fields: Any) -> None:
     if not fields:
         return
-    fields = {k: _as_text(v) if k in {"payload", "result", "error"} else v for k, v in fields.items()}
-    fields["updated_at"] = _utcnow()
-    sets = ", ".join(f"{k}=:{k}" for k in fields.keys())
-    params = dict(id=id, **fields)
-    with _conn() as con:
-        con.execute(f"UPDATE submissions SET {sets} WHERE id=:id", params)
+    # normaliza json
+    if "payload" in fields:
+        fields["payload"] = _to_json_value(fields["payload"])
+    if "result" in fields:
+        fields["result"] = _to_json_value(fields["result"])
 
+    sets = []
+    params: Dict[str, Any] = {"id": id}
+    for k, v in fields.items():
+        sets.append(f"{k} = %({k})s")
+        params[k] = v
+    sets.append("updated_at = now()")
+
+    q = f"UPDATE submissions SET {', '.join(sets)} WHERE id = %(id)s"
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(q, params)
 
 def get_submission(id: str) -> Optional[Dict[str, Any]]:
-    with _conn() as con:
-        cur = con.execute("SELECT * FROM submissions WHERE id = ?", (id,))
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM submissions WHERE id = %s", (id,))
         row = cur.fetchone()
         return dict(row) if row else None
-
 
 def list_submissions(
     kind: Optional[str] = None,
@@ -122,53 +129,62 @@ def list_submissions(
     limit: int = 50,
     offset: int = 0,
 ) -> List[Dict[str, Any]]:
-    q = "SELECT * FROM submissions WHERE 1=1"
-    params: Tuple[Any, ...] = ()
+    # Segurança: exige um identificador de ator para não vazar dados
+    if not actor_cpf and not actor_email:
+        raise RuntimeError("Identificador do ator ausente (cpf/email).")
+
+    params: List[Any] = []
+    where = ["1=1"]
     if kind:
-        q += " AND kind = ?"
-        params += (kind,)
-    # Prioriza CPF; se não houver, cai para e-mail
-    if actor_cpf is not None:
-        q += " AND actor_cpf = ?"
-        params += (actor_cpf,)
-    elif actor_email is not None:
-        q += " AND actor_email = ?"
-        params += (actor_email,)
-    q += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    params += (limit, offset)
+        where.append("kind = %s")
+        params.append(kind)
+    if actor_cpf:
+        where.append("actor_cpf = %s")
+        params.append(actor_cpf)
+    else:
+        where.append("actor_email = %s")
+        params.append(actor_email)
 
-    with _conn() as con:
-        cur = con.execute(q, params)
-        return [dict(r) for r in cur.fetchall()]
+    where_sql = " AND ".join(where)
+    sql = f"""
+        SELECT * FROM submissions
+        WHERE {where_sql}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([limit, offset])
 
-
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall() or []
+        return [dict(r) for r in rows]
 
 def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any]) -> None:
-    with _conn() as con:
-        con.execute(
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
             """
-            INSERT INTO audits (at, actor_cpf, actor_nome, kind, action, meta)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO automation_audits (actor_cpf, actor_nome, kind, action, meta)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (
-                _utcnow(),
-                actor.get("cpf"),
-                actor.get("nome"),
-                kind,
-                action,
-                json.dumps(meta, ensure_ascii=False),
-            ),
+            (actor.get("cpf"), actor.get("nome"), kind, action, _to_json_value(meta)),
         )
 
 def list_audits(kind: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-    q = "SELECT * FROM audits WHERE 1=1"
-    params: Tuple[Any, ...] = ()
+    params: List[Any] = []
+    where = ["1=1"]
     if kind:
-        q += " AND kind = ?"
-        params += (kind,)
-    q += " ORDER BY at DESC LIMIT ? OFFSET ?"
-    params += (limit, offset)
-    with _conn() as con:
-        cur = con.execute(q, params)
-        rows = [dict(r) for r in cur.fetchall()]
-        return rows
+        where.append("kind = %s")
+        params.append(kind)
+    where_sql = " AND ".join(where)
+    sql = f"""
+        SELECT * FROM automation_audits
+        WHERE {where_sql}
+        ORDER BY at DESC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([limit, offset])
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall() or []
+        return [dict(r) for r in rows]
