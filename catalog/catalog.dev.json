@@ -71,7 +71,8 @@
         { "path": "/form2json", "kind": "iframe" }
       ],
       "tags": ["utilitário"],
-      "requiredRoles": ["automations.form2json"]
+      "requiredRoles": ["automations.form2json"],
+      "hidden": true
     },
 
     {
