@@ -1,5 +1,7 @@
 <!doctype html>
-<html lang="pt-BR"><meta charset="utf-8"/>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>DFD — Documento de Formalização da Demanda (MVP)</title>
 <style>
@@ -16,7 +18,7 @@
   textarea { min-height: 100px; resize: vertical; }
   .row { display:flex; gap: 12px; }
   .col { flex:1; min-width: 0; }
-  .actions { display:flex; gap: 12px; align-items:center; }
+  .actions { display:flex; gap: 12px; align-items:center; justify-content: space-between; }
   .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
   .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
@@ -27,10 +29,10 @@
   .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
   .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
   .note { font-size:12px; color:var(--muted); }
-  .status { margin-top:12px; font-size:13px; }
+  .status { font-size:13px; color: var(--muted); }
   .list { margin-top: 24px; }
-  .item { padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
-  .item .meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .item { position: relative; padding:12px; padding-bottom: 60px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
+  .item .meta { display:flex; justify-content:flex-start; align-items:center; margin-bottom:8px; gap:8px; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
   .inline-help { display:inline-flex; align-items:center; position:relative; margin-left:6px; }
   .inline-help .help { width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center; padding:0; cursor:pointer; }
@@ -40,12 +42,20 @@
   .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
   .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
   .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
-  input[disabled], textarea[disabled], select[disabled] {
-    background:#f1f5f9; color:#64748b; border-color:#e2e8f0; cursor:not-allowed;
-  }
+  input[disabled], textarea[disabled], select[disabled] { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; cursor:not-allowed; }
   input.readonly { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
+  /* Remover no canto inferior direito do item */
+  .remove-item { position: absolute; right: 12px; bottom: 12px; }
+  /* Micro feedback quando tenta remover o último item */
+  @keyframes shake { from{transform:translateX(0)} 33%{transform:translateX(-2px)} 66%{transform:translateX(2px)} to{transform:translateX(0)} }
+  /* Melhor espaçamento em telas pequenas */
+  @media (max-width: 640px) {
+    .actions { flex-direction: column; align-items: stretch; gap: 8px; }
+    .actions .btn-row { justify-content: flex-end; }
+  }
 </style>
-
+</head>
+<body>
 <div class="wrap">
   <div class="header">
     <h1>DFD — Documento de Formalização da Demanda (MVP)</h1>
@@ -56,7 +66,7 @@
     <form id="f">
       <div class="row">
         <div class="col">
-          <label>Timbre
+          <label for="modeloSlug">Timbre
             <span class="inline-help">
               <button type="button" class="help" aria-label="Ajuda sobre Timbre">!</button>
               <span class="tip">Selecione o timbre/cabeçalho do documento.</span>
@@ -68,25 +78,25 @@
         </div>
 
         <div class="col">
-          <label>Nº do memorando
+          <label for="numero">Nº do memorando
             <span class="inline-help">
               <button type="button" class="help" aria-label="Ajuda sobre Nº do memorando">!</button>
               <span class="tip">Use o padrão da sua unidade (ex.: <code>012/2025</code>). Esse número aparece no cabeçalho.</span>
             </span>
           </label>
-          <input name="numero" placeholder="Ex.: 0XX/202X" required />
+          <input id="numero" name="numero" placeholder="Ex.: 0XX/202X" required />
         </div>
       </div>
 
-      <label>Assunto
+      <label for="assunto">Assunto
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Assunto">!</button>
           <span class="tip">Assunto exibido no cabeçalho e metadados. Ex.: <em>Aquisição de software X</em>.</span>
         </span>
       </label>
-      <input name="assunto" placeholder="Ex.: Aquisição de software X" required />
+      <input id="assunto" name="assunto" placeholder="Ex.: Aquisição de software X" required />
 
-      <label>Ano de execução do PCA
+      <label for="pcaAno">Ano de execução do PCA
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">!</button>
           <span class="tip">Informe 4 dígitos (ex.: <code>2027</code>). Define os meses da “Data pretendida”.</span>
@@ -96,17 +106,17 @@
 
       <!-- ======== Campos ======== -->
 
-      <label>Diretoria demandante
+      <label for="diretoriaDemandante">Diretoria demandante
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Diretoria demandante">!</button>
-          <span class="tip">Selecione a diretoria responsável pela demanda. (Lista pode ser integrada ao BFF em /options.)</span>
+          <span class="tip">Selecione a diretoria responsável pela demanda.</span>
         </span>
       </label>
       <select name="diretoriaDemandante" id="diretoriaDemandante" required>
         <option value="">-- Selecionar --</option>
       </select>
       
-      <label>Alinhamento com o <em>Planejamento Estratégico</em>
+      <label for="alinhamentoPE">Alinhamento com o <em>Planejamento Estratégico</em>
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button>
           <span class="tip">Explique como a demanda se conecta a objetivos/indicadores estratégicos da organização.</span>
@@ -116,7 +126,7 @@
 
       <hr class="hr" />
 
-      <label>Objeto
+      <label for="objeto">Objeto
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button>
           <span class="tip">Descreva o objeto da contratação (ex.: <em>Licenças do sistema Z</em>).</span>
@@ -126,18 +136,17 @@
 
       <hr class="hr" />
 
-      <div class="row" style="align-items:center">
-        <h2 style="font-size:16px; margin:0">Itens</h2>
-        <div style="flex:1"></div>
-        <button type="button" class="btn small" id="addItemBtn">Adicionar item</button>
-      </div>
+      <h2 style="font-size:16px; margin:0 0 8px">Itens</h2>
       <div class="note">Adicione um ou mais itens. Cada item possui seus próprios campos.</div>
 
       <div id="items"></div>
 
       <div class="actions" style="margin-top:16px">
-        <button class="btn" id="submitBtn">Gerar DFD</button>
-        <span class="status" id="status" aria-live="polite"></span>
+        <span class="status" id="status" role="status" aria-live="polite"></span>
+        <div class="btn-row">
+          <button type="button" class="btn secondary" id="addItemBtn">Adicionar item</button>
+          <button type="submit" class="btn" id="submitBtn">Gerar DFD</button>
+        </div>
       </div>
     </form>
   </div>
@@ -146,7 +155,7 @@
 </div>
 
 <script>
-  // ------- Constantes de listas (poderão vir do BFF depois) -------
+  // ------- Constantes de listas -------
   const LISTS = {
     unidadeMedida: [
       "Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro","Metro cúbico","Metro linear","Metro quadrado","Milheiro","Miligrama","Mililitro","Outras Unidades de Medidas","Par","Quilograma","Quilograma do peso drenado","Quilômetro","Rolo","Teste","Tubo","Unidade Internacional","Unitário"
@@ -259,25 +268,25 @@
     meta.className = 'meta';
     const title = document.createElement('div');
     title.innerHTML = `<span class="badge">Item</span> <strong class="item-number">#${idx+1}</strong>`;
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn small danger';
-    removeBtn.textContent = 'Remover';
-    removeBtn.onclick = () => { wrap.remove(); recomputeItemNumbers(); };
     meta.appendChild(title);
-    meta.appendChild(removeBtn);
 
     // Descrição
     const lblDesc = document.createElement('label');
     lblDesc.textContent = 'Descrição sucinta do objeto';
     lblDesc.appendChild(helpIcon('Texto resumido do que será contratado/adquirido.'));
-    const txtDesc = document.createElement('textarea'); txtDesc.name = `items[${idx}][descricao]`;
+    const txtDesc = document.createElement('textarea'); 
+    txtDesc.name = `items[${idx}][descricao]`;
+    txtDesc.id = `item-${idx}-descricao`;
+    lblDesc.htmlFor = txtDesc.id;
 
     // Justificativa
     const lblJust = document.createElement('label');
     lblJust.textContent = 'Justificativa para aquisição ou contratação';
     lblJust.appendChild(helpIcon('Explique por que é necessário, problema atual e benefício esperado.'));
-    const txtJust = document.createElement('textarea'); txtJust.name = `items[${idx}][justificativa]`;
+    const txtJust = document.createElement('textarea'); 
+    txtJust.name = `items[${idx}][justificativa]`;
+    txtJust.id = `item-${idx}-justificativa`;
+    lblJust.htmlFor = txtJust.id;
 
     // Linha 1: Unidade, Quantidade, Valor Unitário, Valor Total
     const row1 = document.createElement('div'); row1.className = 'row';
@@ -287,6 +296,8 @@
     lblUM.appendChild(helpIcon('Escolha uma unidade padronizada. O campo não aceita texto livre.'));
     const selUM = buildSelect(LISTS.unidadeMedida);
     selUM.name = `items[${idx}][unidadeMedida]`;
+    selUM.id = `item-${idx}-unidadeMedida`;
+    lblUM.htmlFor = selUM.id;
     colUM.appendChild(lblUM); colUM.appendChild(selUM);
 
     const colQt = document.createElement('div'); colQt.className='col';
@@ -294,6 +305,8 @@
     lblQt.appendChild(helpIcon('Informe um número inteiro (sem casas decimais).'));
     const inpQt = document.createElement('input'); inpQt.type='number'; inpQt.min='0'; inpQt.step='1'; inpQt.inputMode='numeric';
     inpQt.name = `items[${idx}][quantidade]`;
+    inpQt.id = `item-${idx}-quantidade`;
+    lblQt.htmlFor = inpQt.id;
     colQt.appendChild(lblQt); colQt.appendChild(inpQt);
 
     const colVU = document.createElement('div'); colVU.className='col';
@@ -301,6 +314,8 @@
     lblVU.appendChild(helpIcon('Digite o valor unitário em reais (use ponto como separador decimal).'));
     const inpVU = document.createElement('input'); inpVU.type='number'; inpVU.min='0'; inpVU.step='0.01'; inpVU.inputMode='decimal';
     inpVU.name = `items[${idx}][valorUnitario]`;
+    inpVU.id = `item-${idx}-valorUnitario`;
+    lblVU.htmlFor = inpVU.id;
     colVU.appendChild(lblVU); colVU.appendChild(inpVU);
 
     const colVT = document.createElement('div'); colVT.className='col';
@@ -313,6 +328,8 @@
     inpVT.tabIndex = -1;
     inpVT.classList.add('readonly');
     inpVT.name = `items[${idx}][valorTotal]`;
+    inpVT.id = `item-${idx}-valorTotal`;
+    lblVT.htmlFor = inpVT.id;
     colVT.appendChild(lblVT); colVT.appendChild(inpVT);
 
     row1.appendChild(colUM); row1.appendChild(colQt); row1.appendChild(colVU); row1.appendChild(colVT);
@@ -325,6 +342,8 @@
     lblGP.appendChild(helpIcon('Selecione o grau conforme impacto da não contratação.'));
     const selGP = buildSelect(LISTS.grauPrioridade);
     selGP.name = `items[${idx}][grauPrioridade]`;
+    selGP.id = `item-${idx}-grauPrioridade`;
+    lblGP.htmlFor = selGP.id;
     colGP.appendChild(lblGP); colGP.appendChild(selGP);
 
     const colDP = document.createElement('div'); colDP.className='col';
@@ -332,6 +351,8 @@
     lblDP.appendChild(helpIcon('Escolha o mês no formato “mês de [ano do PCA]”. A lista muda quando o ano do PCA é alterado.'));
     const selDP = buildSelect(mesesDoAno(document.getElementById('pcaAno')?.value || ''));
     selDP.name = `items[${idx}][dataPretendida]`;
+    selDP.id = `item-${idx}-dataPretendida`;
+    lblDP.htmlFor = selDP.id;
     colDP.appendChild(lblDP); colDP.appendChild(selDP);
 
     row2.appendChild(colGP); row2.appendChild(colDP);
@@ -344,12 +365,17 @@
     lblDep.appendChild(helpIcon('Informe se este item depende de outra contratação para fazer sentido.'));
     const selDep = buildSelect(LISTS.simNao);
     selDep.name = `items[${idx}][haDependencia]`;
+    selDep.id = `item-${idx}-haDependencia`;
+    lblDep.htmlFor = selDep.id;
     colDep.appendChild(lblDep); colDep.appendChild(selDep);
 
     const colQual = document.createElement('div'); colQual.className='col';
     const lblQual = document.createElement('label'); lblQual.textContent = "Se 'Sim', qual?";
     lblQual.appendChild(helpIcon('Descreva a contratação da qual este item depende.'));
-    const inpQual = document.createElement('input'); inpQual.placeholder = 'Descreva a dependência'; inpQual.name = `items[${idx}][dependenciaQual]`;
+    const inpQual = document.createElement('input'); inpQual.placeholder = 'Descreva a dependência'; 
+    inpQual.name = `items[${idx}][dependenciaQual]`;
+    inpQual.id = `item-${idx}-dependenciaQual`;
+    lblQual.htmlFor = inpQual.id;
     colQual.appendChild(lblQual); colQual.appendChild(inpQual);
 
     row3.appendChild(colDep); row3.appendChild(colQual);
@@ -360,7 +386,10 @@
     const colRisco = document.createElement('div'); colRisco.className='col';
     const lblRisco = document.createElement('label'); lblRisco.textContent = 'Riscos da não contratação';
     lblRisco.appendChild(helpIcon('Consequências de não realizar a contratação (impactos operacionais, legais, etc.).'));
-    const txtRisco = document.createElement('textarea'); txtRisco.name = `items[${idx}][riscosNaoContratacao]`;
+    const txtRisco = document.createElement('textarea'); 
+    txtRisco.name = `items[${idx}][riscosNaoContratacao]`;
+    txtRisco.id = `item-${idx}-riscosNaoContratacao`;
+    lblRisco.htmlFor = txtRisco.id;
     colRisco.appendChild(lblRisco); colRisco.appendChild(txtRisco);
 
     const colRen = document.createElement('div'); colRen.className='col';
@@ -368,9 +397,28 @@
     lblRen.appendChild(helpIcon('Indique se se trata de renovação de contrato já existente.'));
     const selRen = buildSelect(LISTS.simNao);
     selRen.name = `items[${idx}][renovacaoContrato]`;
+    selRen.id = `item-${idx}-renovacaoContrato`;
+    lblRen.htmlFor = selRen.id;
     colRen.appendChild(lblRen); colRen.appendChild(selRen);
 
     row4.appendChild(colRisco); row4.appendChild(colRen);
+
+    // Botão remover (canto inferior direito)
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn small danger remove-item';
+    removeBtn.textContent = 'Remover';
+    removeBtn.onclick = () => {
+      if (itemsEl.children.length <= 1) {
+        removeBtn.blur();
+        wrap.style.animation = 'shake .2s';
+        setTimeout(() => (wrap.style.animation = ''), 250);
+        return;
+      }
+      wrap.remove();
+      recomputeItemNumbers();
+      updateRemoveButtons();
+    };
 
     // Interações
     function recalc(){
@@ -400,39 +448,52 @@
     wrap.appendChild(row2);
     wrap.appendChild(row3);
     wrap.appendChild(row4);
+    wrap.appendChild(removeBtn);
     return wrap;
+  }
+
+  function updateRemoveButtons(){
+    const onlyOne = itemsEl.children.length <= 1;
+    itemsEl.querySelectorAll('.remove-item')
+      .forEach(btn => { btn.disabled = onlyOne; });
   }
 
   function recomputeItemNumbers(){
     Array.from(itemsEl.children).forEach((div, i) => {
-      // atualiza número visível
       const numEl = div.querySelector('.item-number');
       if (numEl) numEl.textContent = `#${i+1}`;
-      // atualiza data-idx
       div.dataset.idx = String(i);
-      // reindexa names: items[<old>][field] -> items[i][field]
       div.querySelectorAll('[name^="items["]').forEach(el => {
-        const old = el.name;
-        const newer = old.replace(/items\[\d+\]/, `items[${i}]`);
-        el.name = newer;
+        el.name = el.name.replace(/items\[\d+\]/, `items[${i}]`);
+      });
+      // também atualiza os IDs dinâmicos para manter labels consistentes
+      div.querySelectorAll('[id^="item-"]').forEach(el => {
+        el.id = el.id.replace(/item-\d+-/, `item-${i}-`);
+      });
+      div.querySelectorAll('label[for^="item-"]').forEach(lab => {
+        lab.htmlFor = lab.htmlFor.replace(/item-\d+-/, `item-${i}-`);
       });
     });
+    updateRemoveButtons();
   }
 
   function ensureOneItem(){
     if (itemsEl.children.length === 0) {
       itemsEl.appendChild(createItem());
       recomputeItemNumbers();
+      updateRemoveButtons();
     }
   }
 
   addItemBtn?.addEventListener('click', () => {
     itemsEl.appendChild(createItem());
     recomputeItemNumbers();
+    updateRemoveButtons();
+    const last = itemsEl.lastElementChild;
+    if (last) last.querySelector('textarea, input, select')?.focus();
   });
 
   pcaAnoEl?.addEventListener('input', () => {
-    // Atualiza todos os combos de Data pretendida quando o ano mudar
     const ano = pcaAnoEl.value;
     const options = mesesDoAno(ano);
     itemsEl.querySelectorAll('select[name$="[dataPretendida]"]').forEach(sel => {
@@ -444,7 +505,7 @@
     });
   });
 
-  // ------- Serialização custom para incluir array de itens -------
+  // ------- Serialização -------
   function formToPayload(){
     const header = {
       modeloSlug: f.modeloSlug.value || "",
@@ -484,16 +545,25 @@
     statusEl.textContent = 'Enviando...';
     smoothScrollTo(subsEl);
     ensureOneItem();
+
     const payload = formToPayload();
 
-    const res = await fetch('./submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
+    let res, data;
+    try {
+      res = await fetch('./submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      try { data = await res.json(); } catch { data = {}; }
+    } catch (e) {
+      statusEl.textContent = 'Erro de rede ao enviar. Tente novamente.';
+      submitBtn.disabled = false;
+      return;
+    }
+
     if (!res.ok) {
-      let msg = (data && data.message) ? data.message : String(res.status);
+      let msg = (data && data.message) ? data.message : `HTTP ${res.status}`;
       const details = (data && data.details && data.details.errors);
       if (Array.isArray(details) && details.length) {
         msg += ' — ' + details.join(' | ');
@@ -508,13 +578,19 @@
     const sid = data.submissionId;
     let tries = 0;
     let row = null;
+
     while (tries < 120) {
       await new Promise(r => setTimeout(r, 1000));
-      const r = await fetch('./submissions/' + sid);
-      row = await r.json();
-      if (row.status === 'done' || row.status === 'error') break;
+      try {
+        const r = await fetch('./submissions/' + sid);
+        row = await r.json();
+      } catch {
+        // ignora falhas transitórias da consulta
+      }
+      if (row && (row.status === 'done' || row.status === 'error')) break;
       tries++;
     }
+
     if (!row) {
       statusEl.textContent = 'Falha ao acompanhar processamento.';
       submitBtn.disabled = false;
@@ -618,3 +694,5 @@
   f.addEventListener('submit', submit);
   init();
 </script>
+</body>
+</html>
