@@ -33,7 +33,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "2.0.0"
+DFD_VERSION = "2.2.0"  # alinhado à UI com itens antes dos campos gerais finais
 REQUIRED_ROLES = ("automations.dfd",)
 
 # Diretório com os modelos DOCX por diretoria (timbre)
@@ -148,18 +148,15 @@ REGEX_DATA_PRETENDIDA = re.compile(
 
 class Item(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    # Itens (por UI atual)
     descricao: str = Field("", max_length=MAX_TEXTO_LONGO)
-    justificativa: str = Field("", max_length=MAX_TEXTO_LONGO)
-    unidadeMedida: str
+    haDependencia: str  # "Sim" | "Não"
+    dependenciaQual: Optional[str] = Field(default=None, max_length=MAX_TEXTO_LONGO)
+    renovacaoContrato: str  # "Sim" | "Não"
     quantidade: int = Field(0, ge=0)
+    unidadeMedida: str
     valorUnitario: float = Field(0.0, ge=0.0)
     valorTotal: Optional[float] = Field(None, ge=0.0)
-    grauPrioridade: str
-    dataPretendida: str
-    haDependencia: str
-    dependenciaQual: Optional[str] = Field(default=None, max_length=MAX_TEXTO_LONGO)
-    riscosNaoContratacao: str = Field("", max_length=MAX_TEXTO_LONGO)
-    renovacaoContrato: str
 
     @field_validator("unidadeMedida")
     @classmethod
@@ -168,13 +165,6 @@ class Item(BaseModel):
             return v
         raise ValueError("Unidade de medida inválida.")
 
-    @field_validator("grauPrioridade")
-    @classmethod
-    def _valid_prioridade(cls, v: str) -> str:
-        if v and v in ALLOWED_PRIORIDADE:
-            return v
-        raise ValueError("Grau de prioridade inválido.")
-
     @field_validator("haDependencia", "renovacaoContrato")
     @classmethod
     def _valid_simnao(cls, v: str) -> str:
@@ -182,20 +172,11 @@ class Item(BaseModel):
             return v
         raise ValueError("Valor deve ser 'Sim' ou 'Não'.")
 
-    @field_validator("dataPretendida")
-    @classmethod
-    def _valid_data_fmt(cls, v: str) -> str:
-        if not v:
-            raise ValueError("Informe a data pretendida no formato 'mês de AAAA'.")
-        if not REGEX_DATA_PRETENDIDA.match(v.strip()):
-            raise ValueError("Use o formato 'mês de AAAA' (em minúsculas).")
-        return v
-
     @model_validator(mode="after")
     def _normalize_compute(self):
         # Dependência: se Sim, exige 'dependenciaQual'
         if self.haDependencia == "Sim" and not (self.dependenciaQual or "").strip():
-            raise ValueError("Campo 'Se Sim, qual?' é obrigatório quando há dependência.")
+            raise ValueError("Campo 'Se Sim, descreva o vínculo' é obrigatório quando há vínculo.")
         # Valor total sempre recalculado
         try:
             qt = int(self.quantidade or 0)
@@ -207,7 +188,7 @@ class Item(BaseModel):
 
 
 class DfdIn(BaseModel):
-    """Modelo de entrada do DFD (alinhado à UI atual)."""
+    """Modelo de entrada do DFD (alinhado à nova UI)."""
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     # Cabeçalho
@@ -216,25 +197,48 @@ class DfdIn(BaseModel):
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)  # compõe o assunto final
     pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")
 
-    # Identificação
+    # Bloco geral (unificado)
     diretoria_demandante: str = Field(..., alias="diretoriaDemandante")
     alinhamento_pe: Optional[str] = Field("", alias="alinhamentoPE", max_length=MAX_TEXTO_LONGO)
+    justificativa_necessidade: Optional[str] = Field("", alias="justificativaNecessidade", max_length=MAX_TEXTO_LONGO)
     objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
+
+    # Campos gerais finais (após itens na UI)
+    prazos_envolvidos: Optional[str] = Field("", alias="prazosEnvolvidos")
+    consequencia_nao_aquisicao: Optional[str] = Field("", alias="consequenciaNaoAquisicao", max_length=MAX_TEXTO_LONGO)
+    grau_prioridade: Optional[str] = Field(None, alias="grauPrioridade")
 
     # Itens
     items: List[Item] = Field(..., min_length=1)
 
+    @field_validator("grau_prioridade")
+    @classmethod
+    def _valid_prioridade_geral(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ""):
+            return ""
+        if v in ALLOWED_PRIORIDADE:
+            return v
+        raise ValueError("Grau de prioridade inválido.")
+
+    @field_validator("prazos_envolvidos")
+    @classmethod
+    def _valid_prazos_fmt(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return ""
+        if not REGEX_DATA_PRETENDIDA.match(v.strip()):
+            raise ValueError("Use o formato 'mês de AAAA' (em minúsculas).")
+        return v
+
     @model_validator(mode="after")
     def _valid_relacoes(self):
-        # Confere se todas as datas pretendidas usam o mesmo ano do PCA
-        ano = (self.pca_ano or "").strip()
-        for i, it in enumerate(self.items):
-            m = REGEX_DATA_PRETENDIDA.match((it.dataPretendida or "").strip())
+        # Se prazos_envolvidos vier preenchido, o ano deve bater com pca_ano
+        if self.prazos_envolvidos:
+            m = REGEX_DATA_PRETENDIDA.match(self.prazos_envolvidos.strip())
             if not m:
-                raise ValueError(f"Item {i+1}: Data pretendida inválida.")
-            ano_item = m.group(2)
-            if ano_item != ano:
-                raise ValueError(f"Item {i+1}: Data pretendida deve estar no ano do PCA ({ano}).")
+                raise ValueError("Campo 'Prazos envolvidos' inválido.")
+            ano_prazo = m.group(2)
+            if ano_prazo != (self.pca_ano or "").strip():
+                raise ValueError(f"'Prazos envolvidos' deve estar no ano do PCA ({self.pca_ano}).")
         return self
 
 
@@ -248,8 +252,16 @@ SCHEMA = {
         {"name": "pcaAno", "type": "text", "label": "Ano de execução do PCA"},
         {"name": "diretoriaDemandante", "type": "select", "label": "Diretoria demandante"},
         {"name": "alinhamentoPE", "type": "textarea", "label": "Alinhamento com o Planejamento Estratégico"},
+        {"name": "justificativaNecessidade", "type": "textarea", "label": "Justificativa da necessidade"},
         {"name": "objeto", "type": "textarea", "label": "Objeto"},
+
+        # === Itens agora vêm antes dos campos gerais finais ===
         {"name": "items", "type": "array", "label": "Itens"},
+
+        # Campos gerais finais (após Itens)
+        {"name": "prazosEnvolvidos", "type": "select", "label": "Prazos envolvidos"},
+        {"name": "consequenciaNaoAquisicao", "type": "textarea", "label": "Consequência da não aquisição"},
+        {"name": "grauPrioridade", "type": "select", "label": "Grau de prioridade"},
     ],
 }
 
@@ -265,20 +277,24 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "diretoria_demandante": {"label": "Diretoria demandante"},
     "alinhamentoPE": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
     "alinhamento_pe": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
+    "justificativaNecessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO},
+    "justificativa_necessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO},
     "objeto": {"label": "Objeto", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
-    # Itens (nomes finais vêm no último elemento do caminho do erro)
+    "prazosEnvolvidos": {"label": "Prazos envolvidos"},
+    "prazos_envolvidos": {"label": "Prazos envolvidos"},
+    "consequenciaNaoAquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO},
+    "consequencia_nao_aquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO},
+    "grauPrioridade": {"label": "Grau de prioridade"},
+    "grau_prioridade": {"label": "Grau de prioridade"},
+    # Itens
     "descricao": {"label": "Descrição sucinta do objeto"},
-    "justificativa": {"label": "Justificativa para aquisição ou contratação"},
-    "unidadeMedida": {"label": "Unidade de medida do item a ser adquirido ou contratado"},
-    "quantidade": {"label": "Quantidade a ser adquirida ou contratada"},
-    "valorUnitario": {"label": "Estimativa preliminar de valor unitário da contratação (R$)"},
-    "valorTotal": {"label": "Estimativa preliminar de valor total da contratação (auto)"},
-    "grauPrioridade": {"label": "Grau de prioridade da contratação"},
-    "dataPretendida": {"label": "Data pretendida para compra/contratação"},
-    "haDependencia": {"label": "Há vínculo ou dependência com outra contratação?"},
-    "dependenciaQual": {"label": "Se 'Sim', qual?"},
-    "riscosNaoContratacao": {"label": "Riscos da não contratação"},
+    "haDependencia": {"label": "Há vinculação ou dependência com a contratação de outro item?"},
+    "dependenciaQual": {"label": "Se 'Sim', descreva o vínculo"},
     "renovacaoContrato": {"label": "Renovação de contrato"},
+    "unidadeMedida": {"label": "Unidade de medida"},
+    "quantidade": {"label": "Quantidade a ser adquirida"},
+    "valorUnitario": {"label": "Estimativa de valor unitário (R$)"},
+    "valorTotal": {"label": "Estimativa de valor total (auto)"},
 }
 
 
@@ -312,7 +328,7 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
         elif typ == "missing":
             msgs.append(f"Campo '{label}' é obrigatório.")
         else:
-            # Para erros de model_validator (ex.: datas e dependência):
+            # Para erros de model_validator/field_validator:
             msgs.append(f"Campo '{label}': {msg}")
     return msgs
 
@@ -434,13 +450,14 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         for i, it in enumerate(itens_in, start=1):
             try:
                 item = Item(**it)  # revalida item com regras de negócio
+                item_dict = item.model_dump()
             except ValidationError as ve:
                 # Erro amigável por item
                 update_submission(sid, status="error", error=f"Item {i}: {ve.errors()}")
                 add_audit(KIND, "failed", actor, {"sid": sid, "error": f"item {i} invalid"})
                 return
-            total_geral += float(item.valorTotal or 0.0)
-            itens_out.append(item.model_dump())
+            total_geral += float(item_dict.get("valorTotal") or 0.0)
+            itens_out.append(item_dict)
 
         ctx = {
             "diretoria": raw["modeloSlug"],
@@ -448,10 +465,16 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "assunto": assunto_final,  # usado no cabeçalho/timbre
             "pca_ano": pca_ano,        # usado no texto introdutório do corpo
             "data": today_iso,
-            # novos campos
+            # campos gerais
             "diretoria_demandante": raw.get("diretoriaDemandante") or "",
             "alinhamento_pe": raw.get("alinhamentoPE") or "",
+            "justificativa_necessidade": raw.get("justificativaNecessidade") or "",
             "objeto": raw.get("objeto") or "",
+            # campos gerais finais
+            "prazos_envolvidos": raw.get("prazosEnvolvidos") or "",
+            "consequencia_nao_aquisicao": raw.get("consequenciaNaoAquisicao") or "",
+            "grau_prioridade": raw.get("grauPrioridade") or "",
+            # itens e totais
             "itens": itens_out,
             "total_geral": round(total_geral, 2),
         }
@@ -534,7 +557,11 @@ async def submit_dfd(
         "pcaAno": (body.get("pcaAno") or "").strip(),
         "diretoriaDemandante": none_if_empty(body.get("diretoriaDemandante")),
         "alinhamentoPE": (body.get("alinhamentoPE") or "").strip(),
+        "justificativaNecessidade": (body.get("justificativaNecessidade") or "").strip(),
         "objeto": (body.get("objeto") or "").strip(),
+        "prazosEnvolvidos": (body.get("prazosEnvolvidos") or "").strip(),
+        "consequenciaNaoAquisicao": (body.get("consequenciaNaoAquisicao") or "").strip(),
+        "grauPrioridade": none_if_empty(body.get("grauPrioridade")),
         "items": body.get("items") or [],
     }
     if not raw["modeloSlug"]:

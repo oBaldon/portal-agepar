@@ -13,11 +13,13 @@
   h1 { font-size: 20px; margin: 0 0 12px; }
   .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
   .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+
   label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
-  input, textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
   textarea { min-height: 100px; resize: vertical; }
   .row { display:flex; gap: 12px; }
   .col { flex:1; min-width: 0; }
+
   .actions { display:flex; gap: 12px; align-items:center; justify-content: space-between; }
   .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
@@ -28,12 +30,15 @@
   .btn.danger { background:#b91c1c; }
   .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
   .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+
   .note { font-size:12px; color:var(--muted); }
   .status { font-size:13px; color: var(--muted); }
   .list { margin-top: 24px; }
-  .item { position: relative; padding:12px; padding-bottom: 60px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
+
+  .item { position: relative; padding:12px; padding-bottom: 64px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
   .item .meta { display:flex; justify-content:flex-start; align-items:center; margin-bottom:8px; gap:8px; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+
   .inline-help { display:inline-flex; align-items:center; position:relative; margin-left:6px; }
   .inline-help .help { width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center; padding:0; cursor:pointer; }
   .inline-help .help:hover { background:#dbeafe; border-color:#93c5fd; }
@@ -41,14 +46,22 @@
   .inline-help .tip { position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px; background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px; box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none; opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
   .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
   .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
+
   .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+
+  /* inativos/readonly em cinza */
   input[disabled], textarea[disabled], select[disabled] { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; cursor:not-allowed; }
   input.readonly { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
-  /* Remover no canto inferior direito do item */
-  .remove-item { position: absolute; right: 12px; bottom: 12px; }
-  /* Micro feedback quando tenta remover o último item */
+  .group-disabled label { color:#94a3b8; }
+  .group-disabled .inline-help .help { background:#e5e7eb; color:#94a3b8; border-color:#e5e7eb; }
+  .group-disabled input:not([type="checkbox"]):not([type="radio"]), .group-disabled select, .group-disabled textarea { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
+
+  .item-actions { position:absolute; right:12px; bottom:12px; display:flex; gap:8px; }
+  .checkline { display:flex; align-items:center; gap:8px; padding:6px 0; }
+  .checkline input[type="checkbox"] { width:auto; margin:0; }
+  .checkline label { margin:0; font-size:12px; color:var(--muted); }
+
   @keyframes shake { from{transform:translateX(0)} 33%{transform:translateX(-2px)} 66%{transform:translateX(2px)} to{transform:translateX(0)} }
-  /* Melhor espaçamento em telas pequenas */
   @media (max-width: 640px) {
     .actions { flex-direction: column; align-items: stretch; gap: 8px; }
     .actions .btn-row { justify-content: flex-end; }
@@ -63,7 +76,7 @@
   </div>
 
   <div class="card">
-    <form id="f">
+    <form id="f" novalidate>
       <div class="row">
         <div class="col">
           <label for="modeloSlug">Timbre
@@ -81,7 +94,7 @@
           <label for="numero">Nº do memorando
             <span class="inline-help">
               <button type="button" class="help" aria-label="Ajuda sobre Nº do memorando">!</button>
-              <span class="tip">Use o padrão da sua unidade (ex.: <code>012/2025</code>). Esse número aparece no cabeçalho.</span>
+              <span class="tip">Use o padrão da sua unidade (ex.: <code>012/2025</code>).</span>
             </span>
           </label>
           <input id="numero" name="numero" placeholder="Ex.: 0XX/202X" required />
@@ -89,64 +102,74 @@
       </div>
 
       <label for="assunto">Assunto
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Assunto">!</button>
-          <span class="tip">Assunto exibido no cabeçalho e metadados. Ex.: <em>Aquisição de software X</em>.</span>
-        </span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Assunto">!</button><span class="tip">Assunto exibido no cabeçalho e metadados.</span></span>
       </label>
       <input id="assunto" name="assunto" placeholder="Ex.: Aquisição de software X" required />
 
       <label for="pcaAno">Ano de execução do PCA
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">!</button>
-          <span class="tip">Informe 4 dígitos (ex.: <code>2027</code>). Define os meses da “Data pretendida”.</span>
-        </span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">!</button><span class="tip">Informe 4 dígitos.</span></span>
       </label>
       <input name="pcaAno" id="pcaAno" placeholder="Ex.: 2027" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}" required />
 
-      <!-- ======== Campos ======== -->
-
       <label for="diretoriaDemandante">Diretoria demandante
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Diretoria demandante">!</button>
-          <span class="tip">Selecione a diretoria responsável pela demanda.</span>
-        </span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Diretoria demandante">!</button><span class="tip">Selecione a diretoria responsável.</span></span>
       </label>
       <select name="diretoriaDemandante" id="diretoriaDemandante" required>
         <option value="">-- Selecionar --</option>
       </select>
       
       <label for="alinhamentoPE">Alinhamento com o <em>Planejamento Estratégico</em>
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button>
-          <span class="tip">Explique como a demanda se conecta a objetivos/indicadores estratégicos da organização.</span>
-        </span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button><span class="tip">Explique o alinhamento.</span></span>
       </label>
       <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico"></textarea>
 
-      <hr class="hr" />
+      <label for="justificativaNecessidade">Justificativa da necessidade
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa da necessidade">!</button><span class="tip">Por que a demanda é necessária.</span></span>
+      </label>
+      <textarea name="justificativaNecessidade" id="justificativaNecessidade" placeholder="Contexto e motivação da demanda"></textarea>
 
       <label for="objeto">Objeto
-        <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button>
-          <span class="tip">Descreva o objeto da contratação (ex.: <em>Licenças do sistema Z</em>).</span>
-        </span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button><span class="tip">Descreva o objeto da contratação.</span></span>
       </label>
       <textarea name="objeto" id="objeto" placeholder="Ex.: Licenças do sistema Z" required></textarea>
+
+      <div class="checkline">
+        <input type="checkbox" id="objetoUmItem" />
+        <label for="objetoUmItem">O objeto <strong>possui</strong> <em>apenas</em> 1 item?</label>
+      </div>
 
       <hr class="hr" />
 
       <h2 style="font-size:16px; margin:0 0 8px">Itens</h2>
       <div class="note">Adicione um ou mais itens. Cada item possui seus próprios campos.</div>
-
       <div id="items"></div>
+
+      <hr class="hr" />
+
+      <div id="prazosGroup">
+        <label for="prazosEnvolvidos">Prazos envolvidos
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Prazos envolvidos">!</button><span class="tip">Selecione “mês de AAAA”.</span></span>
+        </label>
+        <select name="prazosEnvolvidos" id="prazosEnvolvidos" disabled>
+          <option value="">Informe o ano do PCA primeiro</option>
+        </select>
+      </div>
+
+      <label for="consequenciaNaoAquisicao">Consequência da não aquisição
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Consequência da não aquisição">!</button><span class="tip">Impactos se não contratar.</span></span>
+      </label>
+      <textarea name="consequenciaNaoAquisicao" id="consequenciaNaoAquisicao" placeholder="Descreva as consequências"></textarea>
+
+      <label for="grauPrioridade">Grau de prioridade
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Grau de prioridade">!</button><span class="tip">Selecione conforme impacto.</span></span>
+      </label>
+      <select name="grauPrioridade" id="grauPrioridade">
+        <option value="">-- Selecionar --</option>
+      </select>
 
       <div class="actions" style="margin-top:16px">
         <span class="status" id="status" role="status" aria-live="polite"></span>
-        <div class="btn-row">
-          <button type="button" class="btn secondary" id="addItemBtn">Adicionar item</button>
-          <button type="submit" class="btn" id="submitBtn">Gerar DFD</button>
-        </div>
+        <div class="btn-row"><button type="submit" class="btn" id="submitBtn">Gerar DFD</button></div>
       </div>
     </form>
   </div>
@@ -155,11 +178,8 @@
 </div>
 
 <script>
-  // ------- Constantes de listas -------
   const LISTS = {
-    unidadeMedida: [
-      "Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro","Metro cúbico","Metro linear","Metro quadrado","Milheiro","Miligrama","Mililitro","Outras Unidades de Medidas","Par","Quilograma","Quilograma do peso drenado","Quilômetro","Rolo","Teste","Tubo","Unidade Internacional","Unitário"
-    ],
+    unidadeMedida: ["Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro","Metro cúbico","Metro linear","Metro quadrado","Milheiro","Miligrama","Mililitro","Outras Unidades de Medidas","Par","Quilograma","Quilograma do peso drenado","Quilômetro","Rolo","Teste","Tubo","Unidade Internacional","Unitário"],
     grauPrioridade: [
       "Alto, quando a impossibilidade de contratação provoca interrupção de processo crítico ou estratégico.",
       "Médio, quando a impossibilidade de contratação provoca atraso de processo crítico ou estratégico.",
@@ -168,526 +188,245 @@
     ],
     simNao: ["Sim","Não"],
     diretoriasDemandantes: [
-      "Diretoria da Presidência - DP",
-      "Diretoria Administrativa e Financeira - DAF",
-      "Diretoria de Regulação Econômica - DRE",
-      "Diretoria de Fiscalização e Qualidade de Serviços - DFQS",
-      "Diretoria de Normas e Regulamentação - DNR",
+      "Diretoria da Presidência - DP","Diretoria Administrativa e Financeira - DAF","Diretoria de Regulação Econômica - DRE","Diretoria de Fiscalização e Qualidade de Serviços - DFQS","Diretoria de Normas e Regulamentação - DNR",
     ]
   };
 
-  function mesesDoAno(ano){
-    const nomes = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
-    if(!/^[0-9]{4}$/.test(String(ano||""))) return [];
-    return nomes.map(n => `${n} de ${ano}`);
-  }
-
-  // ------- Infra de UI -------
   const f = document.getElementById('f');
   const statusEl = document.getElementById('status');
   const subsEl = document.getElementById('subs');
   const submitBtn = document.getElementById('submitBtn');
   const modeloSel = document.getElementById('modeloSlug');
   const pcaAnoEl = document.getElementById('pcaAno');
-  const addItemBtn = document.getElementById('addItemBtn');
   const itemsEl = document.getElementById('items');
   const dirDemSel = document.getElementById('diretoriaDemandante');
+  const objetoEl = document.getElementById('objeto');
+  const objetoUmItemEl = document.getElementById('objetoUmItem');
+  const prazosSel = document.getElementById('prazosEnvolvidos');
+  const prazosGroup = document.getElementById('prazosGroup');
 
-  async function loadModels(){
-    try {
-      const r = await fetch('./models');
-      if (!r.ok) return;
-      const data = await r.json();
-      const items = (data && data.items) || [];
-      items.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.slug;
-        opt.textContent = m.slug;
-        modeloSel.appendChild(opt);
-      });
-    } catch(e) {}
+  function mesesDoAno(ano){ const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]; if(!/^[0-9]{4}$/.test(String(ano||""))) return []; return n.map(m=>`${m} de ${ano}`); }
+
+  async function loadModels(){ try{ const r=await fetch('./models'); if(!r.ok) return; const data=await r.json(); (data.items||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.slug; o.textContent=m.slug; modeloSel.appendChild(o); }); }catch{} }
+  function loadDiretoriasDemandantes(){ LISTS.diretoriasDemandantes.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; dirDemSel.appendChild(o); }); }
+  function loadGrauPrioridade(){ const gpSel=document.getElementById('grauPrioridade'); LISTS.grauPrioridade.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; gpSel.appendChild(o); }); }
+
+  function rebuildPrazosOptions(){
+    const ano=(pcaAnoEl?.value||'').trim(); const valid=/^[0-9]{4}$/.test(ano);
+    prazosSel.innerHTML='';
+    if(!valid){ prazosSel.disabled=true; prazosGroup.classList.add('group-disabled'); const o=document.createElement('option'); o.value=''; o.textContent='Informe o ano do PCA primeiro'; prazosSel.appendChild(o); return; }
+    prazosSel.disabled=false; prazosGroup.classList.remove('group-disabled');
+    const ph=document.createElement('option'); ph.value=''; ph.textContent='-- Selecionar --'; prazosSel.appendChild(ph);
+    mesesDoAno(ano).forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; prazosSel.appendChild(o); });
   }
 
-  function loadDiretoriasDemandantes(){
-    if (!dirDemSel) return;
-    LISTS.diretoriasDemandantes.forEach(v => {
-      const o = document.createElement('option');
-      o.value = v;
-      o.textContent = v;
-      dirDemSel.appendChild(o);
-    });
-  }
+  function smoothScrollTo(el){ if(!el) return; const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({behavior: reduced?'auto':'smooth', block:'start'}); }
 
-  function smoothScrollTo(el) {
-    if (!el) return;
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' });
-  }
-
-  // ------- Itens (dinâmico) -------
-  let itemSeq = 0;
-
-  function buildSelect(options, placeholder="-- Selecionar --"){
-    const sel = document.createElement('select');
-    const opt0 = document.createElement('option');
-    opt0.value = "";
-    opt0.textContent = placeholder;
-    sel.appendChild(opt0);
-    options.forEach(v => {
-      const o = document.createElement('option');
-      o.value = v;
-      o.textContent = v;
-      sel.appendChild(o);
-    });
-    return sel;
-  }
-
-  function helpIcon(text){
-    const span = document.createElement('span');
-    span.className = 'inline-help';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'help';
-    btn.setAttribute('aria-label','Ajuda');
-    btn.textContent = '!';
-    const tip = document.createElement('span');
-    tip.className = 'tip';
-    tip.textContent = text;
-    span.appendChild(btn);
-    span.appendChild(tip);
-    return span;
-  }
+  let itemSeq=0;
+  function buildSelect(options, placeholder="-- Selecionar --"){ const sel=document.createElement('select'); const o0=document.createElement('option'); o0.value=''; o0.textContent=placeholder; sel.appendChild(o0); options.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); }); return sel; }
+  function helpIcon(text){ const span=document.createElement('span'); span.className='inline-help'; const b=document.createElement('button'); b.type='button'; b.className='help'; b.setAttribute('aria-label','Ajuda'); b.textContent='!'; const tip=document.createElement('span'); tip.className='tip'; tip.textContent=text; span.appendChild(b); span.appendChild(tip); return span; }
 
   function createItem(){
-    const idx = itemSeq++;
-    const wrap = document.createElement('div');
-    wrap.className = 'item';
-    wrap.dataset.idx = idx;
+    const idx=itemSeq++;
+    const wrap=document.createElement('div'); wrap.className='item'; wrap.dataset.idx=idx;
 
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    const title = document.createElement('div');
-    title.innerHTML = `<span class="badge">Item</span> <strong class="item-number">#${idx+1}</strong>`;
+    const meta=document.createElement('div'); meta.className='meta';
+    const title=document.createElement('div'); title.innerHTML=`<span class="badge">Item</span> <strong class="item-number">#${idx+1}</strong>`;
     meta.appendChild(title);
 
-    // Descrição
-    const lblDesc = document.createElement('label');
-    lblDesc.textContent = 'Descrição sucinta do objeto';
-    lblDesc.appendChild(helpIcon('Texto resumido do que será contratado/adquirido.'));
-    const txtDesc = document.createElement('textarea'); 
-    txtDesc.name = `items[${idx}][descricao]`;
-    txtDesc.id = `item-${idx}-descricao`;
-    lblDesc.htmlFor = txtDesc.id;
+    const lblDesc=document.createElement('label'); lblDesc.textContent='Descrição sucinta do objeto'; lblDesc.appendChild(helpIcon('Texto resumido do que será contratado/adquirido.'));
+    const txtDesc=document.createElement('textarea'); txtDesc.name=`items[${idx}][descricao]`; txtDesc.id=`item-${idx}-descricao`; lblDesc.htmlFor=txtDesc.id;
 
-    // Justificativa
-    const lblJust = document.createElement('label');
-    lblJust.textContent = 'Justificativa para aquisição ou contratação';
-    lblJust.appendChild(helpIcon('Explique por que é necessário, problema atual e benefício esperado.'));
-    const txtJust = document.createElement('textarea'); 
-    txtJust.name = `items[${idx}][justificativa]`;
-    txtJust.id = `item-${idx}-justificativa`;
-    lblJust.htmlFor = txtJust.id;
+    const row1=document.createElement('div'); row1.className='row';
 
-    // Linha 1: Unidade, Quantidade, Valor Unitário, Valor Total
-    const row1 = document.createElement('div'); row1.className = 'row';
-
-    const colUM = document.createElement('div'); colUM.className='col';
-    const lblUM = document.createElement('label'); lblUM.textContent = 'Unidade de medida do item a ser adquirido ou contratado';
-    lblUM.appendChild(helpIcon('Escolha uma unidade padronizada. O campo não aceita texto livre.'));
-    const selUM = buildSelect(LISTS.unidadeMedida);
-    selUM.name = `items[${idx}][unidadeMedida]`;
-    selUM.id = `item-${idx}-unidadeMedida`;
-    lblUM.htmlFor = selUM.id;
-    colUM.appendChild(lblUM); colUM.appendChild(selUM);
-
-    const colQt = document.createElement('div'); colQt.className='col';
-    const lblQt = document.createElement('label'); lblQt.textContent = 'Quantidade a ser adquirida ou contratada';
-    lblQt.appendChild(helpIcon('Informe um número inteiro (sem casas decimais).'));
-    const inpQt = document.createElement('input'); inpQt.type='number'; inpQt.min='0'; inpQt.step='1'; inpQt.inputMode='numeric';
-    inpQt.name = `items[${idx}][quantidade]`;
-    inpQt.id = `item-${idx}-quantidade`;
-    lblQt.htmlFor = inpQt.id;
-    colQt.appendChild(lblQt); colQt.appendChild(inpQt);
-
-    const colVU = document.createElement('div'); colVU.className='col';
-    const lblVU = document.createElement('label'); lblVU.textContent = 'Estimativa preliminar de valor unitário da contratação (R$)';
-    lblVU.appendChild(helpIcon('Digite o valor unitário em reais (use ponto como separador decimal).'));
-    const inpVU = document.createElement('input'); inpVU.type='number'; inpVU.min='0'; inpVU.step='0.01'; inpVU.inputMode='decimal';
-    inpVU.name = `items[${idx}][valorUnitario]`;
-    inpVU.id = `item-${idx}-valorUnitario`;
-    lblVU.htmlFor = inpVU.id;
-    colVU.appendChild(lblVU); colVU.appendChild(inpVU);
-
-    const colVT = document.createElement('div'); colVT.className='col';
-    const lblVT = document.createElement('label'); lblVT.textContent = 'Estimativa preliminar de valor total da contratação (auto)';
-    lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário. Campo não editável.'));
-    const inpVT = document.createElement('input');
-    inpVT.type = 'text';
-    inpVT.readOnly = true;
-    inpVT.disabled = true;
-    inpVT.tabIndex = -1;
-    inpVT.classList.add('readonly');
-    inpVT.name = `items[${idx}][valorTotal]`;
-    inpVT.id = `item-${idx}-valorTotal`;
-    lblVT.htmlFor = inpVT.id;
-    colVT.appendChild(lblVT); colVT.appendChild(inpVT);
-
-    row1.appendChild(colUM); row1.appendChild(colQt); row1.appendChild(colVU); row1.appendChild(colVT);
-
-    // Linha 2: Grau prioridade, Data pretendida
-    const row2 = document.createElement('div'); row2.className = 'row';
-
-    const colGP = document.createElement('div'); colGP.className='col';
-    const lblGP = document.createElement('label'); lblGP.textContent = 'Grau de prioridade da contratação';
-    lblGP.appendChild(helpIcon('Selecione o grau conforme impacto da não contratação.'));
-    const selGP = buildSelect(LISTS.grauPrioridade);
-    selGP.name = `items[${idx}][grauPrioridade]`;
-    selGP.id = `item-${idx}-grauPrioridade`;
-    lblGP.htmlFor = selGP.id;
-    colGP.appendChild(lblGP); colGP.appendChild(selGP);
-
-    const colDP = document.createElement('div'); colDP.className='col';
-    const lblDP = document.createElement('label'); lblDP.textContent = 'Data pretendida para compra/contratação';
-    lblDP.appendChild(helpIcon('Escolha o mês no formato “mês de [ano do PCA]”. A lista muda quando o ano do PCA é alterado.'));
-    const selDP = buildSelect(mesesDoAno(document.getElementById('pcaAno')?.value || ''));
-    selDP.name = `items[${idx}][dataPretendida]`;
-    selDP.id = `item-${idx}-dataPretendida`;
-    lblDP.htmlFor = selDP.id;
-    colDP.appendChild(lblDP); colDP.appendChild(selDP);
-
-    row2.appendChild(colGP); row2.appendChild(colDP);
-
-    // Linha 3: Dependência (Sim/Não) + Qual
-    const row3 = document.createElement('div'); row3.className = 'row';
-
-    const colDep = document.createElement('div'); colDep.className='col';
-    const lblDep = document.createElement('label'); lblDep.textContent = 'Há vínculo ou dependência com outra contratação?';
-    lblDep.appendChild(helpIcon('Informe se este item depende de outra contratação para fazer sentido.'));
-    const selDep = buildSelect(LISTS.simNao);
-    selDep.name = `items[${idx}][haDependencia]`;
-    selDep.id = `item-${idx}-haDependencia`;
-    lblDep.htmlFor = selDep.id;
+    const colDep=document.createElement('div'); colDep.className='col';
+    const lblDep=document.createElement('label'); lblDep.textContent='Há vinculação ou dependência com a contratação de outro item?'; lblDep.appendChild(helpIcon('Informe se este item possui vínculo/dependência com outra contratação.'));
+    const selDep=buildSelect(LISTS.simNao); selDep.name=`items[${idx}][haDependencia]`; selDep.id=`item-${idx}-haDependencia`; lblDep.htmlFor=selDep.id;
     colDep.appendChild(lblDep); colDep.appendChild(selDep);
 
-    const colQual = document.createElement('div'); colQual.className='col';
-    const lblQual = document.createElement('label'); lblQual.textContent = "Se 'Sim', qual?";
-    lblQual.appendChild(helpIcon('Descreva a contratação da qual este item depende.'));
-    const inpQual = document.createElement('input'); inpQual.placeholder = 'Descreva a dependência'; 
-    inpQual.name = `items[${idx}][dependenciaQual]`;
-    inpQual.id = `item-${idx}-dependenciaQual`;
-    lblQual.htmlFor = inpQual.id;
-    colQual.appendChild(lblQual); colQual.appendChild(inpQual);
-
-    row3.appendChild(colDep); row3.appendChild(colQual);
-
-    // Linha 4: Riscos & Renovação
-    const row4 = document.createElement('div'); row4.className = 'row';
-
-    const colRisco = document.createElement('div'); colRisco.className='col';
-    const lblRisco = document.createElement('label'); lblRisco.textContent = 'Riscos da não contratação';
-    lblRisco.appendChild(helpIcon('Consequências de não realizar a contratação (impactos operacionais, legais, etc.).'));
-    const txtRisco = document.createElement('textarea'); 
-    txtRisco.name = `items[${idx}][riscosNaoContratacao]`;
-    txtRisco.id = `item-${idx}-riscosNaoContratacao`;
-    lblRisco.htmlFor = txtRisco.id;
-    colRisco.appendChild(lblRisco); colRisco.appendChild(txtRisco);
-
-    const colRen = document.createElement('div'); colRen.className='col';
-    const lblRen = document.createElement('label'); lblRen.textContent = 'Renovação de contrato';
-    lblRen.appendChild(helpIcon('Indique se se trata de renovação de contrato já existente.'));
-    const selRen = buildSelect(LISTS.simNao);
-    selRen.name = `items[${idx}][renovacaoContrato]`;
-    selRen.id = `item-${idx}-renovacaoContrato`;
-    lblRen.htmlFor = selRen.id;
+    const colRen=document.createElement('div'); colRen.className='col';
+    const lblRen=document.createElement('label'); lblRen.textContent='Renovação de contrato'; lblRen.appendChild(helpIcon('Indique se se trata de renovação de contrato.'));
+    const selRen=buildSelect(LISTS.simNao); selRen.name=`items[${idx}][renovacaoContrato]`; selRen.id=`item-${idx}-renovacaoContrato`; lblRen.htmlFor=selRen.id;
     colRen.appendChild(lblRen); colRen.appendChild(selRen);
 
-    row4.appendChild(colRisco); row4.appendChild(colRen);
+    row1.appendChild(colDep); row1.appendChild(colRen);
 
-    // Botão remover (canto inferior direito)
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'btn small danger remove-item';
-    removeBtn.textContent = 'Remover';
-    removeBtn.onclick = () => {
-      if (itemsEl.children.length <= 1) {
-        removeBtn.blur();
-        wrap.style.animation = 'shake .2s';
-        setTimeout(() => (wrap.style.animation = ''), 250);
-        return;
-      }
-      wrap.remove();
-      recomputeItemNumbers();
-      updateRemoveButtons();
-    };
+    // Detalhe do vínculo (COMEÇA DESABILITADO)
+    const row2a=document.createElement('div'); row2a.className='row';
+    const colQual=document.createElement('div'); colQual.className='col group-disabled'; colQual.id=`group-qual-${idx}`;
+    const lblQual=document.createElement('label'); lblQual.textContent="Se 'Sim', descreva o vínculo"; lblQual.appendChild(helpIcon('Descreva a contratação vinculada/dependente.'));
+    const inpQual=document.createElement('input'); inpQual.placeholder='Ex.: Depende do contrato ABC'; inpQual.name=`items[${idx}][dependenciaQual]`; inpQual.id=`item-${idx}-dependenciaQual`; inpQual.disabled=true; // << começa disabled
+    lblQual.htmlFor=inpQual.id;
+    colQual.appendChild(lblQual); colQual.appendChild(inpQual);
+    row2a.appendChild(colQual);
 
-    // Interações
-    function recalc(){
-      const q = parseFloat(inpQt.value || '0');
-      const vu = parseFloat(inpVU.value || '0');
-      const vt = (isFinite(q) && isFinite(vu)) ? (q * vu) : 0;
-      inpVT.value = (Math.round(vt * 100) / 100).toFixed(2);
-    }
-    inpQt.addEventListener('input', recalc);
-    inpVU.addEventListener('input', recalc);
-    recalc();
+    // Quantidade / UM / Valores
+    const row2=document.createElement('div'); row2.className='row';
+
+    const colQt=document.createElement('div'); colQt.className='col';
+    const lblQt=document.createElement('label'); lblQt.textContent='Quantidade a ser adquirida'; lblQt.appendChild(helpIcon('Informe um número inteiro.'));
+    const inpQt=document.createElement('input'); inpQt.type='number'; inpQt.min='0'; inpQt.step='1'; inpQt.inputMode='numeric'; inpQt.name=`items[${idx}][quantidade]`; inpQt.id=`item-${idx}-quantidade`; lblQt.htmlFor=inpQt.id;
+    colQt.appendChild(lblQt); colQt.appendChild(inpQt);
+
+    const colUM=document.createElement('div'); colUM.className='col';
+    const lblUM=document.createElement('label'); lblUM.textContent='Unidade de medida'; lblUM.appendChild(helpIcon('Escolha uma unidade padronizada.'));
+    const selUM=buildSelect(LISTS.unidadeMedida); selUM.name=`items[${idx}][unidadeMedida]`; selUM.id=`item-${idx}-unidadeMedida`; lblUM.htmlFor=selUM.id;
+    colUM.appendChild(lblUM); colUM.appendChild(selUM);
+
+    const colVU=document.createElement('div'); colVU.className='col';
+    const lblVU=document.createElement('label'); lblVU.textContent='Estimativa de valor unitário (R$)'; lblVU.appendChild(helpIcon('Use ponto como separador decimal.'));
+    const inpVU=document.createElement('input'); inpVU.type='number'; inpVU.min='0'; inpVU.step='0.01'; inpVU.inputMode='decimal'; inpVU.name=`items[${idx}][valorUnitario]`; inpVU.id=`item-${idx}-valorUnitario`; lblVU.htmlFor=inpVU.id;
+    colVU.appendChild(lblVU); colVU.appendChild(inpVU);
+
+    const colVT=document.createElement('div'); colVT.className='col group-disabled'; // visual cinza no label também
+    const lblVT=document.createElement('label'); lblVT.textContent='Estimativa de valor total (auto)'; lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário.'));
+    const inpVT=document.createElement('input'); inpVT.type='text'; inpVT.readOnly=true; inpVT.disabled=true; inpVT.tabIndex=-1; inpVT.classList.add('readonly'); inpVT.name=`items[${idx}][valorTotal]`; inpVT.id=`item-${idx}-valorTotal`; lblVT.htmlFor=inpVT.id;
+    colVT.appendChild(lblVT); colVT.appendChild(inpVT);
+
+    row2.appendChild(colQt); row2.appendChild(colUM); row2.appendChild(colVU); row2.appendChild(colVT);
+
+    const actions=document.createElement('div'); actions.className='item-actions';
+    const removeBtn=document.createElement('button'); removeBtn.type='button'; removeBtn.className='btn small danger remove-item'; removeBtn.textContent='Remover';
+    const addBtn=document.createElement('button'); addBtn.type='button'; addBtn.className='btn small secondary add-item'; addBtn.textContent='Adicionar item';
+    actions.appendChild(removeBtn); actions.appendChild(addBtn);
+
+    removeBtn.onclick=()=>{ if(itemsEl.children.length<=1){ removeBtn.blur(); wrap.style.animation='shake .2s'; setTimeout(()=>wrap.style.animation='',250); return; } wrap.remove(); recomputeItemNumbers(); updateItemButtons(); };
+    addBtn.onclick=()=>{ itemsEl.appendChild(createItem()); recomputeItemNumbers(); updateItemButtons(); const last=itemsEl.lastElementChild; if(last) last.querySelector('textarea, input, select')?.focus(); };
+
+    function recalc(){ const q=parseFloat(inpQt.value||'0'); const vu=parseFloat(inpVU.value||'0'); const vt=(isFinite(q)&&isFinite(vu))?(q*vu):0; inpVT.value=(Math.round(vt*100)/100).toFixed(2); }
+    inpQt.addEventListener('input', recalc); inpVU.addEventListener('input', recalc); recalc();
 
     function toggleQual(){
-      const show = (selDep.value === 'Sim');
-      inpQual.disabled = !show;
-      inpQual.required = show;
-      inpQual.parentElement.style.opacity = show ? '1' : '.6';
+      const show=(selDep.value==='Sim');
+      inpQual.disabled=!show;
+      inpQual.required=show;
+      const group=document.getElementById(`group-qual-${idx}`);
+      if(group) group.classList.toggle('group-disabled', !show);
+      if(!show) inpQual.value="";
     }
     selDep.addEventListener('change', toggleQual);
-    toggleQual();
+    toggleQual(); // garante estado inicial desabilitado
 
-    // Montagem
     wrap.appendChild(meta);
     wrap.appendChild(lblDesc); wrap.appendChild(txtDesc);
-    wrap.appendChild(lblJust); wrap.appendChild(txtJust);
     wrap.appendChild(row1);
+    wrap.appendChild(row2a);
     wrap.appendChild(row2);
-    wrap.appendChild(row3);
-    wrap.appendChild(row4);
-    wrap.appendChild(removeBtn);
+    wrap.appendChild(actions);
+
     return wrap;
   }
 
-  function updateRemoveButtons(){
-    const onlyOne = itemsEl.children.length <= 1;
-    itemsEl.querySelectorAll('.remove-item')
-      .forEach(btn => { btn.disabled = onlyOne; });
+  function updateItemButtons(){
+    const onlyOne=itemsEl.children.length<=1;
+    Array.from(itemsEl.children).forEach((div,i,arr)=>{
+      const isLast=i===arr.length-1;
+      const removeBtn=div.querySelector('.remove-item');
+      const addBtn=div.querySelector('.add-item');
+      if(removeBtn) removeBtn.disabled=onlyOne;
+      if(addBtn) addBtn.style.display=isLast?'':'none';
+    });
   }
 
   function recomputeItemNumbers(){
-    Array.from(itemsEl.children).forEach((div, i) => {
-      const numEl = div.querySelector('.item-number');
-      if (numEl) numEl.textContent = `#${i+1}`;
-      div.dataset.idx = String(i);
-      div.querySelectorAll('[name^="items["]').forEach(el => {
-        el.name = el.name.replace(/items\[\d+\]/, `items[${i}]`);
-      });
-      // também atualiza os IDs dinâmicos para manter labels consistentes
-      div.querySelectorAll('[id^="item-"]').forEach(el => {
-        el.id = el.id.replace(/item-\d+-/, `item-${i}-`);
-      });
-      div.querySelectorAll('label[for^="item-"]').forEach(lab => {
-        lab.htmlFor = lab.htmlFor.replace(/item-\d+-/, `item-${i}-`);
-      });
+    Array.from(itemsEl.children).forEach((div,i)=>{
+      const numEl=div.querySelector('.item-number'); if(numEl) numEl.textContent=`#${i+1}`;
+      div.dataset.idx=String(i);
+      div.querySelectorAll('[name^="items["]').forEach(el=>{ el.name=el.name.replace(/items\[\d+\]/, `items[${i}]`); });
+      div.querySelectorAll('[id^="item-"]').forEach(el=>{ el.id=el.id.replace(/item-\d+-/, `item-${i}-`); });
+      div.querySelectorAll('label[for^="item-"]').forEach(l=>{ l.htmlFor=l.htmlFor.replace(/item-\d+-/, `item-${i}-`); });
     });
-    updateRemoveButtons();
   }
 
-  function ensureOneItem(){
-    if (itemsEl.children.length === 0) {
-      itemsEl.appendChild(createItem());
-      recomputeItemNumbers();
-      updateRemoveButtons();
-    }
-  }
+  function ensureOneItem(){ if(itemsEl.children.length===0){ itemsEl.appendChild(createItem()); recomputeItemNumbers(); updateItemButtons(); } else { updateItemButtons(); } }
 
-  addItemBtn?.addEventListener('click', () => {
-    itemsEl.appendChild(createItem());
-    recomputeItemNumbers();
-    updateRemoveButtons();
-    const last = itemsEl.lastElementChild;
-    if (last) last.querySelector('textarea, input, select')?.focus();
-  });
+  pcaAnoEl?.addEventListener('input', rebuildPrazosOptions);
 
-  pcaAnoEl?.addEventListener('input', () => {
-    const ano = pcaAnoEl.value;
-    const options = mesesDoAno(ano);
-    itemsEl.querySelectorAll('select[name$="[dataPretendida]"]').forEach(sel => {
-      const current = sel.value;
-      sel.innerHTML = '';
-      const rebuilt = buildSelect(options);
-      Array.from(rebuilt.children).forEach(c => sel.appendChild(c));
-      if (options.includes(current)) sel.value = current;
-    });
-  });
+  function syncObjToFirstItem(){ const first=itemsEl.firstElementChild; if(!first) return; const desc=first.querySelector('textarea[name$="[descricao]"]'); if(desc) desc.value=objetoEl.value||""; }
+  objetoUmItemEl?.addEventListener('change', ()=>{ ensureOneItem(); if(objetoUmItemEl.checked) syncObjToFirstItem(); });
+  objetoEl?.addEventListener('input', ()=>{ if(objetoUmItemEl.checked) syncObjToFirstItem(); });
 
-  // ------- Serialização -------
   function formToPayload(){
-    const header = {
-      modeloSlug: f.modeloSlug.value || "",
-      numero: f.numero.value || "",
-      assunto: f.assunto.value || "",
-      pcaAno: f.pcaAno.value || "",
-      diretoriaDemandante: f.diretoriaDemandante.value || "",
-      alinhamentoPE: f.alinhamentoPE.value || "",
-      objeto: f.objeto.value || ""
-    };
-    const items = Array.from(itemsEl.children).map(div => {
-      const pick = (sel) => div.querySelector(sel);
-      const num = (x) => { const v = parseFloat(x||'0'); return isFinite(v) ? v : 0; };
-      const dep = (pick('select[name$="[haDependencia]"]')?.value || "");
+    const header={ modeloSlug:f.modeloSlug.value||"", numero:f.numero.value||"", assunto:f.assunto.value||"", pcaAno:f.pcaAno.value||"", diretoriaDemandante:f.diretoriaDemandante.value||"", alinhamentoPE:f.alinhamentoPE.value||"", justificativaNecessidade:f.justificativaNecessidade.value||"", objeto:f.objeto.value||"", prazosEnvolvidos:f.prazosEnvolvidos.value||"", consequenciaNaoAquisicao:f.consequenciaNaoAquisicao.value||"", grauPrioridade:f.grauPrioridade.value||"" };
+    const items=Array.from(itemsEl.children).map(div=>{
+      const pick=sel=>div.querySelector(sel);
+      const num=x=>{ const v=parseFloat(x||'0'); return isFinite(v)?v:0; };
+      const dep=(pick('select[name$="[haDependencia]"]')?.value||"");
       return {
-        descricao: pick('textarea[name$="[descricao]"]')?.value || "",
-        justificativa: pick('textarea[name$="[justificativa]"]')?.value || "",
-        unidadeMedida: pick('select[name$="[unidadeMedida]"]')?.value || "",
-        quantidade: Math.trunc(num(pick('input[name$="[quantidade]"]')?.value)),
-        valorUnitario: num(pick('input[name$="[valorUnitario]"]')?.value),
-        valorTotal: num(pick('input[name$="[valorTotal]"]')?.value),
-        grauPrioridade: pick('select[name$="[grauPrioridade]"]')?.value || "",
-        dataPretendida: pick('select[name$="[dataPretendida]"]')?.value || "",
+        descricao: pick('textarea[name$="[descricao]"]')?.value||"",
         haDependencia: dep,
-        dependenciaQual: dep === 'Sim' ? (pick('input[name$="[dependenciaQual]"]')?.value || "") : "",
-        riscosNaoContratacao: pick('textarea[name$="[riscosNaoContratacao]"]')?.value || "",
-        renovacaoContrato: pick('select[name$="[renovacaoContrato]"]')?.value || ""
+        dependenciaQual: dep==='Sim' ? (pick('input[name$="[dependenciaQual]"]')?.value||"") : "",
+        renovacaoContrato: (pick('select[name$="[renovacaoContrato]"]')?.value||""),
+        quantidade: Math.trunc(num(pick('input[name$="[quantidade]"]')?.value)),
+        unidadeMedida: pick('select[name$="[unidadeMedida]"]')?.value||"",
+        valorUnitario: num(pick('input[name$="[valorUnitario]"]')?.value),
+        valorTotal: num(pick('input[name$="[valorTotal]"]')?.value)
       };
     });
     return { ...header, items };
   }
 
-  // ------- Submit -------
-  async function submit(evt) {
+  async function submit(evt){
     evt.preventDefault();
-    submitBtn.disabled = true;
-    statusEl.textContent = 'Enviando...';
+    submitBtn.disabled=true;
+    statusEl.textContent='Enviando...';
     smoothScrollTo(subsEl);
     ensureOneItem();
 
-    const payload = formToPayload();
-
+    const payload=formToPayload();
     let res, data;
-    try {
-      res = await fetch('./submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      try { data = await res.json(); } catch { data = {}; }
-    } catch (e) {
-      statusEl.textContent = 'Erro de rede ao enviar. Tente novamente.';
-      submitBtn.disabled = false;
-      return;
+    try{ res=await fetch('./submit',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); try{ data=await res.json(); }catch{ data={}; } }
+    catch(e){ statusEl.textContent='Erro de rede ao enviar. Tente novamente.'; submitBtn.disabled=false; return; }
+
+    if(!res.ok){
+      let msg=(data&&data.message)?data.message:`HTTP ${res.status}`;
+      const details=(data&&data.details&&data.details.errors);
+      if(Array.isArray(details)&&details.length){ msg+=' — '+details.join(' | '); }
+      statusEl.textContent='Erro: '+msg; smoothScrollTo(statusEl); submitBtn.disabled=false; return;
     }
 
-    if (!res.ok) {
-      let msg = (data && data.message) ? data.message : `HTTP ${res.status}`;
-      const details = (data && data.details && data.details.errors);
-      if (Array.isArray(details) && details.length) {
-        msg += ' — ' + details.join(' | ');
-      }
-      statusEl.textContent = 'Erro: ' + msg;
-      smoothScrollTo(statusEl);
-      submitBtn.disabled = false;
-      return;
-    }
+    statusEl.textContent='Fila criada, aguardando processamento...';
+    const sid=data.submissionId; let tries=0; let row=null;
+    while(tries<120){ await new Promise(r=>setTimeout(r,1000)); try{ const r=await fetch('./submissions/'+sid); row=await r.json(); }catch{} if(row&&(row.status==='done'||row.status==='error')) break; tries++; }
 
-    statusEl.textContent = 'Fila criada, aguardando processamento...';
-    const sid = data.submissionId;
-    let tries = 0;
-    let row = null;
+    if(!row){ statusEl.textContent='Falha ao acompanhar processamento.'; submitBtn.disabled=false; return; }
 
-    while (tries < 120) {
-      await new Promise(r => setTimeout(r, 1000));
-      try {
-        const r = await fetch('./submissions/' + sid);
-        row = await r.json();
-      } catch {
-        // ignora falhas transitórias da consulta
-      }
-      if (row && (row.status === 'done' || row.status === 'error')) break;
-      tries++;
-    }
+    if(row.status==='done'){
+      statusEl.textContent='Pronto! Download do arquivo abaixo.';
+      const div=document.createElement('div'); div.className='item';
+      const toObj=x=>{ if(!x) return {}; if(typeof x==='string'){ try{ return JSON.parse(x);}catch{return{};} } if(typeof x==='object') return x; return {}; };
+      const d=toObj(row.result);
+      const displayName=(()=>{ const n=(d.filename||d.filename_pdf||d.filename_docx||'').trim(); const i=n.lastIndexOf('.'); return i>0?n.slice(0,i):n; })();
+      const meta=document.createElement('div'); meta.className='meta';
+      const badge=document.createElement('span'); badge.className='badge'; badge.textContent='done';
+      const when=new Date(d.generated_at||Date.now()).toLocaleString();
+      const title=document.createElement('span'); title.textContent=` ${displayName} — ${when}`;
+      meta.appendChild(badge); meta.appendChild(title);
 
-    if (!row) {
-      statusEl.textContent = 'Falha ao acompanhar processamento.';
-      submitBtn.disabled = false;
-      return;
-    }
-
-    if (row.status === 'done') {
-      statusEl.textContent = 'Pronto! Download do arquivo abaixo.';
-      const div = document.createElement('div');
-      div.className = 'item';
-
-      const toObj = (x) => {
-        if (!x) return {};
-        if (typeof x === 'string') { try { return JSON.parse(x); } catch { return {}; } }
-        if (typeof x === 'object') return x;
-        return {};
-      };
-
-      const d = toObj(row.result);
-
-      const displayName = (() => {
-        const n = (d.filename || d.filename_pdf || d.filename_docx || '').trim();
-        const i = n.lastIndexOf('.');
-        return i > 0 ? n.slice(0, i) : n;
-      })();
-
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-
-      const badge = document.createElement('span');
-      badge.className = 'badge';
-      badge.textContent = 'done';
-
-      const when = new Date(d.generated_at || Date.now()).toLocaleString();
-      const title = document.createElement('span');
-      title.textContent = ` ${displayName} — ${when}`;
-
-      meta.appendChild(badge);
-      meta.appendChild(title);
-
-      const buttons = document.createElement('div');
-      buttons.className = 'btn-row';
-
-      if (d.filename_pdf && d.file_path_pdf) {
-        const btnPdf = document.createElement('button');
-        btnPdf.type = 'button';
-        btnPdf.className = 'btn';
-        btnPdf.textContent = 'Baixar PDF';
-        btnPdf.onclick = async () => {
-          try {
-            const dl = await fetch('./submissions/' + sid + '/download/pdf', { method: 'POST' });
-            if (!dl.ok) throw new Error('Falha no download (PDF)');
-            const blob = await dl.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = (d.filename_pdf || ('dfd_' + sid + '.pdf'));
-            a.click();
-            URL.revokeObjectURL(a.href);
-          } catch (e) { alert('Não foi possível baixar o PDF.'); }
-        };
+      const buttons=document.createElement('div'); buttons.className='btn-row';
+      if(d.filename_pdf && d.file_path_pdf){
+        const btnPdf=document.createElement('button'); btnPdf.type='button'; btnPdf.className='btn'; btnPdf.textContent='Baixar PDF';
+        btnPdf.onclick=async()=>{ try{ const dl=await fetch('./submissions/'+sid+'/download/pdf',{method:'POST'}); if(!dl.ok) throw new Error(); const blob=await dl.blob(); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(d.filename_pdf||('dfd_'+sid+'.pdf')); a.click(); URL.revokeObjectURL(a.href);}catch(e){ alert('Não foi possível baixar o PDF.'); } };
         buttons.appendChild(btnPdf);
       }
-
-      const btnDocx = document.createElement('button');
-      btnDocx.type = 'button';
-      btnDocx.className = 'btn secondary';
-      btnDocx.textContent = 'Baixar DOCX';
-      btnDocx.onclick = async () => {
-        try {
-          const dl = await fetch('./submissions/' + sid + '/download/docx', { method: 'POST' });
-          if (!dl.ok) throw new Error('Falha no download (DOCX)');
-          const blob = await dl.blob();
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = (d.filename_docx || ('dfd_' + sid + '.docx'));
-          a.click();
-          URL.revokeObjectURL(a.href);
-        } catch (e) { alert('Não foi possível baixar o DOCX.'); }
-      };
+      const btnDocx=document.createElement('button'); btnDocx.type='button'; btnDocx.className='btn secondary'; btnDocx.textContent='Baixar DOCX';
+      btnDocx.onclick=async()=>{ try{ const dl=await fetch('./submissions/'+sid+'/download/docx',{method:'POST'}); if(!dl.ok) throw new Error(); const blob=await dl.blob(); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(d.filename_docx||('dfd_'+sid+'.docx')); a.click(); URL.revokeObjectURL(a.href);}catch(e){ alert('Não foi possível baixar o DOCX.'); } };
       buttons.appendChild(btnDocx);
 
-      div.appendChild(meta);
-      div.appendChild(buttons);
-      subsEl.prepend(div);
-      smoothScrollTo(div);
-      const firstBtn = div.querySelector('button');
-      if (firstBtn) firstBtn.focus();
+      div.appendChild(meta); div.appendChild(buttons);
+      subsEl.prepend(div); smoothScrollTo(div);
+      const firstBtn=div.querySelector('button'); if(firstBtn) firstBtn.focus();
     } else {
-      statusEl.textContent = 'Erro ao gerar: ' + (row.error || 'desconhecido');
-      smoothScrollTo(statusEl);
+      statusEl.textContent='Erro ao gerar: '+(row.error||'desconhecido'); smoothScrollTo(statusEl);
     }
-    submitBtn.disabled = false;
+    submitBtn.disabled=false;
   }
 
   function init(){
     loadModels();
     loadDiretoriasDemandantes();
+    loadGrauPrioridade();
+    rebuildPrazosOptions();
     ensureOneItem();
   }
 

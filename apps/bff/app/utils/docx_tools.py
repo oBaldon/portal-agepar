@@ -148,7 +148,68 @@ def _mk_label_value(label: str, value: str, indent_level: int = 0) -> ET.Element
     )
 
 # -------------------------------------------------------------------
-# Blocos prontos (fraseados no estilo do DFD antigo)
+# Tabelas (WordprocessingML)
+# -------------------------------------------------------------------
+def _tc(text: str, *, bold: bool=False, align: str|None=None, grid_span: int|None=None) -> ET.Element:
+    """
+    Cria uma célula <w:tc> com um único parágrafo e texto.
+    align: None | 'left' | 'center' | 'right'
+    grid_span: número de colunas a mesclar (gridSpan)
+    """
+    tc = ET.Element(_w("tc"))
+    tcpr = ET.SubElement(tc, _w("tcPr"))
+    if grid_span and grid_span > 1:
+        gs = ET.SubElement(tcpr, _w("gridSpan"))
+        gs.set(_w("val"), str(grid_span))
+    p = ET.SubElement(tc, _w("p"))
+    if align in ("left","center","right"):
+        ppr = ET.SubElement(p, _w("pPr"))
+        jc = ET.SubElement(ppr, _w("jc"))
+        jc.set(_w("val"), align)
+    r = ET.SubElement(p, _w("r"))
+    if bold:
+        rpr = ET.SubElement(r, _w("rPr"))
+        ET.SubElement(rpr, _w("b"))
+    t = ET.SubElement(r, _w("t"))
+    t.set(f"{{{NS_XML}}}space", "preserve")
+    t.text = text
+    return tc
+
+def _tr(cells: list[ET.Element]) -> ET.Element:
+    tr = ET.Element(_w("tr"))
+    for c in cells:
+        tr.append(c)
+    return tr
+
+def _tbl(rows: list[list[ET.Element]], *, borders: bool=True, col_widths: list[int]|None=None) -> ET.Element:
+    """
+    Cria <w:tbl> simples.
+    col_widths: lista com larguras em twips (opcional).
+    """
+    tbl = ET.Element(_w("tbl"))
+    tblpr = ET.SubElement(tbl, _w("tblPr"))
+    tblw = ET.SubElement(tblpr, _w("tblW"))
+    tblw.set(_w("type"), "auto")
+    tblw.set(_w("w"), "0")
+    if borders:
+        tb = ET.SubElement(tblpr, _w("tblBorders"))
+        for side in ("top","left","bottom","right","insideH","insideV"):
+            b = ET.SubElement(tb, _w(side))
+            b.set(_w("val"), "single")
+            b.set(_w("sz"), "4")
+            b.set(_w("space"), "0")
+            b.set(_w("color"), "auto")
+    if col_widths:
+        grid = ET.SubElement(tbl, _w("tblGrid"))
+        for w in col_widths:
+            gc = ET.SubElement(grid, _w("gridCol"))
+            gc.set(_w("w"), str(w))
+    for r in rows:
+        tbl.append(_tr(r))
+    return tbl
+
+# -------------------------------------------------------------------
+# Blocos prontos (fraseados no estilo do DFD)
 # -------------------------------------------------------------------
 _PRIORITY_OPTIONS = [
     "Alto, quando a impossibilidade de contratação provoca interrupção de processo crítico ou estratégico.",
@@ -158,7 +219,7 @@ _PRIORITY_OPTIONS = [
 ]
 
 def _priority_block(selected: str | None) -> List[ET.Element]:
-    """Renderiza a lista de prioridade com (X) na opção selecionada."""
+    """Renderiza a lista de prioridade com (X) na opção selecionada (campo geral)."""
     out: List[ET.Element] = []
     out.append(_mk_p(text="Grau de prioridade da aquisição/contratação:", bold=True))
     sel_norm = (selected or "").strip()
@@ -169,9 +230,9 @@ def _priority_block(selected: str | None) -> List[ET.Element]:
 
 def _quantidade_valor_sentence(qtd: Any, um: str, vu: Any, vt: Any) -> str:
     """
-    Frase nos moldes do exemplo antigo:
+    Frase:
     'A quantidade é de 10 (dez) unidades no valor de R$ 2.000,00 cada, totalizando R$ 20.000,00.'
-    (Não faremos número por extenso aqui — mantemos somente valores numéricos formatados)
+    (sem número por extenso; valores numéricos formatados)
     """
     try:
         qn = int(float(qtd))
@@ -184,7 +245,7 @@ def _quantidade_valor_sentence(qtd: Any, um: str, vu: Any, vt: Any) -> str:
     return f"A quantidade é de {qn}{s_um} no valor de {vu_txt} cada, totalizando {vt_txt}."
 
 # -------------------------------------------------------------------
-# Manipulação do corpo (fallback DFD v2 lapidado)
+# Corpo do documento (sem placeholders Jinja)
 # -------------------------------------------------------------------
 def _append_body_sections_xml_et(
     document_xml_bytes: bytes,
@@ -192,22 +253,19 @@ def _append_body_sections_xml_et(
     intro_lines: List[str] | None = None,
 ) -> bytes:
     """
-    Monta o corpo com a organização e o tom do DFD antigo, aplicado aos novos campos:
+    Organização alinhada à NOVA UI e ao modelo de exemplo:
       - Introdução
       - Diretoria demandante
       - Alinhamento com o Planejamento Estratégico (multilinha)
+      - Justificativa da necessidade (GERAL)
       - Objeto (multilinha)
-      - Itens (1..N) com sub-blocos:
-          * Descrição sucinta do objeto
-          * Justificativa da necessidade
-          * Consequências da não contratação
-          * Prazos envolvidos
-          * Quantidade e Valor estimados
-          * Unidade de medida (separado se fizer sentido)
-          * Dependência (quando Sim)
-          * Renovação de contrato (Sim/Não)
-          * Grau de prioridade (lista com (X))
-      - Total geral (soma dos itens)
+      - Itens em TABELA 1: Item | Descrição | Vínculo | Renovação (tudo à ESQUERDA)
+      - 'Valores estimados:' + TABELA 2: Item | Quantidade | Unidade | Valor Unitário | Valor Total
+        (tudo à ESQUERDA, EXCETO 'Valor Total', que fica à DIREITA) + linha Total com valor à DIREITA
+      - Prazos envolvidos
+      - Consequências da não aquisição
+      - Grau de prioridade
+      - ASSINATURA
     """
     root = ET.fromstring(document_xml_bytes)
     body = root.find(_w("body"))
@@ -242,7 +300,15 @@ def _append_body_sections_xml_et(
             elems.append(_mk_p(text=line, indent_level=1))
         elems.append(ET.Element(_w("p")))
 
-    # 3) Objeto
+    # 3) Justificativa da necessidade (GERAL)
+    just_geral = str(context.get("justificativa_necessidade") or "").strip()
+    if just_geral:
+        elems.append(_mk_p(text="Justificativa da necessidade (Problema a ser resolvido)", bold=True))
+        for line in _split_lines(just_geral):
+            elems.append(_mk_p(text=line, indent_level=1))
+        elems.append(ET.Element(_w("p")))
+
+    # 4) Objeto
     obj = str(context.get("objeto") or "").strip()
     if obj:
         elems.append(_mk_p(text="Objeto", bold=True))
@@ -250,79 +316,95 @@ def _append_body_sections_xml_et(
             elems.append(_mk_p(text=line, indent_level=1))
         elems.append(ET.Element(_w("p")))
 
-    # 4) Itens
+    # 5) Tabela 1 — Itens: Item | Descrição | Vínculo | Renovação (tudo à ESQUERDA)
     itens = context.get("itens") or []
     if isinstance(itens, list) and itens:
-        #elems.append(_mk_p(text="Itens", bold=True))
         elems.append(ET.Element(_w("p")))
-
+        header = [
+            _tc("Item", bold=True, align="left"),
+            _tc("Descrição", bold=True, align="left"),
+            _tc("Vínculo", bold=True, align="left"),
+            _tc("Renovação", bold=True, align="left"),
+        ]
+        rows = [header]
         for i, it in enumerate(itens, start=1):
             desc = (it.get("descricao") or "").strip()
-            just = (it.get("justificativa") or "").strip()
-            um = (it.get("unidadeMedida") or "").strip()
-            qtd = it.get("quantidade")
-            vu = it.get("valorUnitario")
-            vt = it.get("valorTotal")
-            grau = (it.get("grauPrioridade") or "").strip()
-            data = (it.get("dataPretendida") or "").strip()
             dep = (it.get("haDependencia") or "").strip()
-            depq = (it.get("dependenciaQual") or "").strip()
-            riscos = (it.get("riscosNaoContratacao") or "").strip()
             renov = (it.get("renovacaoContrato") or "").strip()
+            rows.append([
+                _tc(str(i), align="left"),
+                _tc(desc, align="left"),
+                _tc(dep, align="left"),
+                _tc(renov, align="left"),
+            ])
+        elems.append(_tbl(rows, borders=True))
+        elems.append(ET.Element(_w("p")))
 
-            # Cabeçalho do item
-            elems.append(_mk_p(text=f"Item #{i}", bold=True))
-            # Descrição
-            if desc:
-                elems.append(_mk_p(text="Descrição sucinta do objeto", bold=True, indent_level=1))
-                for line in _split_lines(desc):
-                    elems.append(_mk_p(text=line, indent_level=2))
-            # Justificativa
-            if just:
-                elems.append(_mk_p(text="Justificativa da necessidade (Problema a ser resolvido)", bold=True, indent_level=1))
-                for line in _split_lines(just):
-                    elems.append(_mk_p(text=line, indent_level=2))
-            # Consequências
-            if riscos:
-                elems.append(_mk_p(text="Consequências da não aquisição/contratação do objeto (Possíveis impactos se o problema não for resolvido)", bold=True, indent_level=1))
-                for line in _split_lines(riscos):
-                    elems.append(_mk_p(text=line, indent_level=2))
-            # Prazos envolvidos
-            if data:
-                elems.append(_mk_p(text="Prazos envolvidos (Data – mês e ano – em que o objeto precisa estar adquirido ou contratado)", bold=True, indent_level=1))
-                elems.append(_mk_p(text=f"Até {data}.", indent_level=2))
-            # Quantidade e Valor
-            if (qtd is not None) or (vu is not None) or (vt is not None):
-                elems.append(_mk_p(text="Quantidade e Valor estimados", bold=True, indent_level=1))
-                sent = _quantidade_valor_sentence(qtd, um, vu, vt)
-                elems.append(_mk_p(text=sent, indent_level=2))
-                # Unidade de medida (separadamente, caso deseje destacar)
-                if um:
-                    elems.append(_mk_label_value("Unidade de medida", um, indent_level=2))
+        # 6) Valores estimados — título + tabela 2
+        elems.append(_mk_p(text="Valores estimados:", bold=True))
+        v_header = [
+            _tc("Item", bold=True, align="left"),
+            _tc("Quantidade", bold=True, align="left"),
+            _tc("Unidade", bold=True, align="left"),
+            _tc("Valor Unitário", bold=True, align="left"),  # agora ESQUERDA
+            _tc("Valor Total", bold=True, align="right"),    # Total fica à DIREITA
+        ]
+        v_rows = [v_header]
+        total_geral = 0.0
+        for i, it in enumerate(itens, start=1):
+            qtd = it.get("quantidade")
+            um  = (it.get("unidadeMedida") or "").strip()
+            vu  = it.get("valorUnitario")
+            vt  = it.get("valorTotal")
+            try:
+                total_geral += float(vt or 0.0)
+            except Exception:
+                pass
+            # normaliza quantidade para inteiro
+            try:
+                qtd_txt = str(int(float(qtd or 0)))
+            except Exception:
+                qtd_txt = "0"
+            v_rows.append([
+                _tc(str(i), align="left"),
+                _tc(qtd_txt, align="left"),
+                _tc(um, align="left"),
+                _tc(_fmt_money(vu), align="left"),     # agora ESQUERDA
+                _tc(_fmt_money(vt), align="right"),    # Total à DIREITA
+            ])
+        # Linha Total (mescla 4 primeiras colunas); valor à direita
+        v_rows.append([
+            _tc("Total", bold=True, grid_span=4, align="left"),
+            _tc(_fmt_money(total_geral), bold=True, align="right"),
+        ])
+        elems.append(_tbl(v_rows, borders=True))
+        elems.append(ET.Element(_w("p")))
 
-            # Dependência
-            if dep:
-                elems.append(_mk_label_value("Há vínculo/dependência com outra contratação", dep, indent_level=1))
-                if dep == "Sim" and depq:
-                    elems.append(_mk_label_value("Se 'Sim', qual", depq, indent_level=2))
+    # 7) Seção geral (após itens): prazos, consequência, prioridade
+    prazos = str(context.get("prazos_envolvidos") or context.get("prazosEnvolvidos") or "").strip()
+    consq = str(context.get("consequencia_nao_aquisicao") or context.get("consequenciaNaoAquisicao") or "").strip()
+    grau = str(context.get("grau_prioridade") or context.get("grauPrioridade") or "").strip()
 
-            # Renovação
-            if renov:
-                elems.append(_mk_label_value("Renovação de contrato", renov, indent_level=1))
-
-            # Grau de prioridade
+    if prazos or consq or grau:
+        # Prazos envolvidos — texto igual ao exemplo
+        if prazos:
+            elems.append(_mk_p(text="Prazos envolvidos (Data – mês e ano – em que o objeto precisa estar adquirido ou contratado)", bold=True))
+            elems.append(_mk_p(text=f"Até {prazos}.", indent_level=1))
+            elems.append(ET.Element(_w("p")))
+        # Consequências
+        if consq:
+            elems.append(_mk_p(text="Consequências da não aquisição/contratação do objeto (Possíveis impactos se o problema não for resolvido)", bold=True))
+            for line in _split_lines(consq):
+                elems.append(_mk_p(text=line, indent_level=1))
+            elems.append(ET.Element(_w("p")))
+        # Grau de prioridade (lista com marcação)
+        if grau:
             elems.extend(_priority_block(grau))
-
-            # Espaço entre itens
             elems.append(ET.Element(_w("p")))
 
-    # 5) Total geral
-    total_geral = context.get("total_geral", None)
-    if total_geral is None and itens:
-        total_geral = sum(_num((it or {}).get("valorTotal")) for it in itens if isinstance(it, dict))
-    if itens:
-        elems.append(_mk_p(text=f"Total geral da contratação (soma dos itens): {_fmt_money(total_geral)}", bold=True))
-        elems.append(ET.Element(_w("p")))
+    # 8) ASSINATURA
+    elems.append(_mk_p(text="ASSINATURA", bold=True))
+    elems.append(ET.Element(_w("p")))
 
     # Inserção no corpo
     for off, el in enumerate(elems):
@@ -348,13 +430,13 @@ def _patch_header_xml_text(xml: str, numero: str, assunto: str, data_fmt: str) -
     return xml
 
 # -------------------------------------------------------------------
-# Renderização preservando timbre (fallback para DFD v2)
+# Renderização preservando timbre (fallback para DFD v2+)
 # -------------------------------------------------------------------
 def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: str) -> None:
     """
     Copia o DOCX e aplica:
       - patch nos headers (número/assunto/data),
-      - injeção de INTRO + seções do DFD v2 no corpo (formatação lapidada).
+      - injeção de INTRO + seções do DFD no corpo (formatação leve).
     """
     numero = str(context.get("numero") or "")
     assunto = str(context.get("assunto") or "Documento de Formalização de Demanda")

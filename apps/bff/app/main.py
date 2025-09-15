@@ -249,7 +249,7 @@ def automations_index() -> Dict[str, Any]:
 # ------------------------------------------------------------------------------
 APP.include_router(form2json_router)
 APP.include_router(dfd_router)
-APP.include_router(snake_router)  # já incluído acima; manter por clareza (idempotente)
+# (removido) APP.include_router(snake_router)  # já incluído acima
 
 # ------------------------------------------------------------------------------
 # Nota de segurança (prod)

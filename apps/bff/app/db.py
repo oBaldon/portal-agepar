@@ -2,7 +2,7 @@
 from __future__ import annotations
 import os
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import psycopg
 from psycopg.rows import dict_row
@@ -25,6 +25,7 @@ def init_db() -> None:
     """
     Cria tabelas e índices idempotentes (IF NOT EXISTS).
     Inclui índices compostos otimizados para consultas por kind+ator.
+    Aplica reforços de robustez (CHECK de status) e índices adicionais.
     """
     sql = """
     CREATE TABLE IF NOT EXISTS submissions (
@@ -74,6 +75,28 @@ def init_db() -> None:
     CREATE TRIGGER trg_submissions_touch
     BEFORE UPDATE ON submissions
     FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+    -- Robustez: CHECK constraint para status permitido (queued|running|done|error).
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_submissions_status'
+          AND conrelid = 'submissions'::regclass
+      ) THEN
+        ALTER TABLE submissions
+          ADD CONSTRAINT chk_submissions_status
+          CHECK (status IN ('queued','running','done','error'));
+      END IF;
+    END$$;
+
+    -- Índice adicional para consultas por status (ex.: dashboards/filas).
+    CREATE INDEX IF NOT EXISTS ix_submissions_kind_status_created
+      ON submissions (kind, status, created_at DESC);
+
+    -- Índices GIN opcionais para consultas por campos dentro de JSONB (payload/result).
+    CREATE INDEX IF NOT EXISTS ix_submissions_payload_gin ON submissions USING GIN (payload);
+    CREATE INDEX IF NOT EXISTS ix_submissions_result_gin  ON submissions USING GIN (result);
     """
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(sql)
@@ -107,7 +130,7 @@ def insert_submission(sub: Dict[str, Any]) -> None:
             """,
             {
                 **sub,
-                "payload": _to_json_value(sub.get("payload") or {}),
+                "payload": _to_json_value(sub.get("payload") | {} if isinstance(sub.get("payload"), dict) else (sub.get("payload") or {})),
                 "result": _to_json_value(sub.get("result")),
             },
         )
