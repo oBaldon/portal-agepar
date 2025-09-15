@@ -81,7 +81,7 @@
         <div class="col">
           <label for="modeloSlug">Timbre
             <span class="inline-help">
-              <button type="button" class="help" aria-label="Ajuda sobre Timbre">!</button>
+              <button type="button" class="help" aria-label="Ajuda sobre Timbre">?</button>
               <span class="tip">Selecione o timbre/cabeçalho do documento.</span>
             </span>
           </label>
@@ -93,8 +93,8 @@
         <div class="col">
           <label for="numero">Nº do memorando
             <span class="inline-help">
-              <button type="button" class="help" aria-label="Ajuda sobre Nº do memorando">!</button>
-              <span class="tip">Use o padrão da sua unidade (ex.: <code>012/2025</code>).</span>
+              <button type="button" class="help" aria-label="Ajuda sobre Nº do memorando">?</button>
+              <span class="tip">Use o padrão da sua diretoria (ex.: <code>012/2025</code>).</span>
             </span>
           </label>
           <input id="numero" name="numero" placeholder="Ex.: 0XX/202X" required />
@@ -102,40 +102,40 @@
       </div>
 
       <label for="assunto">Assunto
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Assunto">!</button><span class="tip">Assunto exibido no cabeçalho e metadados.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Assunto">?</button><span class="tip">Assunto exibido no cabeçalho do documento.</span></span>
       </label>
       <input id="assunto" name="assunto" placeholder="Ex.: Aquisição de software X" required />
 
       <label for="pcaAno">Ano de execução do PCA
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">!</button><span class="tip">Informe 4 dígitos.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Ano de execução do PCA">?</button><span class="tip">Ano: Informe 4 dígitos.</span></span>
       </label>
       <input name="pcaAno" id="pcaAno" placeholder="Ex.: 2027" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}" required />
 
       <label for="diretoriaDemandante">Diretoria demandante
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Diretoria demandante">!</button><span class="tip">Selecione a diretoria responsável.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Diretoria demandante">?</button><span class="tip">Selecione a diretoria requerente da demanda.</span></span>
       </label>
       <select name="diretoriaDemandante" id="diretoriaDemandante" required>
         <option value="">-- Selecionar --</option>
       </select>
       
       <label for="alinhamentoPE">Alinhamento com o <em>Planejamento Estratégico</em>
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Alinhamento">!</button><span class="tip">Explique o alinhamento.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Alinhamento">?</button><span class="tip">Explique o alinhamento.</span></span>
       </label>
       <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico"></textarea>
 
       <label for="justificativaNecessidade">Justificativa da necessidade
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa da necessidade">!</button><span class="tip">Por que a demanda é necessária.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa da necessidade">?</button><span class="tip">Por que a demanda é necessária.</span></span>
       </label>
       <textarea name="justificativaNecessidade" id="justificativaNecessidade" placeholder="Contexto e motivação da demanda"></textarea>
 
       <label for="objeto">Objeto
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Objeto">!</button><span class="tip">Descreva o objeto da contratação.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Objeto">?</button><span class="tip">Descreva o objeto da contratação.</span></span>
       </label>
       <textarea name="objeto" id="objeto" placeholder="Ex.: Licenças do sistema Z" required></textarea>
 
       <div class="checkline">
         <input type="checkbox" id="objetoUmItem" />
-        <label for="objetoUmItem">O objeto <strong>possui</strong> <em>apenas</em> 1 item?</label>
+        <label for="objetoUmItem">O objeto possui <strong>apenas</strong> 1 item?</label>
       </div>
 
       <hr class="hr" />
@@ -148,7 +148,7 @@
 
       <div id="prazosGroup">
         <label for="prazosEnvolvidos">Prazos envolvidos
-          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Prazos envolvidos">!</button><span class="tip">Selecione “mês de AAAA”.</span></span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Prazos envolvidos">?</button><span class="tip">Selecione “mês de AAAA”.</span></span>
         </label>
         <select name="prazosEnvolvidos" id="prazosEnvolvidos" disabled>
           <option value="">Informe o ano do PCA primeiro</option>
@@ -156,12 +156,12 @@
       </div>
 
       <label for="consequenciaNaoAquisicao">Consequência da não aquisição
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Consequência da não aquisição">!</button><span class="tip">Impactos se não contratar.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Consequência da não aquisição">?</button><span class="tip">Impactos se não contratar.</span></span>
       </label>
       <textarea name="consequenciaNaoAquisicao" id="consequenciaNaoAquisicao" placeholder="Descreva as consequências"></textarea>
 
       <label for="grauPrioridade">Grau de prioridade
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Grau de prioridade">!</button><span class="tip">Selecione conforme impacto.</span></span>
+        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Grau de prioridade">?</button><span class="tip">Selecione conforme impacto.</span></span>
       </label>
       <select name="grauPrioridade" id="grauPrioridade">
         <option value="">-- Selecionar --</option>
@@ -222,9 +222,14 @@
 
   function smoothScrollTo(el){ if(!el) return; const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({behavior: reduced?'auto':'smooth', block:'start'}); }
 
+  // NOVO: helper para saber se “apenas 1 item” está ativo
+  function isSingleItemLocked(){
+    return !!objetoUmItemEl?.checked;
+  }
+
   let itemSeq=0;
   function buildSelect(options, placeholder="-- Selecionar --"){ const sel=document.createElement('select'); const o0=document.createElement('option'); o0.value=''; o0.textContent=placeholder; sel.appendChild(o0); options.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); }); return sel; }
-  function helpIcon(text){ const span=document.createElement('span'); span.className='inline-help'; const b=document.createElement('button'); b.type='button'; b.className='help'; b.setAttribute('aria-label','Ajuda'); b.textContent='!'; const tip=document.createElement('span'); tip.className='tip'; tip.textContent=text; span.appendChild(b); span.appendChild(tip); return span; }
+  function helpIcon(text){ const span=document.createElement('span'); span.className='inline-help'; const b=document.createElement('button'); b.type='button'; b.className='help'; b.setAttribute('aria-label','Ajuda'); b.textContent='?'; const tip=document.createElement('span'); tip.className='tip'; tip.textContent=text; span.appendChild(b); span.appendChild(tip); return span; }
 
   function createItem(){
     const idx=itemSeq++;
@@ -291,7 +296,8 @@
     actions.appendChild(removeBtn); actions.appendChild(addBtn);
 
     removeBtn.onclick=()=>{ if(itemsEl.children.length<=1){ removeBtn.blur(); wrap.style.animation='shake .2s'; setTimeout(()=>wrap.style.animation='',250); return; } wrap.remove(); recomputeItemNumbers(); updateItemButtons(); };
-    addBtn.onclick=()=>{ itemsEl.appendChild(createItem()); recomputeItemNumbers(); updateItemButtons(); const last=itemsEl.lastElementChild; if(last) last.querySelector('textarea, input, select')?.focus(); };
+    // Ajuste: respeitar o modo "apenas 1 item"
+    addBtn.onclick=()=>{ if (isSingleItemLocked()) return; itemsEl.appendChild(createItem()); recomputeItemNumbers(); updateItemButtons(); const last=itemsEl.lastElementChild; if(last) last.querySelector('textarea, input, select')?.focus(); };
 
     function recalc(){ const q=parseFloat(inpQt.value||'0'); const vu=parseFloat(inpVU.value||'0'); const vt=(isFinite(q)&&isFinite(vu))?(q*vu):0; inpVT.value=(Math.round(vt*100)/100).toFixed(2); }
     inpQt.addEventListener('input', recalc); inpVU.addEventListener('input', recalc); recalc();
@@ -317,14 +323,20 @@
     return wrap;
   }
 
+  // Ajuste: esconder/desabilitar o "Adicionar item" quando travado
   function updateItemButtons(){
     const onlyOne=itemsEl.children.length<=1;
+    const lock=isSingleItemLocked();
     Array.from(itemsEl.children).forEach((div,i,arr)=>{
       const isLast=i===arr.length-1;
       const removeBtn=div.querySelector('.remove-item');
       const addBtn=div.querySelector('.add-item');
       if(removeBtn) removeBtn.disabled=onlyOne;
-      if(addBtn) addBtn.style.display=isLast?'':'none';
+      if(addBtn){
+        addBtn.style.display=(isLast && !lock) ? '' : 'none';
+        addBtn.disabled=lock;
+        addBtn.title = lock ? 'Desabilitado: “apenas 1 item” está marcado.' : '';
+      }
     });
   }
 
@@ -343,7 +355,8 @@
   pcaAnoEl?.addEventListener('input', rebuildPrazosOptions);
 
   function syncObjToFirstItem(){ const first=itemsEl.firstElementChild; if(!first) return; const desc=first.querySelector('textarea[name$="[descricao]"]'); if(desc) desc.value=objetoEl.value||""; }
-  objetoUmItemEl?.addEventListener('change', ()=>{ ensureOneItem(); if(objetoUmItemEl.checked) syncObjToFirstItem(); });
+  // Ajuste: atualizar botões ao alternar o modo "apenas 1 item"
+  objetoUmItemEl?.addEventListener('change', ()=>{ ensureOneItem(); if(objetoUmItemEl.checked) syncObjToFirstItem(); updateItemButtons(); });
   objetoEl?.addEventListener('input', ()=>{ if(objetoUmItemEl.checked) syncObjToFirstItem(); });
 
   function formToPayload(){

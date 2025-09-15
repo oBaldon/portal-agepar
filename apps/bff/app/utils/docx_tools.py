@@ -121,19 +121,33 @@ def _mk_p(
     text: str | None = None,
     bold: bool = False,
     italic: bool = False,
-    indent_level: int = 0
+    # legado: indent_level continua aceito, mapeado para left_indent_level
+    indent_level: int = 0,
+    # novos: controle fino de recuos
+    left_indent_level: int | None = None,
+    first_line_indent_level: int = 0,
 ) -> ET.Element:
     """
-    Cria <w:p> com suporte a múltiplos runs e indentação em níveis.
-    - runs: lista de tuplas (texto, bold, italic)
-    - ou text/bold/italic simples
-    - indent_level: 0..N → aplica w:ind left ~ 360 twips por nível
+    Cria <w:p> com suporte a múltiplos runs e indentação.
+    - runs: lista de tuplas (texto, bold, italic) OU text/bold/italic simples
+    - left_indent_level: níveis de recuo à ESQUERDA (cada nível ≈ 360 twips)
+    - first_line_indent_level: recuo apenas da PRIMEIRA linha (cada nível ≈ 360 twips)
+    - indent_level (legado): equivale a left_indent_level
     """
+    if left_indent_level is None:
+        left_indent_level = indent_level
+
     p = ET.Element(_w("p"))
-    if indent_level > 0:
+
+    if (left_indent_level and left_indent_level > 0) or (first_line_indent_level and first_line_indent_level > 0):
         ppr = ET.SubElement(p, _w("pPr"))
         ind = ET.SubElement(ppr, _w("ind"))
-        ind.set(_w("left"), str(360 * indent_level))
+        if left_indent_level and left_indent_level > 0:
+            ind.set(_w("left"), str(360 * left_indent_level))
+        if first_line_indent_level and first_line_indent_level > 0:
+            # Recuo apenas da primeira linha
+            ind.set(_w("firstLine"), str(360 * first_line_indent_level))
+
     if runs is None:
         runs = [(text or "", bold, italic)]
     for s, b, i in runs:
@@ -144,7 +158,7 @@ def _mk_label_value(label: str, value: str, indent_level: int = 0) -> ET.Element
     """Parágrafo 'Label: valor' (label em negrito)."""
     return _mk_p(
         runs=[(f"{label}: ", True, False), (value or "", False, False)],
-        indent_level=indent_level
+        left_indent_level=indent_level
     )
 
 # -------------------------------------------------------------------
@@ -222,10 +236,13 @@ def _priority_block(selected: str | None) -> List[ET.Element]:
     """Renderiza a lista de prioridade com (X) na opção selecionada (campo geral)."""
     out: List[ET.Element] = []
     out.append(_mk_p(text="Grau de prioridade da aquisição/contratação:", bold=True))
+    # linha em branco após o enunciado
+    out.append(ET.Element(_w("p")))
     sel_norm = (selected or "").strip()
     for opt in _PRIORITY_OPTIONS:
         mark = "( X ) " if opt == sel_norm else "(   ) "
-        out.append(_mk_p(text=mark + opt, indent_level=1))
+        # recuo apenas da primeira linha; linhas seguintes voltam à margem do enunciado
+        out.append(_mk_p(text=mark + opt, left_indent_level=0, first_line_indent_level=1))
     return out
 
 def _quantidade_valor_sentence(qtd: Any, um: str, vu: Any, vt: Any) -> str:
@@ -296,24 +313,29 @@ def _append_body_sections_xml_et(
     alin = str(context.get("alinhamento_pe") or "").strip()
     if alin:
         elems.append(_mk_p(text="Alinhamento com o Planejamento Estratégico", bold=True))
+        # linha em branco após o enunciado
+        elems.append(ET.Element(_w("p")))
         for line in _split_lines(alin):
-            elems.append(_mk_p(text=line, indent_level=1))
+            # recuo somente na primeira linha; demais linhas voltam à margem do enunciado
+            elems.append(_mk_p(text=line, left_indent_level=0, first_line_indent_level=1))
         elems.append(ET.Element(_w("p")))
 
     # 3) Justificativa da necessidade (GERAL)
     just_geral = str(context.get("justificativa_necessidade") or "").strip()
     if just_geral:
-        elems.append(_mk_p(text="Justificativa da necessidade (Problema a ser resolvido)", bold=True))
+        elems.append(_mk_p(text="Justificativa da necessidade", bold=True))
+        elems.append(ET.Element(_w("p")))  # branco após enunciado
         for line in _split_lines(just_geral):
-            elems.append(_mk_p(text=line, indent_level=1))
+            elems.append(_mk_p(text=line, left_indent_level=0, first_line_indent_level=1))
         elems.append(ET.Element(_w("p")))
 
     # 4) Objeto
     obj = str(context.get("objeto") or "").strip()
     if obj:
         elems.append(_mk_p(text="Objeto", bold=True))
+        elems.append(ET.Element(_w("p")))  # branco após enunciado
         for line in _split_lines(obj):
-            elems.append(_mk_p(text=line, indent_level=1))
+            elems.append(_mk_p(text=line, left_indent_level=0, first_line_indent_level=1))
         elems.append(ET.Element(_w("p")))
 
     # 5) Tabela 1 — Itens: Item | Descrição | Vínculo | Renovação (tudo à ESQUERDA)
@@ -345,6 +367,7 @@ def _append_body_sections_xml_et(
 
         # 6) Valores estimados — título + tabela 2
         elems.append(_mk_p(text="Valores estimados:", bold=True))
+        elems.append(ET.Element(_w("p")))  # branco após enunciado
         v_header = [
             _tc("Item", bold=True, align="left"),
             _tc("Quantidade", bold=True, align="left"),
@@ -392,13 +415,15 @@ def _append_body_sections_xml_et(
         # Prazos envolvidos — texto igual ao exemplo
         if prazos:
             elems.append(_mk_p(text="Prazos envolvidos (Data – mês e ano – em que o objeto precisa estar adquirido ou contratado)", bold=True))
-            elems.append(_mk_p(text=f"Até {prazos}.", indent_level=1))
+            elems.append(ET.Element(_w("p")))  # branco após enunciado
+            elems.append(_mk_p(text=f"Até {prazos}.", left_indent_level=0, first_line_indent_level=1))
             elems.append(ET.Element(_w("p")))
         # Consequências
         if consq:
-            elems.append(_mk_p(text="Consequências da não aquisição/contratação do objeto (Possíveis impactos se o problema não for resolvido)", bold=True))
+            elems.append(_mk_p(text="Consequências da não aquisição/contratação do objeto", bold=True))
+            elems.append(ET.Element(_w("p")))  # branco após enunciado
             for line in _split_lines(consq):
-                elems.append(_mk_p(text=line, indent_level=1))
+                elems.append(_mk_p(text=line, left_indent_level=0, first_line_indent_level=1))
             elems.append(ET.Element(_w("p")))
         # Grau de prioridade (lista com marcação)
         if grau:
