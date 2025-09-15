@@ -1,3 +1,4 @@
+<!-- app/automations/templates/controle/ui.html -->
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -78,19 +79,14 @@
         </select>
       </div>
       <div class="col">
-        <label for="username">Servidor (nome, e-mail ou CPF)</label>
-        <input id="username" placeholder="Ex.: Maria, 12345678901, maria@org.br" />
+        <label for="username">Servidor (nome ou CPF)</label>
+        <input id="username" placeholder="Ex.: Maria, 12345678901" />
       </div>
       <div class="col">
         <label for="action">Ação</label>
-        <!-- Agora é SELECT; será populado dinamicamente -->
+        <!-- será populado dinamicamente -->
         <select id="action">
           <option value="">(Todas)</option>
-          <option value="submitted">submitted</option>
-          <option value="running">running</option>
-          <option value="completed" selected>completed</option>
-          <option value="failed">failed</option>
-          <option value="download">download</option>
         </select>
       </div>
     </div>
@@ -120,7 +116,7 @@
 
 <!-- Resultados (full-bleed) -->
 <div class="card fullbleed" style="margin-top:16px" aria-labelledby="result-title">
-  <div class="wrap" style="max-width: 1280px;">
+  <div class="wrap" style="max-width: 1440px;">
     <h2 id="result-title" style="font-size:16px; margin:0 0 8px">Eventos</h2>
     <div class="table-wrap">
       <table id="tbl" aria-describedby="status">
@@ -143,7 +139,9 @@
 </div>
 
 <script>
+  const DEBUG = true;
   const qs = (sel) => document.querySelector(sel);
+
   function fmtTs(s){
     if(!s) return "";
     const d = new Date(s);
@@ -155,7 +153,18 @@
     const d = new Date(dtLocalStr);
     return isNaN(d) ? "" : d.toISOString();
   }
-
+  function toObj(x){
+    if(!x) return {};
+    if(typeof x === "string"){ try { return JSON.parse(x); } catch { return {}; } }
+    if(typeof x === "object") return x;
+    return {};
+  }
+  function buildAssuntoFromPayload(p){
+    const assunto = (p.assunto || "").toString().trim();
+    const ano = (p.pcaAno || p.pca_ano || "").toString().trim();
+    if(assunto && ano) return `DFD - PCA ${ano} - ${assunto}`;
+    return assunto || (p.objeto || "");
+  }
   function getSid(row){
     const extra = row.extra || {};
     return extra.sid || extra.submissionId || extra.id || row.target_id || null;
@@ -174,20 +183,25 @@
       a.download = name;
       a.click();
       URL.revokeObjectURL(a.href);
+      if (DEBUG) console.info("[controle] download ok", { sid, fmt, size: blob.size });
     }catch(e){
+      console.error("[controle] download error", { sid, fmt, error: e });
       alert('Não foi possível baixar o arquivo.');
     }
   }
 
   async function loadActions(){
     const sel = qs("#action");
-    const keep = sel.value; // guarda seleção atual (se houver)
+    const keep = sel.value;
     try{
       const r = await fetch(`/api/automations/controle/actions`, { credentials: "include" });
+      if (DEBUG) console.debug("[controle] GET /actions -> status", r.status);
       if(!r.ok) throw new Error();
       const data = await r.json();
       const items = Array.isArray(data.items) ? data.items : [];
-      sel.innerHTML = ""; // limpa
+      if (DEBUG) console.debug("[controle] actions payload", data);
+
+      sel.innerHTML = "";
       const optAll = document.createElement("option");
       optAll.value = ""; optAll.textContent = "(Todas)";
       sel.appendChild(optAll);
@@ -196,11 +210,10 @@
         o.value = a; o.textContent = a;
         sel.appendChild(o);
       }
-      // preset “completed” se existir; senão, restaura seleção anterior ou deixa “(Todas)”
       if(items.includes("completed")) sel.value = "completed";
       else if(keep) sel.value = keep;
+      if (DEBUG) console.debug("[controle] actions options set; selected:", sel.value);
     }catch(_){
-      // fallback
       const defaults = ["submitted","running","completed","failed","download"];
       sel.innerHTML = "";
       const optAll = document.createElement("option");
@@ -212,11 +225,11 @@
         sel.appendChild(o);
       });
       sel.value = "completed";
+      if (DEBUG) console.warn("[controle] actions fallback applied; selected:", sel.value);
     }
   }
 
   async function load(){
-    qs("#status").textContent = "Carregando...";
     const params = new URLSearchParams();
     const limit = Number(qs("#limit").value || 100);
     const kind = qs("#kind").value.trim();
@@ -232,32 +245,67 @@
     if (since) params.set("since", toISO(since));
     if (until) params.set("until", toISO(until));
 
+    qs("#status").textContent = "Carregando...";
+    if (DEBUG) console.groupCollapsed("[controle] load audits", {
+      url: "/api/automations/controle/audits",
+      params: Object.fromEntries(params.entries())
+    });
+
     try{
-      const resp = await fetch(`/api/automations/controle/audits?` + params.toString(), { credentials: "include" });
+      const url = `/api/automations/controle/audits?` + params.toString();
+      const resp = await fetch(url, { credentials: "include" });
+      if (DEBUG) console.debug("[controle] response status", resp.status, url);
+
       if(!resp.ok){
         const t = await resp.text();
         qs("#status").textContent = `Erro ${resp.status}: ${t}`;
+        console.error("[controle] load error", { status: resp.status, body: t });
+        console.groupEnd?.();
         return;
       }
       const data = await resp.json();
+      if (DEBUG) {
+        console.debug("[controle] audits payload (raw)", data);
+        const sample = Array.isArray(data.items) ? data.items.slice(0,3) : [];
+        console.debug("[controle] audits sample(3)", sample);
+      }
       renderRows(data.items || []);
       qs("#status").textContent = `${data.count ?? (data.items?.length || 0)} evento(s) encontrado(s)`;
     }catch(e){
+      console.error("[controle] network error on audits", e);
       qs("#status").textContent = "Erro de rede ao carregar.";
+    } finally {
+      console.groupEnd?.();
     }
   }
 
   function renderRows(items){
     const tbody = qs("#tbl tbody");
     tbody.innerHTML = "";
-    for(const row of items){
+    if (DEBUG) console.groupCollapsed("[controle] renderRows", { count: items?.length || 0 });
+
+    items?.forEach((row, i) => {
       const tr = document.createElement("tr");
       const alvo = `${esc(row.target_kind || "")} ${esc(row.target_id || "")}`.trim();
       const extra = row.extra ?? {};
       const filename = extra.filename || extra.filename_pdf || extra.filename_docx || "";
-      const assunto = extra.assunto || extra.subject || "";
+      const resultMeta = toObj(extra.result);
+      const payloadMeta = toObj(extra.payload);
+      const assuntoFinal =
+        (extra.assunto || resultMeta.assunto || buildAssuntoFromPayload(payloadMeta) || extra.subject || "");
+      const assuntoDisplay = assuntoFinal || (payloadMeta.objeto || extra.objeto || "");
       const sid = getSid(row);
       const canDownload = !!sid && String(row.action||"").toLowerCase() === "completed";
+
+      if (DEBUG) {
+        console.groupCollapsed(`[controle] row #${i+1}`, { id: row.id || null, ts: row.ts, action: row.action });
+        console.debug("row", row);
+        console.debug("extra", extra);
+        console.debug("payloadMeta", payloadMeta);
+        console.debug("resultMeta", resultMeta);
+        console.debug("computed", { filename, assuntoFinal, assuntoDisplay, sid, canDownload, alvo });
+        console.groupEnd();
+      }
 
       tr.innerHTML = `
         <td class="nowrap">${fmtTs(row.ts)}</td>
@@ -265,7 +313,7 @@
         <td>${esc(row.action || "")}</td>
         <td>${alvo || "—"}</td>
         <td>${esc(filename || "—")}</td>
-        <td>${esc(assunto || "—")}</td>
+        <td>${esc(assuntoDisplay || "—")}</td>
         <td>
           <div class="btn-row">
             ${canDownload ? `
@@ -282,7 +330,9 @@
         pdfBtn?.addEventListener('click', () => downloadFmt(sid, 'pdf'));
         docxBtn?.addEventListener('click', () => downloadFmt(sid, 'docx'));
       }
-    }
+    });
+
+    if (DEBUG) console.groupEnd();
   }
 
   function exportCsv(){
@@ -302,10 +352,10 @@
     if (until) params.set("until", toISO(until));
 
     const url = `/api/automations/controle/audits.csv?` + params.toString();
+    if (DEBUG) console.debug("[controle] export CSV", url);
     window.open(url, "_blank");
   }
 
-  // UX: preset datas e foco; actions vêm do backend
   function initDefaults(){
     const now = new Date();
     const pad = (n)=>String(n).padStart(2,"0");
@@ -314,15 +364,18 @@
     const dd = pad(now.getDate());
     qs("#since").value = `${yyyy}-${mm}-${dd}T00:00`;
     qs("#username").focus();
+    if (DEBUG) console.info("[controle] initDefaults applied");
   }
 
   qs("#btnApply").addEventListener("click", load);
   qs("#btnCsv").addEventListener("click", exportCsv);
 
   async function bootstrap(){
+    if (DEBUG) console.info("[controle] bootstrap starting…");
     await loadActions();
     initDefaults();
     await load();
+    if (DEBUG) console.info("[controle] bootstrap done");
   }
   bootstrap();
 </script>

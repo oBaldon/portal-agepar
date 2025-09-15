@@ -1,4 +1,3 @@
-# app/automations/dfd.py
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
@@ -523,7 +522,17 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "assunto": assunto_final,
         }
         update_submission(sid, status="done", result=result, error=None)
-        add_audit(KIND, "completed", actor, {"sid": sid, "filename": filename})
+        add_audit(
+            KIND,
+            "completed",
+            actor,
+            {
+                "sid": sid,
+                "filename": filename,
+                "assunto": assunto_final,
+                "objeto": ctx.get("objeto") or "",
+            },
+        )
 
         try:
             size_final = os.path.getsize(file_path)

@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/automations/controle",
     tags=["automations", "controle"],
-    dependencies=[Depends(require_roles_any(["director", "admin"]))],
+    # exige qualquer um dos papéis: diretor OU admin
+    dependencies=[Depends(require_roles_any("director", "admin"))],
 )
 
 # Templates (usa pasta local: apps/bff/app/automations/templates)
@@ -46,7 +47,7 @@ class AuditOut(BaseModel):
 
 class SubmissionOut(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    id: Optional[int] = None
+    id: Optional[str] = None
     kind: Optional[str] = None
     status: Optional[str] = None
     user_id: Optional[str] = None
@@ -55,7 +56,7 @@ class SubmissionOut(BaseModel):
     updated_at: Optional[datetime] = None
     payload: Optional[Dict[str, Any]] = None
     result: Optional[Dict[str, Any]] = None
-    error: Optional[Dict[str, Any]] = None
+    error: Optional[Any] = None  # TEXT no banco; pode ser string ou json
 
 
 T = TypeVar("T")
@@ -130,6 +131,120 @@ def _filter_dates(
     return out
 
 
+def _to_obj(x: Any) -> Dict[str, Any]:
+    if x is None:
+        return {}
+    if isinstance(x, dict):
+        return x
+    if isinstance(x, (bytes, bytearray)):
+        try:
+            return json.loads(x.decode("utf-8"))
+        except Exception:
+            return {}
+    if isinstance(x, str):
+        try:
+            return json.loads(x)
+        except Exception:
+            return {}
+    return {}
+
+
+def _build_assunto_from_payload(payload: Dict[str, Any]) -> str:
+    assunto = (payload.get("assunto") or "").strip()
+    ano = (payload.get("pcaAno") or payload.get("pca_ano") or "").strip()
+    if assunto and ano:
+        return f"DFD - PCA {ano} - {assunto}"
+    return assunto
+
+
+def _sid_from_audit_row(row: Dict[str, Any]) -> Optional[str]:
+    extra = row.get("extra") or {}
+    return (
+        extra.get("sid")
+        or extra.get("submissionId")
+        or extra.get("id")
+        or row.get("target_id")
+        or None
+    )
+
+
+def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
+    """
+    Enriquecer in-place: tenta preencher extra.assunto / extra.objeto / extra.filename
+    usando submissions.payload/result quando possível.
+    """
+    for it in rows:
+        extra = it.get("extra") or {}
+        if extra.get("assunto"):
+            continue  # já está enriquecido
+
+        sid = _sid_from_audit_row(it)
+        if not sid:
+            continue
+
+        try:
+            sub = db.get_submission(sid)
+        except Exception:
+            sub = None
+
+        if not sub:
+            continue
+
+        payload = _to_obj(sub.get("payload"))
+        result = _to_obj(sub.get("result"))
+
+        assunto = result.get("assunto") or _build_assunto_from_payload(payload) or ""
+        objeto = (payload.get("objeto") or "").strip()
+        filename = (
+            result.get("filename_pdf")
+            or result.get("filename_docx")
+            or result.get("filename")
+            or extra.get("filename")
+            or ""
+        )
+
+        extra.update({"assunto": assunto})
+        if objeto and not extra.get("objeto"):
+            extra["objeto"] = objeto
+        if filename and not extra.get("filename"):
+            extra["filename"] = filename
+
+        it["extra"] = extra  # grava de volta
+
+
+# --------------------------
+# Endpoints auxiliares (ações distintas)
+# --------------------------
+@router.get("/actions")
+def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
+    """
+    Retorna a lista de ações distintas registradas em automation_audits.
+    Opcionalmente filtra por kind.
+    """
+    try:
+        try:
+            rows = db.list_audits(kind=kind, limit=2000, offset=0) if kind else db.list_audits(limit=2000, offset=0)
+        except TypeError:
+            # assinatura antiga (sem params) — faz fallback
+            rows = db.list_audits()
+
+        seen = set()
+        for r in rows:
+            a = (r.get("action") or "").strip()
+            if not a:
+                continue
+            if kind:
+                rk = r.get("kind") or r.get("target_kind")
+                if rk != kind:
+                    continue
+            seen.add(a)
+        items = sorted(seen)
+        return {"items": items}
+    except Exception as e:
+        logger.exception("erro ao listar actions")
+        raise HTTPException(status_code=500, detail=f"erro ao listar actions: {e}")
+
+
 # --------------------------
 # Endpoints de auditoria
 # --------------------------
@@ -189,7 +304,13 @@ def list_audits_api(
 
         filtered = [it for it in items if match(it)]
         filtered = _filter_dates(filtered, since, until)
+
+        # paginação antes do enriquecimento para evitar N consultas desnecessárias
         sliced = filtered[offset: offset + limit]
+
+        # Enriquecer com dados da submission quando faltar assunto/objeto/filename
+        _enrich_with_submission(sliced)
+
         return {"count": len(filtered), "items": sliced}
     except HTTPException:
         raise
@@ -303,7 +424,7 @@ def list_submissions_api(
 
 
 @router.get("/submissions/{sid}", response_model=SubmissionOut)
-def get_submission_api(sid: int):
+def get_submission_api(sid: str):
     """
     Busca uma submissão específica.
     """
@@ -343,7 +464,7 @@ def submit_not_supported():
 
 
 @router.post("/submissions/{sid}/download")
-def download_not_supported(sid: int):
+def download_not_supported(sid: str):
     raise HTTPException(
         status_code=409,
         detail=(
