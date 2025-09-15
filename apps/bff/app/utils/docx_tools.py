@@ -330,11 +330,14 @@ def _append_body_sections_xml_et(
         for i, it in enumerate(itens, start=1):
             desc = (it.get("descricao") or "").strip()
             dep = (it.get("haDependencia") or "").strip()
+            dep_qual = (it.get("dependenciaQual") or "").strip()
+            # Se houver vínculo (Sim), exibir a descrição do vínculo; se 'Não', mostrar 'Não'
+            vinculo_txt = dep_qual if dep == "Sim" and dep_qual else "Não"
             renov = (it.get("renovacaoContrato") or "").strip()
             rows.append([
                 _tc(str(i), align="left"),
                 _tc(desc, align="left"),
-                _tc(dep, align="left"),
+                _tc(vinculo_txt, align="left"),
                 _tc(renov, align="left"),
             ])
         elems.append(_tbl(rows, borders=True))
@@ -346,8 +349,8 @@ def _append_body_sections_xml_et(
             _tc("Item", bold=True, align="left"),
             _tc("Quantidade", bold=True, align="left"),
             _tc("Unidade", bold=True, align="left"),
-            _tc("Valor Unitário", bold=True, align="left"),  # agora ESQUERDA
-            _tc("Valor Total", bold=True, align="right"),    # Total fica à DIREITA
+            _tc("Valor Unitário", bold=True, align="left"),
+            _tc("Valor Total", bold=True, align="right"),
         ]
         v_rows = [v_header]
         total_geral = 0.0
@@ -369,8 +372,8 @@ def _append_body_sections_xml_et(
                 _tc(str(i), align="left"),
                 _tc(qtd_txt, align="left"),
                 _tc(um, align="left"),
-                _tc(_fmt_money(vu), align="left"),     # agora ESQUERDA
-                _tc(_fmt_money(vt), align="right"),    # Total à DIREITA
+                _tc(_fmt_money(vu), align="left"),
+                _tc(_fmt_money(vt), align="right"),
             ])
         # Linha Total (mescla 4 primeiras colunas); valor à direita
         v_rows.append([
