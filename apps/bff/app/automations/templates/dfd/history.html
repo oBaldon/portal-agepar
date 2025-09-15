@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
+<head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Histórico — Meus DFDs</title>
@@ -17,16 +18,29 @@
   .btn.ghost { background:transparent; color:#334155; border:1px solid #cbd5e1; }
   .btn.small { padding:8px 12px; font-size:12px; }
   .btn[disabled] { opacity:.6; cursor:not-allowed; }
-  table { width:100%; border-collapse: collapse; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-row .btn { white-space: nowrap; }
+
+  /* Tabela com layout fixo e quebra de linha para evitar "empurrar" as ações */
+  table { width:100%; border-collapse: collapse; table-layout: fixed; }
   th, td { text-align:left; padding:10px 12px; border-bottom:1px solid #e2e8f0; vertical-align: top; }
   th { font-size:12px; color:#475569; text-transform: uppercase; letter-spacing:.02em; }
+
+  /* Quebras agressivas para textos longos (sem espaços) */
+  td, .cell-assunto, .cell-assunto div, .subline {
+    overflow-wrap:anywhere;          /* quebra até palavras longas */
+    word-break:break-word;           /* compatibilidade */
+    white-space:normal;              /* permite múltiplas linhas */
+  }
+
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; }
   .badge.err { background:#fee2e2; color:#991b1b; }
   .badge.warn{ background:#fef3c7; color:#92400e; }
-  .btn-row { display:flex; gap:8px; flex-wrap:wrap; }
   .muted { color:#64748b; }
   .subline { color:#64748b; font-size:12px; margin-top:4px; }
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
@@ -49,13 +63,20 @@
 
     <div style="overflow:auto;">
       <table id="tbl">
+        <colgroup>
+          <col style="width:160px">
+          <col style="width:160px">
+          <col> <!-- Assunto ocupa o restante, quebra em múltiplas linhas -->
+          <col style="width:120px">
+          <col style="width:220px">
+        </colgroup>
         <thead>
           <tr>
-            <th style="width:160px">Data</th>
-            <th style="width:160px">Nº Memorando</th>
+            <th>Data</th>
+            <th>Nº Memorando</th>
             <th>Assunto</th>
-            <th style="width:120px">Status</th>
-            <th style="width:220px">Ações</th>
+            <th>Status</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -86,7 +107,7 @@
     if (typeof x === 'string') {
       try { return JSON.parse(x); } catch { return fallback; }
     }
-    if (typeof x === 'object') return x; // já é JSON (Postgres)
+    if (typeof x === 'object') return x;
     return fallback;
   }
   function escapeHTML(s){ return String(s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -95,7 +116,6 @@
   function resultOf(row){ return parseJSON(row.result || "{}", {}); }
 
   function buildAssuntoFrom(row) {
-    // tenta result.assunto; fallback: "DFD - PCA [ano] - [assunto]"
     const res = resultOf(row);
     if (res && res.assunto) return res.assunto;
     const p = payloadOf(row);
@@ -148,6 +168,7 @@
 
       // Assunto + sublinha (objeto / diretoria)
       const tdAss = document.createElement("td");
+      tdAss.className = "cell-assunto";
       const assuntoFinal = buildAssuntoFrom(row);
       const objeto = buildObjetoFrom(row);
       const dir = buildDiretoriaFrom(row);
@@ -221,7 +242,6 @@
     const term = (q.value || "").trim().toLowerCase();
     const sorter = sortSel.value;
 
-    // filtro: nº, assunto, objeto, diretoria, ano PCA
     filtered = items.filter(row => {
       const num = rowNumero(row).toLowerCase();
       const ass = buildAssuntoFrom(row).toLowerCase();
@@ -231,7 +251,6 @@
       return !term || num.includes(term) || ass.includes(term) || obj.includes(term) || dir.includes(term) || ano.includes(term);
     });
 
-    // ordenação
     filtered.sort((a, b) => {
       if (sorter === "date_desc" || sorter === "date_asc") {
         const da = rowDate(a).getTime();
@@ -281,3 +300,6 @@
   // init
   fetchPage({ reset:true });
 </script>
+
+</body>
+</html>
