@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Painel de Controle — Auditoria</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+
+  label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  input:not([type="checkbox"]):not([type="radio"]), select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+  .row { display:flex; gap: 12px; }
+  .col { flex:1; min-width: 0; }
+
+  .actions { display:flex; gap: 12px; align-items:center; justify-content: space-between; }
+  .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
+  .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.secondary:hover { background:#f8fafc; }
+  .btn.small { padding: 8px 12px; font-size: 12px; }
+  .note { font-size:12px; color:var(--muted); }
+  .status { font-size:13px; color: var(--muted); }
+
+  /* Full-bleed para a seção de eventos */
+  .fullbleed {
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  /* Tabela */
+  .table-wrap { overflow:auto; border:1px solid #e2e8f0; border-radius:12px; }
+  table { width:100%; border-collapse: collapse; background:#fff; }
+  th, td { padding:10px 12px; border-bottom:1px solid #eef2f7; vertical-align: top; text-align:left; }
+  th { font-size:12px; color:#64748b; background:#f8fafc; position:sticky; top:0; z-index:1; }
+  tr:hover td { background:#fbfdff; }
+  .nowrap { white-space: nowrap; }
+
+  .btn-row { display:flex; gap:8px; flex-wrap: wrap; }
+  .btn.ghost { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.ghost:hover { background:#f8fafc; }
+
+  @media (max-width: 640px) {
+    .actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Painel de Controle — Auditoria</h1>
+    <span class="note">Somente leitura • Diretores/Admin</span>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card" aria-labelledby="filtros-title">
+    <h2 id="filtros-title" style="font-size:16px; margin:0 0 8px">Filtros</h2>
+    <div class="row">
+      <div class="col">
+        <label for="kind">Tipo</label>
+        <select id="kind">
+          <option value="dfd" selected>DFD</option>
+          <option value="">(Todos)</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="username">Servidor (nome, e-mail ou CPF)</label>
+        <input id="username" placeholder="Ex.: Maria, 12345678901, maria@org.br" />
+      </div>
+      <div class="col">
+        <label for="action">Ação</label>
+        <!-- Agora é SELECT; será populado dinamicamente -->
+        <select id="action">
+          <option value="">(Todas)</option>
+          <option value="submitted">submitted</option>
+          <option value="running">running</option>
+          <option value="completed" selected>completed</option>
+          <option value="failed">failed</option>
+          <option value="download">download</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <label for="since">Desde</label>
+        <input id="since" type="datetime-local" />
+      </div>
+      <div class="col">
+        <label for="until">Até</label>
+        <input id="until" type="datetime-local" />
+      </div>
+      <div class="col" style="max-width:180px">
+        <label for="limit">Limite</label>
+        <input id="limit" type="number" value="100" min="1" max="1000" />
+      </div>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <span class="status" id="status" role="status" aria-live="polite"></span>
+      <div>
+        <button id="btnCsv" class="btn secondary small" type="button">Exportar CSV</button>
+        <button id="btnApply" class="btn" type="button">Aplicar filtros</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resultados (full-bleed) -->
+<div class="card fullbleed" style="margin-top:16px" aria-labelledby="result-title">
+  <div class="wrap" style="max-width: 1280px;">
+    <h2 id="result-title" style="font-size:16px; margin:0 0 8px">Eventos</h2>
+    <div class="table-wrap">
+      <table id="tbl" aria-describedby="status">
+        <thead>
+          <tr>
+            <th class="nowrap">Quando</th>
+            <th>Servidor</th>
+            <th>Ação</th>
+            <th>Alvo</th>
+            <th>Nome</th>
+            <th>Assunto</th>
+            <th class="nowrap">Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="note" style="margin-top:8px">Dica: downloads aparecem quando a ação é “completed”.</div>
+  </div>
+</div>
+
+<script>
+  const qs = (sel) => document.querySelector(sel);
+  function fmtTs(s){
+    if(!s) return "";
+    const d = new Date(s);
+    return isNaN(d) ? String(s) : d.toLocaleString();
+  }
+  function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m])); }
+  function toISO(dtLocalStr){
+    if(!dtLocalStr) return "";
+    const d = new Date(dtLocalStr);
+    return isNaN(d) ? "" : d.toISOString();
+  }
+
+  function getSid(row){
+    const extra = row.extra || {};
+    return extra.sid || extra.submissionId || extra.id || row.target_id || null;
+  }
+
+  async function downloadFmt(sid, fmt){
+    try{
+      const url = fmt ? `/api/automations/dfd/submissions/${encodeURIComponent(sid)}/download/${fmt}`
+                      : `/api/automations/dfd/submissions/${encodeURIComponent(sid)}/download`;
+      const r = await fetch(url, { method: 'POST', credentials: 'include' });
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      const name = (fmt==='pdf' ? `dfd_${sid}.pdf` : `dfd_${sid}.docx`);
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }catch(e){
+      alert('Não foi possível baixar o arquivo.');
+    }
+  }
+
+  async function loadActions(){
+    const sel = qs("#action");
+    const keep = sel.value; // guarda seleção atual (se houver)
+    try{
+      const r = await fetch(`/api/automations/controle/actions`, { credentials: "include" });
+      if(!r.ok) throw new Error();
+      const data = await r.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      sel.innerHTML = ""; // limpa
+      const optAll = document.createElement("option");
+      optAll.value = ""; optAll.textContent = "(Todas)";
+      sel.appendChild(optAll);
+      for(const a of items){
+        const o = document.createElement("option");
+        o.value = a; o.textContent = a;
+        sel.appendChild(o);
+      }
+      // preset “completed” se existir; senão, restaura seleção anterior ou deixa “(Todas)”
+      if(items.includes("completed")) sel.value = "completed";
+      else if(keep) sel.value = keep;
+    }catch(_){
+      // fallback
+      const defaults = ["submitted","running","completed","failed","download"];
+      sel.innerHTML = "";
+      const optAll = document.createElement("option");
+      optAll.value = ""; optAll.textContent = "(Todas)";
+      sel.appendChild(optAll);
+      defaults.forEach(a=>{
+        const o = document.createElement("option");
+        o.value = a; o.textContent = a;
+        sel.appendChild(o);
+      });
+      sel.value = "completed";
+    }
+  }
+
+  async function load(){
+    qs("#status").textContent = "Carregando...";
+    const params = new URLSearchParams();
+    const limit = Number(qs("#limit").value || 100);
+    const kind = qs("#kind").value.trim();
+    const username = qs("#username").value.trim();
+    const action = qs("#action").value.trim();
+    const since = qs("#since").value;
+    const until = qs("#until").value;
+
+    if (limit) params.set("limit", String(limit));
+    if (kind) params.set("kind", kind);
+    if (username) params.set("username", username);
+    if (action) params.set("action", action);
+    if (since) params.set("since", toISO(since));
+    if (until) params.set("until", toISO(until));
+
+    try{
+      const resp = await fetch(`/api/automations/controle/audits?` + params.toString(), { credentials: "include" });
+      if(!resp.ok){
+        const t = await resp.text();
+        qs("#status").textContent = `Erro ${resp.status}: ${t}`;
+        return;
+      }
+      const data = await resp.json();
+      renderRows(data.items || []);
+      qs("#status").textContent = `${data.count ?? (data.items?.length || 0)} evento(s) encontrado(s)`;
+    }catch(e){
+      qs("#status").textContent = "Erro de rede ao carregar.";
+    }
+  }
+
+  function renderRows(items){
+    const tbody = qs("#tbl tbody");
+    tbody.innerHTML = "";
+    for(const row of items){
+      const tr = document.createElement("tr");
+      const alvo = `${esc(row.target_kind || "")} ${esc(row.target_id || "")}`.trim();
+      const extra = row.extra ?? {};
+      const filename = extra.filename || extra.filename_pdf || extra.filename_docx || "";
+      const assunto = extra.assunto || extra.subject || "";
+      const sid = getSid(row);
+      const canDownload = !!sid && String(row.action||"").toLowerCase() === "completed";
+
+      tr.innerHTML = `
+        <td class="nowrap">${fmtTs(row.ts)}</td>
+        <td>${esc(row.username || "")}</td>
+        <td>${esc(row.action || "")}</td>
+        <td>${alvo || "—"}</td>
+        <td>${esc(filename || "—")}</td>
+        <td>${esc(assunto || "—")}</td>
+        <td>
+          <div class="btn-row">
+            ${canDownload ? `
+              <button type="button" class="btn small" data-dl="pdf" aria-label="Baixar PDF">Baixar PDF</button>
+              <button type="button" class="btn small secondary" data-dl="docx" aria-label="Baixar DOCX">Baixar DOCX</button>
+            ` : `<span class="note">—</span>`}
+          </div>
+        </td>`;
+      tbody.appendChild(tr);
+
+      if (canDownload) {
+        const pdfBtn = tr.querySelector('button[data-dl="pdf"]');
+        const docxBtn = tr.querySelector('button[data-dl="docx"]');
+        pdfBtn?.addEventListener('click', () => downloadFmt(sid, 'pdf'));
+        docxBtn?.addEventListener('click', () => downloadFmt(sid, 'docx'));
+      }
+    }
+  }
+
+  function exportCsv(){
+    const params = new URLSearchParams();
+    const limit = Number(qs("#limit").value || 1000);
+    const kind = qs("#kind").value.trim();
+    const username = qs("#username").value.trim();
+    const action = qs("#action").value.trim();
+    const since = qs("#since").value;
+    const until = qs("#until").value;
+
+    if (limit) params.set("limit", String(limit));
+    if (kind) params.set("kind", kind);
+    if (username) params.set("username", username);
+    if (action) params.set("action", action);
+    if (since) params.set("since", toISO(since));
+    if (until) params.set("until", toISO(until));
+
+    const url = `/api/automations/controle/audits.csv?` + params.toString();
+    window.open(url, "_blank");
+  }
+
+  // UX: preset datas e foco; actions vêm do backend
+  function initDefaults(){
+    const now = new Date();
+    const pad = (n)=>String(n).padStart(2,"0");
+    const yyyy = now.getFullYear();
+    const mm = pad(now.getMonth()+1);
+    const dd = pad(now.getDate());
+    qs("#since").value = `${yyyy}-${mm}-${dd}T00:00`;
+    qs("#username").focus();
+  }
+
+  qs("#btnApply").addEventListener("click", load);
+  qs("#btnCsv").addEventListener("click", exportCsv);
+
+  async function bootstrap(){
+    await loadActions();
+    initDefaults();
+    await load();
+  }
+  bootstrap();
+</script>
+</body>
+</html>

@@ -17,6 +17,7 @@ from app.automations.dfd import DFD_VERSION as DFD_VER
 from app.db import init_db
 from app.automations.form2json import router as form2json_router
 from app.automations.dfd import router as dfd_router
+from app.automations.controle import router as controle_router
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
@@ -241,6 +242,7 @@ def automations_index() -> Dict[str, Any]:
         "items": [
             {"kind": "form2json", "version": "1.0.0", "title": "Formulário para JSON"},
             {"kind": "dfd", "version": DFD_VER, "title": "DFD — Documento de Formalização da Demanda"},
+            {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
         ]
     }
 
@@ -249,6 +251,7 @@ def automations_index() -> Dict[str, Any]:
 # ------------------------------------------------------------------------------
 APP.include_router(form2json_router)
 APP.include_router(dfd_router)
+APP.include_router(controle_router)
 # (removido) APP.include_router(snake_router)  # já incluído acima
 
 # ------------------------------------------------------------------------------

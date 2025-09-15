@@ -201,6 +201,49 @@ def list_submissions(
         rows = cur.fetchall() or []
         return [dict(r) for r in rows]
 
+def list_submissions_admin(
+    kind: Optional[str] = None,
+    username: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    """
+    Lista submissões para painéis administrativos (ex.: diretores).
+    Não exige actor_* e aceita filtros livres: kind, username (nome/email/CPF) e status.
+    """
+    where: List[str] = ["1=1"]
+    params: List[Any] = []
+    if kind:
+        where.append("kind = %s")
+        params.append(kind)
+    if status:
+        where.append("LOWER(status) = LOWER(%s)")
+        params.append(status)
+    if username:
+        # busca em nome, email e CPF (ILIKE para nome/email; LIKE para cpf)
+        where.append("("
+                     "actor_nome ILIKE %s OR "
+                     "actor_email ILIKE %s OR "
+                     "actor_cpf LIKE %s"
+                     ")")
+        term = f"%{username}%"
+        params.extend([term, term, f"%{username}%"])
+
+    sql = f"""
+        SELECT *
+        FROM submissions
+        WHERE {' AND '.join(where)}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([limit, offset])
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall() or []
+        return [dict(r) for r in rows]
+
 def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any]) -> None:
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(

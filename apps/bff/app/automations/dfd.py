@@ -611,6 +611,7 @@ async def submit_dfd(
 @router.post("/submissions/{sid}/download")
 async def download_result(
     sid: str,
+    request: Request,
     user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
 ):
     """Rota antiga: baixa o arquivo “primário” (PDF se existir, senão DOCX)."""
@@ -639,6 +640,20 @@ async def download_result(
         with open(file_path, "rb") as f:
             data = f.read()
 
+        # AUDIT: download primário (formato inferido pela extensão)
+        try:
+            ext = (os.path.splitext(filename)[1] or "").lstrip(".").lower() or "auto"
+            add_audit(KIND, "download", user, {
+                "sid": sid,
+                "filename": filename,
+                "bytes": len(data),
+                "fmt": ext,
+                "ip": (getattr(request.client, "host", None) if request and request.client else None),
+                "ua": (request.headers.get("user-agent") if request else None),
+            })
+        except Exception:
+            logger.exception("audit (download legacy) failed (non-blocking)")
+
         media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         return StreamingResponse(
             BytesIO(data),
@@ -654,6 +669,7 @@ async def download_result(
 async def download_result_fmt(
     sid: str,
     fmt: str,
+    request: Request,
     user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
 ):
     """Novo: baixa especificamente PDF ou DOCX."""
@@ -691,6 +707,19 @@ async def download_result_fmt(
 
         with open(file_path, "rb") as f:
             data = f.read()
+
+        # AUDIT: download com formato explícito
+        try:
+            add_audit(KIND, "download", user, {
+                "sid": sid,
+                "filename": filename,
+                "bytes": len(data),
+                "fmt": fmt,
+                "ip": (getattr(request.client, "host", None) if request and request.client else None),
+                "ua": (request.headers.get("user-agent") if request else None),
+            })
+        except Exception:
+            logger.exception("audit (download fmt) failed (non-blocking)")
 
         media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         return StreamingResponse(

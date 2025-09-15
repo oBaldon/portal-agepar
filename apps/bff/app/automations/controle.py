@@ -1,0 +1,353 @@
+from __future__ import annotations
+
+import csv
+import io
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, TypeVar, Generic
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.auth.rbac import require_roles_any
+from app import db as db
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/api/automations/controle",
+    tags=["automations", "controle"],
+    dependencies=[Depends(require_roles_any(["director", "admin"]))],
+)
+
+# Templates (usa pasta local: apps/bff/app/automations/templates)
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# --------------------------
+# Pydantic Models (v2)
+# --------------------------
+class AuditOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    id: Optional[int] = None
+    ts: Optional[datetime] = Field(default=None, description="Timestamp do evento")
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    action: Optional[str] = None
+    target_kind: Optional[str] = None
+    target_id: Optional[str] = None
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    extra: Optional[Dict[str, Any]] = None
+
+
+class SubmissionOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    id: Optional[int] = None
+    kind: Optional[str] = None
+    status: Optional[str] = None
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    payload: Optional[Dict[str, Any]] = None
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[Dict[str, Any]] = None
+
+
+T = TypeVar("T")
+
+
+class Page(BaseModel, Generic[T]):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    count: int
+    items: List[T]
+
+
+# --------------------------
+# UI
+# --------------------------
+@router.get("/ui", response_class=HTMLResponse)
+def get_ui(request: Request):
+    """
+    UI HTML servida por template (iframe).
+    """
+    return templates.TemplateResponse("controle/ui.html", {"request": request})
+
+
+# --------------------------
+# Schema (informativo)
+# --------------------------
+@router.get("/schema")
+def get_schema():
+    return {
+        "filters": {
+            "kind": {"type": "string", "enum": ["dfd", ""], "default": "dfd"},
+            "username": {"type": "string"},
+            "action": {"type": "string"},
+            "since": {"type": "datetime"},
+            "until": {"type": "datetime"},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
+            "offset": {"type": "integer", "minimum": 0, "default": 0},
+        },
+        "notes": "Automação de controle é somente leitura. Use DFD para gerar ou baixar artefatos.",
+    }
+
+
+# --------------------------
+# Helpers
+# --------------------------
+def _filter_dates(
+    items: List[Dict[str, Any]],
+    since: Optional[datetime],
+    until: Optional[datetime],
+    key_candidates=("ts", "created_at", "updated_at"),
+):
+    def pick_dt(row):
+        for k in key_candidates:
+            v = row.get(k)
+            if isinstance(v, str):
+                try:
+                    # aceita ISO com 'Z'
+                    return datetime.fromisoformat(v.replace("Z", "+00:00"))
+                except Exception:
+                    continue
+            if isinstance(v, datetime):
+                return v
+        return None
+
+    out = []
+    for it in items:
+        dt = pick_dt(it)  # pode ser None
+        if since and dt and dt < since:
+            continue
+        if until and dt and dt > until:
+            continue
+        out.append(it)
+    return out
+
+
+# --------------------------
+# Endpoints de auditoria
+# --------------------------
+@router.get("/audits", response_model=Page[AuditOut])
+def list_audits_api(
+    kind: Optional[str] = Query(default="dfd"),
+    username: Optional[str] = Query(default=None),
+    action: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Lista eventos de auditoria com filtros simples e paginação.
+    """
+    try:
+        # Carrega eventos crus do DB (automation_audits)
+        try:
+            raw = db.list_audits(kind=kind, limit=limit + offset)
+        except TypeError:
+            # assinatura sem limit/kind
+            raw = db.list_audits()
+
+        # Normaliza para o contrato AuditOut / UI
+        items: List[Dict[str, Any]] = []
+        for r in raw:
+            items.append({
+                "id": r.get("id"),
+                "ts": r.get("at") or r.get("ts"),
+                "username": r.get("actor_nome") or r.get("actor_cpf") or r.get("actor_email") or r.get("username"),
+                "action": r.get("action"),
+                "target_kind": r.get("kind") or r.get("target_kind"),
+                "target_id": r.get("target_id"),
+                "ip": r.get("ip"),
+                "user_agent": r.get("user_agent"),
+                "extra": r.get("meta") or r.get("extra") or {},
+            })
+
+        # Filtros adicionais (username/action) + datas
+        def match(it: Dict[str, Any]) -> bool:
+            if username:
+                u = it.get("username") or ""
+                if username.lower() not in str(u).lower():
+                    return False
+            if action:
+                a = it.get("action") or ""
+                if action.lower() not in str(a).lower():
+                    return False
+            if kind:
+                tk = it.get("target_kind")
+                if tk not in (kind, f"automations/{kind}", "dfd" if kind == "dfd" else kind):
+                    ek = (it.get("extra") or {}).get("kind")
+                    if ek != kind:
+                        return False
+            return True
+
+        filtered = [it for it in items if match(it)]
+        filtered = _filter_dates(filtered, since, until)
+        sliced = filtered[offset: offset + limit]
+        return {"count": len(filtered), "items": sliced}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erro ao listar audits")
+        raise HTTPException(status_code=500, detail=f"erro ao listar audits: {e}")
+
+
+@router.get("/audits.csv")
+def list_audits_csv(
+    kind: Optional[str] = Query(default="dfd"),
+    username: Optional[str] = Query(default=None),
+    action: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=1000, ge=1, le=10000),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Exporta os eventos de auditoria em CSV respeitando os filtros.
+    """
+    page = list_audits_api(
+        kind=kind,
+        username=username,
+        action=action,
+        since=since,
+        until=until,
+        limit=limit,
+        offset=offset,
+    )
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["id", "ts", "username", "action", "target_kind", "target_id", "ip", "user_agent", "extra"]
+    )
+    # page aqui é um dict {"count": int, "items": [...]}
+    for r in page["items"]:
+        writer.writerow(
+            [
+                r.get("id", ""),
+                r.get("ts", ""),
+                r.get("username", ""),
+                r.get("action", ""),
+                r.get("target_kind", ""),
+                r.get("target_id", ""),
+                r.get("ip", ""),
+                r.get("user_agent", ""),
+                json.dumps(r.get("extra") or {}, ensure_ascii=False),
+            ]
+        )
+    data = buf.getvalue().encode("utf-8")
+    headers = {"Content-Disposition": 'attachment; filename="audits.csv"'}
+    return StreamingResponse(
+        io.BytesIO(data), media_type="text/csv; charset=utf-8", headers=headers
+    )
+
+
+# --------------------------
+# Endpoints de submissões (consulta)
+# --------------------------
+@router.get("/submissions", response_model=Page[SubmissionOut])
+def list_submissions_api(
+    kind: Optional[str] = Query(default="dfd"),
+    username: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Lista submissões (ex.: DFD) com filtros.
+    """
+    try:
+        # Usa o método admin (não exige actor_*), aplicando filtros server-side
+        try:
+            items = db.list_submissions_admin(
+                kind=kind, username=username, status=status, limit=limit + offset, offset=0
+            )
+        except AttributeError:
+            # Se a função ainda não existir, sinaliza claramente
+            raise HTTPException(
+                status_code=500,
+                detail="list_submissions_admin() não disponível em app.db; implemente para o painel de controle.",
+            )
+
+        # Normaliza campos para o contrato SubmissionOut/UI
+        norm: List[Dict[str, Any]] = []
+        for r in items:
+            norm.append({
+                "id": r.get("id"),
+                "kind": r.get("kind"),
+                "status": r.get("status"),
+                "username": r.get("actor_nome") or r.get("actor_cpf") or r.get("actor_email") or r.get("username"),
+                "user_id": r.get("actor_cpf") or r.get("user_id"),
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at"),
+                "payload": r.get("payload") or {},
+                "result": r.get("result"),
+                "error": r.get("error"),
+            })
+        # Filtro de datas + paginação
+        norm = _filter_dates(norm, since, until, key_candidates=("created_at", "updated_at", "ts"))
+        sliced = norm[offset: offset + limit]
+        return {"count": len(norm), "items": sliced}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erro ao listar submissions")
+        raise HTTPException(status_code=500, detail=f"erro ao listar submissions: {e}")
+
+
+@router.get("/submissions/{sid}", response_model=SubmissionOut)
+def get_submission_api(sid: int):
+    """
+    Busca uma submissão específica.
+    """
+    try:
+        sub = db.get_submission(sid)
+        if not sub:
+            raise HTTPException(status_code=404, detail=f"submission {sid} não encontrada")
+        # Normaliza retorno pontual
+        return {
+            "id": sub.get("id"),
+            "kind": sub.get("kind"),
+            "status": sub.get("status"),
+            "username": sub.get("actor_nome") or sub.get("actor_cpf") or sub.get("actor_email") or sub.get("username"),
+            "user_id": sub.get("actor_cpf") or sub.get("user_id"),
+            "created_at": sub.get("created_at"),
+            "updated_at": sub.get("updated_at"),
+            "payload": sub.get("payload") or {},
+            "result": sub.get("result"),
+            "error": sub.get("error"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erro ao buscar submission %s", sid)
+        raise HTTPException(status_code=500, detail=f"erro ao buscar submission: {e}")
+
+
+# --------------------------
+# Endpoints não suportados (somente leitura)
+# --------------------------
+@router.post("/submit")
+def submit_not_supported():
+    raise HTTPException(
+        status_code=409,
+        detail="controle é somente leitura; use a automação de origem (ex.: dfd) para submeter.",
+    )
+
+
+@router.post("/submissions/{sid}/download")
+def download_not_supported(sid: int):
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            "download deve ser feito na automação de origem "
+            "(ex.: /api/automations/dfd/submissions/{id}/download)."
+        ),
+    )
