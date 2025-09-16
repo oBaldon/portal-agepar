@@ -148,6 +148,8 @@ def _to_obj(x: Any) -> Dict[str, Any]:
             return {}
     return {}
 
+def _digits(s: Optional[str]) -> str:
+    return "".join(ch for ch in str(s or "") if ch.isdigit())
 
 def _build_assunto_from_payload(payload: Dict[str, Any]) -> str:
     assunto = (payload.get("assunto") or "").strip()
@@ -276,6 +278,10 @@ def list_audits_api(
                 "id": r.get("id"),
                 "ts": r.get("at") or r.get("ts"),
                 "username": r.get("actor_nome") or r.get("actor_cpf") or r.get("actor_email") or r.get("username"),
+                # ↓↓↓ PRESERVAR CAMPOS ORIGINAIS PARA FILTRO
+                "actor_nome": r.get("actor_nome"),
+                "actor_cpf": r.get("actor_cpf"),
+                "actor_email": r.get("actor_email"),
                 "action": r.get("action"),
                 "target_kind": r.get("kind") or r.get("target_kind"),
                 "target_id": r.get("target_id"),
@@ -285,11 +291,27 @@ def list_audits_api(
             })
 
         # Filtros adicionais (username/action) + datas
+        # --- CHANGE: ainda em list_audits_api(), na função match()
         def match(it: Dict[str, Any]) -> bool:
             if username:
-                u = it.get("username") or ""
-                if username.lower() not in str(u).lower():
-                    return False
+                term = (username or "").strip().lower()
+                term_digits = _digits(username)
+
+                hay = " ".join([
+                    str(it.get("username") or ""),
+                    str(it.get("actor_nome") or ""),
+                    str(it.get("actor_email") or ""),
+                ]).lower()
+
+                if term_digits:
+                    # tenta bater por CPF (apenas dígitos)
+                    cpf_digits = _digits(it.get("actor_cpf"))
+                    if term_digits not in cpf_digits and term not in hay:
+                        return False
+                else:
+                    if term not in hay:
+                        return False
+
             if action:
                 a = it.get("action") or ""
                 if action.lower() not in str(a).lower():
@@ -301,6 +323,7 @@ def list_audits_api(
                     if ek != kind:
                         return False
             return True
+
 
         filtered = [it for it in items if match(it)]
         filtered = _filter_dates(filtered, since, until)
