@@ -1,3 +1,4 @@
+# app/automations/dfd.py
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 KIND = "dfd"
 DFD_VERSION = "2.2.0"  # alinhado à UI com itens antes dos campos gerais finais
 REQUIRED_ROLES = ("automations.dfd",)
+# Papéis elevados que devem poder baixar qualquer arquivo via Controle
+ELEVATED_ROLES = ("admin", "director")
 
 # Diretório com os modelos DOCX por diretoria (timbre)
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
@@ -104,8 +107,13 @@ def _get_model_path(slug: str) -> Optional[str]:
     return None
 
 
+def _has_any_role(user: Dict[str, Any], *roles: str) -> bool:
+    user_roles = set((user or {}).get("roles") or [])
+    return any(r in user_roles for r in roles)
+
+
 def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
-    """Permite acesso se CPF bater, ou se não houver CPF gravado mas o e-mail bater."""
+    """Permite acesso se CPF bater, ou se não houver CPF mas o e-mail bater."""
     u_cpf = (user.get("cpf") or "").strip() or None
     u_email = (user.get("email") or "").strip() or None
     owner_cpf = (row.get("actor_cpf") or "").strip() or None
@@ -114,6 +122,18 @@ def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
         (owner_cpf and u_cpf and owner_cpf == u_cpf) or
         (not owner_cpf and owner_email and u_email and owner_email == u_email)
     )
+
+
+def _can_access_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
+    """
+    Dono pode acessar. Além disso, papéis elevados ('admin'/'director')
+    podem acessar independentemente do autor.
+    """
+    if _owns_submission(row, user):
+        return True
+    if _has_any_role(user, *ELEVATED_ROLES):
+        return True
+    return False
 
 
 def _read_html(name: str) -> str:
@@ -617,11 +637,15 @@ async def submit_dfd(
     return {"submissionId": sid, "status": "queued"}
 
 
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# DOWNLOADS: agora permitem automations.dfd OU director/admin e ignoram ownership
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.post("/submissions/{sid}/download")
 async def download_result(
     sid: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
+    # permite também director/admin
+    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "director", "admin")),
 ):
     """Rota antiga: baixa o arquivo “primário” (PDF se existir, senão DOCX)."""
     try:
@@ -633,7 +657,8 @@ async def download_result(
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
 
-    if not _owns_submission(row, user):
+    # Bypass de ownership para papéis elevados
+    if not _can_access_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
 
     if row.get("status") != "done":
@@ -679,7 +704,8 @@ async def download_result_fmt(
     sid: str,
     fmt: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
+    # permite também director/admin
+    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "director", "admin")),
 ):
     """Novo: baixa especificamente PDF ou DOCX."""
     if fmt not in ("pdf", "docx"):
@@ -694,7 +720,8 @@ async def download_result_fmt(
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
 
-    if not _owns_submission(row, user):
+    # Bypass de ownership para papéis elevados
+    if not _can_access_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
 
     if row.get("status") != "done":
