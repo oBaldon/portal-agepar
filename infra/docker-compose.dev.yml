@@ -25,6 +25,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   host:
     image: node:20-alpine
@@ -45,6 +50,11 @@ services:
       - bff
       - docs
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   docs:
     build:
@@ -58,6 +68,11 @@ services:
     expose:
       - "8000"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   portal_agepar_node_modules:

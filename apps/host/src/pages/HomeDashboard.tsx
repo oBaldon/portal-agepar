@@ -1,6 +1,9 @@
+// src/pages/HomeDashboard.tsx
+import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Catalog, Block, User } from "@/types";
-import { groupBlocksByCategory, userCanSeeBlock } from "@/types";
+import { groupBlocksByCategory } from "@/types";
+import { visibleBlocks, visibleCategories } from "@/lib/catalog";
 
 /** Escolhe um path “principal” do bloco: prioriza navigation[0].path e cai para routes[0].path */
 function primaryPathOf(block: Block): string | null {
@@ -16,14 +19,29 @@ export default function HomeDashboard({
   catalog: Catalog | null;
   user: User | null;
 }) {
+  // ⚠️ Hooks devem ser chamados sempre, em todas as renders
   const nav = useNavigate();
-  if (!catalog) return <div className="p-6">Carregando catálogo…</div>;
 
-  // RBAC simples + agrupamento por categoria
-  const grouped = groupBlocksByCategory(
-    (catalog.blocks ?? []).filter((b) => userCanSeeBlock(user, b)),
-    catalog.categories
+  // Catálogo filtrado (RBAC + hidden) preservando ordem declarada
+  const blocksVisiveis = useMemo(
+    () => (catalog ? visibleBlocks(catalog, user ?? undefined) : []),
+    [catalog, user]
   );
+  const categoriasVisiveis = useMemo(
+    () => (catalog ? visibleCategories(catalog, user ?? undefined) : []),
+    [catalog, user]
+  );
+
+  // Agrupamento por categoria usando apenas itens visíveis
+  const grouped = useMemo(
+    () => groupBlocksByCategory(blocksVisiveis, categoriasVisiveis),
+    [blocksVisiveis, categoriasVisiveis]
+  );
+
+  // 🔁 Só decide o que mostrar depois (sem interromper a chamada dos hooks)
+  if (!catalog) {
+    return <div className="p-6">Carregando catálogo…</div>;
+  }
 
   // quantos cards mostrar por categoria na Home
   const MAX_PER_CATEGORY = 6;
@@ -60,9 +78,7 @@ export default function HomeDashboard({
               </div>
 
               {visible.length === 0 ? (
-                <div className="text-sm text-slate-500">
-                  Sem blocos nesta categoria.
-                </div>
+                <div className="text-sm text-slate-500">Sem blocos nesta categoria.</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {visible.map((b) => {
@@ -70,8 +86,10 @@ export default function HomeDashboard({
                     const disabled = !to;
                     return (
                       <button
+                        type="button"
                         key={b.name}
                         disabled={disabled}
+                        aria-disabled={disabled}
                         onClick={() => to && nav(to)}
                         className={[
                           "group text-left rounded-2xl border p-4 bg-white shadow-sm hover:shadow-md transition w-full",
@@ -82,9 +100,7 @@ export default function HomeDashboard({
                         title={b.description || b.displayName}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="text-base font-medium">
-                            {b.displayName}
-                          </div>
+                          <div className="text-base font-medium">{b.displayName}</div>
                           <span
                             className={[
                               "text-[10px] font-semibold uppercase rounded-full px-2 py-0.5",
@@ -135,8 +151,8 @@ export default function HomeDashboard({
 
       <div className="mt-8 text-xs text-slate-500">
         Catálogo gerado em{" "}
-        {new Date(catalog.generatedAt).toLocaleString()} • Host{" "}
-        {catalog.host?.version}
+        {catalog.generatedAt ? new Date(catalog.generatedAt).toLocaleString() : "—"} • Host{" "}
+        {catalog.host?.version ?? "—"}
       </div>
     </div>
   );

@@ -117,6 +117,7 @@ nav:
       - Runbooks:
           - BFF: 50-operacoes/runbooks/bff.md
           - DB: 50-operacoes/runbooks/db.md
+          - Dev Stack Composto: 50-operacoes/runbooks/dev-stack-composto.md
           - Host: 50-operacoes/runbooks/host.md
   - 60 — Testes:
       - Estratégia de Testes: 60-testes/estrategia-de-testes.md

@@ -161,12 +161,32 @@ export default function App() {
   const initials =
     user?.nome?.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AG";
 
-  // Mostra apenas categorias com ao menos um bloco visível ao usuário
-  const visibleCategories = (catalog?.categories ?? []).filter((cat) =>
-    (catalog?.blocks ?? []).some(
-      (b) => b.categoryId === cat.id && !b.hidden && userCanSeeBlock(user, b)
-    )
-  );
+  // Mostra apenas categorias visíveis:
+  // - categoria NÃO hidden
+  // - RBAC ANY-of em category.requiredRoles (se houver)
+  // - pelo menos 1 bloco visível (não hidden + userCanSeeBlock)
+  const visibleCategories = useMemo(() => {
+    const cats = catalog?.categories ?? [];
+    const blocks = catalog?.blocks ?? [];
+    const roles = user?.roles ?? [];
+
+    const blockIsVisible = (b: any) => {
+      if (b?.hidden) return false;
+      return userCanSeeBlock(user, b);
+    };
+    const catHasVisibleBlock = new Set(
+      blocks.filter(blockIsVisible).map((b) => b.categoryId)
+    );
+
+    const anyRole = (required?: string[]) =>
+      !required || required.length === 0 || required.some((r) => roles.includes(r));
+
+    return cats.filter((c: any) => {
+      if (c?.hidden) return false;
+      if (!anyRole(c?.requiredRoles)) return false;
+      return catHasVisibleBlock.has(c.id);
+    });
+  }, [catalog, user]);
 
   return (
     <div className="min-h-full">
@@ -279,7 +299,10 @@ export default function App() {
         <Route path="/conta/sessoes" element={<AccountSessions />} />
 
         {/* Rotas dos blocos do catálogo (com guard RBAC) */}
-        {catalog?.blocks?.map((b) =>
+        {(catalog?.blocks ?? [])
+          // não monta rotas de blocos explicitamente escondidos
+          .filter((b: any) => !b?.hidden)
+          .map((b) =>
           b.routes?.map((r) => (
             <Route
               key={`${b.name}:${r.path}`}

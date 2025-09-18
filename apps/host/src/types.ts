@@ -41,6 +41,11 @@ export type Category = {
   icon?: string;
   /** Ordenação da categoria (menor = aparece primeiro). */
   order?: number;
+  /** Esconde totalmente a categoria da navbar/menu. */
+  hidden?: boolean;
+  /** RBAC ANY-of para a categoria inteira (opcional, além do RBAC por bloco). */
+  requiredRoles?: string[];
+  
 };
 
 /** Metadados e definição de um bloco/automação. */

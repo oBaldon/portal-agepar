@@ -19,6 +19,11 @@ services:
       - pg_data:/var/lib/postgresql/data
       # ATENÇÃO: este caminho é relativo ao próprio arquivo (pasta infra/)
       - ./sql:/docker-entrypoint-initdb.d:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Override no BFF apenas para injetar DATABASE_URL enquanto mantemos AUTH_MODE=mock
   bff:
@@ -27,6 +32,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   pg_data:

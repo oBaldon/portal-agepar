@@ -7,10 +7,10 @@
 
   "categories": [
     { "id": "cat1", "label": "Compras", "icon": "ShoppingCart" },
-    { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck" },
-    { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck" },
-    { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical" },
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield" }
+    { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck",  "hidden": true},
+    { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck",  "hidden": true},
+    { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true},
+    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin","director"] }
   ],
 
   "blocks": [
@@ -26,7 +26,8 @@
       "routes": [
         { "path": "/demo", "kind": "iframe" }
       ],
-      "tags": ["exemplo"]
+      "tags": ["exemplo"],
+      "hidden": true
     },
     {
       "name": "dfd",
@@ -105,7 +106,8 @@
       "routes": [
         { "path": "/automacao-2", "kind": "iframe" }
       ],
-      "tags": ["exemplo", "piloto"]
+      "tags": ["exemplo", "piloto"],
+      "hidden": true
     },
     {
       "name": "automacao3",
@@ -119,7 +121,8 @@
       "routes": [
         { "path": "/automacao-3", "kind": "iframe" }
       ],
-      "tags": ["exemplo", "piloto"]
+      "tags": ["exemplo", "piloto"],
+      "hidden": true
     },
     {
       "name": "possibilidades",
@@ -134,7 +137,8 @@
         { "path": "/possibilidades", "kind": "iframe" }
       ],
       "tags": ["idéias", "exploração"],
-      "requiredRoles": ["admin"]
+      "requiredRoles": ["admin"],
+      "hidden": true
     }
   ]
 }
