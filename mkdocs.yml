@@ -1,45 +1,131 @@
-site_name: Portal AGEPAR — Guia do Usuário
+site_name: "Portal AGEPAR — Documentação Técnica"
+site_description: "Docs técnicos do monorepo: BFF (FastAPI), Host (React/Vite/TS), Catálogo e Infra."
+site_url: "http://localhost:5173/docs/"
 repo_url: "https://github.com/oBaldon/portal-agepar"
+use_directory_urls: true
+
 theme:
   name: material
   language: pt-BR
+  custom_dir: docs/overrides
   features:
-    - navigation.instant
-    - navigation.tracking
-    - content.tabs.link
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
     - content.code.copy
     - toc.integrate
+    - search.suggest
+    - search.highlight
   palette:
     - scheme: default
-      primary: blue
-      accent: light blue
-markdown_extensions:
-  - admonition
-  - footnotes
-  - tables
-  - attr_list
-  - md_in_html
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.highlight
+      primary: indigo
+      accent: indigo
+  icon:
+    repo: fontawesome/brands/github
+
 plugins:
   - search
   - glightbox
-  - mermaid2
+  - mermaid2:
+      arguments:
+        theme: default
+        securityLevel: strict
+  - swagger-ui-tag
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
 nav:
   - Início: index.md
-  - Como usar:
-      - Como entrar: uso/como-entrar.md
-      - Como navegar: uso/como-navegar.md
-  - Fluxo de compras:
-      - Visão geral: fluxo-compras/visao-geral.md
-  - Automações:
-      - Sobre as automações: automacoes/index.md
-      - Formulário → JSON: automacoes/form2json.md
-      - DFD — Documento de Formalização da Demanda: automacoes/dfd.md
-  - Ajuda:
-      - Perguntas frequentes (FAQ): ajuda/perguntas-frequentes.md
-      - Segurança & privacidade: ajuda/seguranca-privacidade.md
-      - Suporte: ajuda/suporte.md
-  - Glossário: glossario.md
-  - Mudanças & novidades: mudancas-novidades.md
+  - 00 — Overview:
+      - Sumário: 00-overview/index.md
+      - Visão Geral: 00-overview/visao-geral.md
+      - Arquitetura: 00-overview/arquitetura.md
+      - Layout do Monorepo: 00-overview/layout-do-monorepo.md
+      - Decisões (ADR):
+          - ADR-0001 — Padrão Monorepo: 00-overview/decisões/adr-0001-padrao-monorepo.md
+          - ADR-0002 — BFF FastAPI + Postgres: 00-overview/decisões/adr-0002-bff-fastapi-postgres.md
+          - ADR-0003 — Host React + Vite: 00-overview/decisões/adr-0003-host-react-vite.md
+  - 10 — BFF (FastAPI):
+      - Overview: 10-bff/overview.md
+      - Configuração: 10-bff/configuracao.md
+      - API:
+          - Auth: 10-bff/api/auth.md
+          - Automations: 10-bff/api/automations.md
+          - Catalog: 10-bff/api/catalog.md
+          - Health & Version: 10-bff/api/health-version.md
+      - Auth:
+          - Visão Geral: 10-bff/auth/overview.md
+          - RBAC: 10-bff/auth/rbac.md
+          - Rotas: 10-bff/auth/rotas.md
+          - Sessões: 10-bff/auth/sessoes.md
+      - Automations:
+          - Índice: 10-bff/automations/index.md
+          - DFD: 10-bff/automations/dfd.md
+          - Form2JSON: 10-bff/automations/form2json.md
+          - Guia de Nova Automação: 10-bff/automations/guia-de-nova-automacao.md
+      - Database:
+          - Conexão & Pool: 10-bff/database/conexao-e-pool.md
+          - Índices & Performance: 10-bff/database/indices-performance.md
+          - Migrações: 10-bff/database/migracoes.md
+          - Schema: 10-bff/database/schema.md
+      - Logs & Observabilidade: 10-bff/logging-observabilidade.md
+      - Erros & Status: 10-bff/erros-e-status.md
+      - Utils:
+          - DOCX Tools: 10-bff/utils/docx-tools.md
+  - 20 — Host (React/Vite/TS):
+      - Overview: 20-host/overview.md
+      - Arquitetura de UI: 20-host/arquitetura-ui.md
+      - Integração com Catálogo: 20-host/catalog-integration.md
+      - Roteamento e Rotas: 20-host/roteamento-e-rotas.md
+      - RBAC no Front: 20-host/rbac-no-front.md
+      - Vite — Proxies: 20-host/vite-config-proxies.md
+      - Páginas:
+          - Login: 20-host/paginas/login.md
+          - Home (Dashboard): 20-host/paginas/home-dashboard.md
+          - Category View: 20-host/paginas/category-view.md
+          - Account / Sessions: 20-host/paginas/account-sessions.md
+  - 30 — Catálogo:
+      - Overview: 30-catalog/overview.md
+      - Schema de Categoria e Bloco: 30-catalog/schema-de-categoria-e-bloco.md
+      - Boas Práticas: 30-catalog/boas-praticas.md
+      - Exemplos: 30-catalog/exemplos.md
+  - 40 — Infra:
+      - Ambientes & Variáveis: 40-infra/ambientes-e-variaveis.md
+      - Banco de Dados (PostgreSQL): 40-infra/banco-de-dados-postgres.md
+      - Docker Compose: 40-infra/docker-compose.md
+      - Pipelines CI/CD: 40-infra/pipelines-ci-cd.md
+      - Scripts Operacionais: 40-infra/scripts-operacionais.md
+  - 50 — Operações:
+      - Segurança: 50-operacoes/seguranca.md
+      - Observabilidade: 50-operacoes/observabilidade.md
+      - Desempenho & Capacidade: 50-operacoes/desempenho-capacidade.md
+      - Backups & Retenção: 50-operacoes/backups-e-retencao.md
+      - Runbooks:
+          - BFF: 50-operacoes/runbooks/bff.md
+          - DB: 50-operacoes/runbooks/db.md
+          - Host: 50-operacoes/runbooks/host.md
+  - 60 — Testes:
+      - Estratégia de Testes: 60-testes/estrategia-de-testes.md
+      - API via cURL: 60-testes/testes-de-api-curl.md
+      - Front — Vitest: 60-testes/testes-front-vitest.md
+      - Testes Manuais: 60-testes/testes-manuais.md
+      - Backend — Unitários: 60-testes/testes-unitarios-backend.md
+  - 70 — Referência:
+      - OpenAPI: 70-referencia/openapi.md
+      - Glossário: 70-referencia/glossary.md
+      - Esquemas Mermaid: 70-referencia/esquemas-mermaid.md
+      - Changelog: 70-referencia/changelog.md
