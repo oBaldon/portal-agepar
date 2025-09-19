@@ -1,4 +1,3 @@
-# app/automations/dfd.py
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
@@ -33,7 +32,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "2.2.0"  # alinhado à UI com itens antes dos campos gerais finais
+DFD_VERSION = "2.3.0"  # adiciona campo obrigatório 'protocolo'
 REQUIRED_ROLES = ("automations.dfd",)
 # Papéis elevados que devem poder baixar qualquer arquivo via Controle
 ELEVATED_ROLES = ("admin", "director")
@@ -146,6 +145,7 @@ def _read_html(name: str) -> str:
 # ---------------------- Models & Validation ----------------------
 MAX_ASSUNTO_LEN = 200
 MAX_TEXTO_LONGO = 8000
+MAX_PROTOCOLO_LEN = 100
 
 ALLOWED_UNIDADES = {
     "Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro",
@@ -215,6 +215,7 @@ class DfdIn(BaseModel):
     numero: str
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)  # compõe o assunto final
     pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")
+    protocolo: str = Field(..., min_length=1, max_length=MAX_PROTOCOLO_LEN)
 
     # Bloco geral (unificado)
     diretoria_demandante: str = Field(..., alias="diretoriaDemandante")
@@ -281,6 +282,7 @@ SCHEMA = {
         {"name": "prazosEnvolvidos", "type": "select", "label": "Prazos envolvidos"},
         {"name": "consequenciaNaoAquisicao", "type": "textarea", "label": "Consequência da não aquisição"},
         {"name": "grauPrioridade", "type": "select", "label": "Grau de prioridade"},
+        {"name": "protocolo", "type": "text", "label": "Protocolo"},
     ],
 }
 
@@ -305,6 +307,7 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "consequencia_nao_aquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO},
     "grauPrioridade": {"label": "Grau de prioridade"},
     "grau_prioridade": {"label": "Grau de prioridade"},
+    "protocolo": {"label": "Protocolo", "min_length": 1, "max_length": MAX_PROTOCOLO_LEN},
     # Itens
     "descricao": {"label": "Descrição sucinta do objeto"},
     "haDependencia": {"label": "Há vinculação ou dependência com a contratação de outro item?"},
@@ -478,25 +481,28 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             total_geral += float(item_dict.get("valorTotal") or 0.0)
             itens_out.append(item_dict)
 
-        ctx = {
-            "diretoria": raw["modeloSlug"],
-            "numero": raw["numero"],
-            "assunto": assunto_final,  # usado no cabeçalho/timbre
-            "pca_ano": pca_ano,        # usado no texto introdutório do corpo
-            "data": today_iso,
-            # campos gerais
-            "diretoria_demandante": raw.get("diretoriaDemandante") or "",
-            "alinhamento_pe": raw.get("alinhamentoPE") or "",
-            "justificativa_necessidade": raw.get("justificativaNecessidade") or "",
-            "objeto": raw.get("objeto") or "",
-            # campos gerais finais
-            "prazos_envolvidos": raw.get("prazosEnvolvidos") or "",
-            "consequencia_nao_aquisicao": raw.get("consequenciaNaoAquisicao") or "",
-            "grau_prioridade": raw.get("grauPrioridade") or "",
-            # itens e totais
-            "itens": itens_out,
-            "total_geral": round(total_geral, 2),
-        }
+        ctx = (
+            {
+                "diretoria": raw["modeloSlug"],
+                "numero": raw["numero"],
+                "assunto": assunto_final,  # usado no cabeçalho/timbre
+                "pca_ano": pca_ano,        # usado no texto introdutório do corpo
+                "data": today_iso,
+                "protocolo": raw.get("protocolo") or "",
+                # campos gerais
+                "diretoria_demandante": raw.get("diretoriaDemandante") or "",
+                "alinhamento_pe": raw.get("alinhamentoPE") or "",
+                "justificativa_necessidade": raw.get("justificativaNecessidade") or "",
+                "objeto": raw.get("objeto") or "",
+                # campos gerais finais
+                "prazos_envolvidos": raw.get("prazosEnvolvidos") or "",
+                "consequencia_nao_aquisicao": raw.get("consequenciaNaoAquisicao") or "",
+                "grau_prioridade": raw.get("grauPrioridade") or "",
+                # itens e totais
+                "itens": itens_out,
+                "total_geral": round(total_geral, 2),
+            }
+        )
 
         # Log de placeholders (apenas informativo)
         try:
@@ -584,6 +590,7 @@ async def submit_dfd(
         "numero": (body.get("numero") or "").strip(),
         "assunto": (body.get("assunto") or "").strip(),
         "pcaAno": (body.get("pcaAno") or "").strip(),
+        "protocolo": (body.get("protocolo") or "").strip(),
         "diretoriaDemandante": none_if_empty(body.get("diretoriaDemandante")),
         "alinhamentoPE": (body.get("alinhamentoPE") or "").strip(),
         "justificativaNecessidade": (body.get("justificativaNecessidade") or "").strip(),
@@ -597,6 +604,8 @@ async def submit_dfd(
         return err_json(422, code="validation_error", message="Timbre é obrigatório.")
     if not raw["numero"]:
         return err_json(422, code="validation_error", message="Número do memorando é obrigatório.")
+    if not raw["protocolo"]:
+        return err_json(422, code="validation_error", message="Protocolo é obrigatório.")
 
     try:
         payload = DfdIn(**raw)
@@ -623,7 +632,7 @@ async def submit_dfd(
     }
     try:
         insert_submission(sub)
-        add_audit(KIND, "submitted", user, {"sid": sid})
+        add_audit(KIND, "submitted", user, {"sid": sid, "protocolo": raw.get("protocolo")})
     except Exception as e:
         logger.exception("insert_submission failed")
         return err_json(500, code="storage_error", message="Falha ao salvar a submissão.", details=str(e))

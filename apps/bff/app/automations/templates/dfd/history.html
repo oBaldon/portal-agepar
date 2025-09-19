@@ -28,9 +28,9 @@
 
   /* Quebras agressivas para textos longos (sem espaços) */
   td, .cell-assunto, .cell-assunto div, .subline {
-    overflow-wrap:anywhere;          /* quebra até palavras longas */
-    word-break:break-word;           /* compatibilidade */
-    white-space:normal;              /* permite múltiplas linhas */
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    white-space:normal;
   }
 
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; }
@@ -50,7 +50,7 @@
 
   <div class="card" style="margin-top:12px;">
     <div class="toolbar">
-      <input id="q" placeholder="Buscar por nº do memorando, objeto, assunto, diretoria, ano PCA…" style="flex:1; min-width:260px;" />
+      <input id="q" placeholder="Buscar por nº do memorando, protocolo, objeto, assunto, diretoria, ano PCA…" style="flex:1; min-width:260px;" />
       <select id="sort">
         <option value="date_desc">Mais recentes</option>
         <option value="date_asc">Mais antigos</option>
@@ -64,16 +64,18 @@
     <div style="overflow:auto;">
       <table id="tbl">
         <colgroup>
-          <col style="width:160px">
-          <col style="width:160px">
-          <col> <!-- Assunto ocupa o restante, quebra em múltiplas linhas -->
-          <col style="width:120px">
-          <col style="width:220px">
+          <col style="width:160px"><!-- Data -->
+          <col style="width:160px"><!-- Nº Memorando -->
+          <col style="width:180px"><!-- Protocolo -->
+          <col><!-- Assunto ocupa o restante -->
+          <col style="width:120px"><!-- Status -->
+          <col style="width:220px"><!-- Ações -->
         </colgroup>
         <thead>
           <tr>
             <th>Data</th>
             <th>Nº Memorando</th>
+            <th>Protocolo</th>
             <th>Assunto</th>
             <th>Status</th>
             <th>Ações</th>
@@ -131,6 +133,10 @@
     const p = payloadOf(row);
     return p.diretoriaDemandante || p.diretoria_demandante || "";
   }
+  function buildProtocoloFrom(row){
+    const p = payloadOf(row);
+    return p.protocolo || "";
+  }
   function rowPcaAno(row){
     const p = payloadOf(row);
     return p.pcaAno || p.pca_ano || "";
@@ -165,6 +171,11 @@
       const tdNum = document.createElement("td");
       tdNum.textContent = rowNumero(row);
       tr.appendChild(tdNum);
+
+      // Protocolo (novo)
+      const tdProto = document.createElement("td");
+      tdProto.textContent = buildProtocoloFrom(row);
+      tr.appendChild(tdProto);
 
       // Assunto + sublinha (objeto / diretoria)
       const tdAss = document.createElement("td");
@@ -248,7 +259,8 @@
       const obj = buildObjetoFrom(row).toLowerCase();
       const dir = buildDiretoriaFrom(row).toLowerCase();
       const ano = String(rowPcaAno(row) || "").toLowerCase();
-      return !term || num.includes(term) || ass.includes(term) || obj.includes(term) || dir.includes(term) || ano.includes(term);
+      const proto = buildProtocoloFrom(row).toLowerCase();
+      return !term || num.includes(term) || ass.includes(term) || obj.includes(term) || dir.includes(term) || ano.includes(term) || proto.includes(term);
     });
 
     filtered.sort((a, b) => {

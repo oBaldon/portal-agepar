@@ -167,9 +167,20 @@
         <option value="">-- Selecionar --</option>
       </select>
 
+      <!-- NOVO: Protocolo (fica ao fim da página e governa o botão de envio) -->
+      <label for="protocolo">Protocolo
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Protocolo">?</button>
+          <span class="tip">Informe o número de protocolo (ex.: <code>17.123.456-7</code>). Campo obrigatório para gerar o DFD.</span>
+        </span>
+      </label>
+      <input id="protocolo" name="protocolo" placeholder="Ex.: 17.123.456-7" maxlength="100" required />
+
       <div class="actions" style="margin-top:16px">
         <span class="status" id="status" role="status" aria-live="polite"></span>
-        <div class="btn-row"><button type="submit" class="btn" id="submitBtn">Gerar DFD</button></div>
+        <div class="btn-row">
+          <button type="submit" class="btn" id="submitBtn" disabled aria-disabled="true" title="Informe o Protocolo para gerar o DFD">Gerar DFD</button>
+        </div>
       </div>
     </form>
   </div>
@@ -204,6 +215,7 @@
   const objetoUmItemEl = document.getElementById('objetoUmItem');
   const prazosSel = document.getElementById('prazosEnvolvidos');
   const prazosGroup = document.getElementById('prazosGroup');
+  const protocoloEl = document.getElementById('protocolo'); // NOVO
 
   function mesesDoAno(ano){ const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]; if(!/^[0-9]{4}$/.test(String(ano||""))) return []; return n.map(m=>`${m} de ${ano}`); }
 
@@ -359,8 +371,30 @@
   objetoUmItemEl?.addEventListener('change', ()=>{ ensureOneItem(); if(objetoUmItemEl.checked) syncObjToFirstItem(); updateItemButtons(); });
   objetoEl?.addEventListener('input', ()=>{ if(objetoUmItemEl.checked) syncObjToFirstItem(); });
 
+  // NOVO: governar o botão pela presença do Protocolo
+  function updateSubmitState(){
+    const hasProto = (protocoloEl?.value || '').trim().length > 0;
+    submitBtn.disabled = !hasProto;
+    submitBtn.setAttribute('aria-disabled', String(!hasProto));
+    submitBtn.title = hasProto ? '' : 'Informe o Protocolo para gerar o DFD';
+  }
+  protocoloEl?.addEventListener('input', updateSubmitState);
+
   function formToPayload(){
-    const header={ modeloSlug:f.modeloSlug.value||"", numero:f.numero.value||"", assunto:f.assunto.value||"", pcaAno:f.pcaAno.value||"", diretoriaDemandante:f.diretoriaDemandante.value||"", alinhamentoPE:f.alinhamentoPE.value||"", justificativaNecessidade:f.justificativaNecessidade.value||"", objeto:f.objeto.value||"", prazosEnvolvidos:f.prazosEnvolvidos.value||"", consequenciaNaoAquisicao:f.consequenciaNaoAquisicao.value||"", grauPrioridade:f.grauPrioridade.value||"" };
+    const header={
+      modeloSlug:f.modeloSlug.value||"",
+      numero:f.numero.value||"",
+      assunto:f.assunto.value||"",
+      pcaAno:f.pcaAno.value||"",
+      diretoriaDemandante:f.diretoriaDemandante.value||"",
+      alinhamentoPE:f.alinhamentoPE.value||"",
+      justificativaNecessidade:f.justificativaNecessidade.value||"",
+      objeto:f.objeto.value||"",
+      prazosEnvolvidos:f.prazosEnvolvidos.value||"",
+      consequenciaNaoAquisicao:f.consequenciaNaoAquisicao.value||"",
+      grauPrioridade:f.grauPrioridade.value||"",
+      protocolo:f.protocolo.value||"" // NOVO
+    };
     const items=Array.from(itemsEl.children).map(div=>{
       const pick=sel=>div.querySelector(sel);
       const num=x=>{ const v=parseFloat(x||'0'); return isFinite(v)?v:0; };
@@ -389,20 +423,20 @@
     const payload=formToPayload();
     let res, data;
     try{ res=await fetch('./submit',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); try{ data=await res.json(); }catch{ data={}; } }
-    catch(e){ statusEl.textContent='Erro de rede ao enviar. Tente novamente.'; submitBtn.disabled=false; return; }
+    catch(e){ statusEl.textContent='Erro de rede ao enviar. Tente novamente.'; updateSubmitState(); return; }
 
     if(!res.ok){
       let msg=(data&&data.message)?data.message:`HTTP ${res.status}`;
       const details=(data&&data.details&&data.details.errors);
       if(Array.isArray(details)&&details.length){ msg+=' — '+details.join(' | '); }
-      statusEl.textContent='Erro: '+msg; smoothScrollTo(statusEl); submitBtn.disabled=false; return;
+      statusEl.textContent='Erro: '+msg; smoothScrollTo(statusEl); updateSubmitState(); return;
     }
 
     statusEl.textContent='Fila criada, aguardando processamento...';
     const sid=data.submissionId; let tries=0; let row=null;
     while(tries<120){ await new Promise(r=>setTimeout(r,1000)); try{ const r=await fetch('./submissions/'+sid); row=await r.json(); }catch{} if(row&&(row.status==='done'||row.status==='error')) break; tries++; }
 
-    if(!row){ statusEl.textContent='Falha ao acompanhar processamento.'; submitBtn.disabled=false; return; }
+    if(!row){ statusEl.textContent='Falha ao acompanhar processamento.'; updateSubmitState(); return; }
 
     if(row.status==='done'){
       statusEl.textContent='Pronto! Download do arquivo abaixo.';
@@ -432,7 +466,7 @@
     } else {
       statusEl.textContent='Erro ao gerar: '+(row.error||'desconhecido'); smoothScrollTo(statusEl);
     }
-    submitBtn.disabled=false;
+    updateSubmitState();
   }
 
   function init(){
@@ -441,6 +475,7 @@
     loadGrauPrioridade();
     rebuildPrazosOptions();
     ensureOneItem();
+    updateSubmitState(); // NOVO: já inicia governando o botão
   }
 
   f.addEventListener('submit', submit);
