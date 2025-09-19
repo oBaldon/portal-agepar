@@ -139,6 +139,22 @@
       "tags": ["idéias", "exploração"],
       "requiredRoles": ["admin"],
       "hidden": true
+    },
+    {
+      "name": "accounts",
+      "displayName": "Admin — Contas & Roles",
+      "version": "1.0.0",
+      "categoryId": "governanca",
+      "description": "Gerenciar usuários (criar, editar, excluir) e delegar roles.",
+      "ui": { "type": "iframe", "url": "/api/automations/accounts/ui" },
+      "navigation": [
+        { "label": "Admin — Contas & Roles", "path": "/admin/accounts", "icon": "Users" }
+      ],
+      "routes": [
+        { "path": "/admin/accounts", "kind": "iframe" }
+      ],
+      "tags": ["admin", "rbac", "usuários"],
+      "requiredRoles": ["admin"]
     }
   ]
 }

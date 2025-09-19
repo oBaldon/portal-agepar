@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import json
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import psycopg
 from psycopg.rows import dict_row
@@ -119,6 +120,9 @@ def _to_json_value(v: Any) -> Optional[Json]:
 # ----------------------------- API ----------------------------------
 def insert_submission(sub: Dict[str, Any]) -> None:
     sub = dict(sub)  # cópia defensiva
+    # Garante ID quando não informado (coluna é NOT NULL e PRIMARY KEY)
+    if not sub.get("id"):
+        sub["id"] = str(uuid4())
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -251,7 +255,13 @@ def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any
             INSERT INTO automation_audits (actor_cpf, actor_nome, kind, action, meta)
             VALUES (%s, %s, %s, %s, %s)
             """,
-            (actor.get("cpf"), actor.get("nome"), kind, action, _to_json_value(meta)),
+            (
+                actor.get("cpf"),
+                actor.get("nome") or actor.get("name"),  # aceita 'nome' (mock) e 'name' (login real)
+                kind,
+                action,
+                _to_json_value(meta),
+            ),
         )
 
 def list_audits(kind: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
