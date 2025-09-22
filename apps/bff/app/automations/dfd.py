@@ -56,7 +56,7 @@ def err_json(status: int, **payload):
 
 
 def _to_obj(x, default=None):
-    """Aceita dict/list/str/bytes; retorna dict/list (robusto a SQLite/Postgres)."""
+    """Aceita dict/list/str/bytes; retorna dict/list (robusto a string/bytes/JSON, independente do backend)."""
     if x is None:
         return {} if default is None else default
     if isinstance(x, (dict, list)):

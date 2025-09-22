@@ -417,7 +417,7 @@ def list_submissions_api(
             # Se a função ainda não existir, sinaliza claramente
             raise HTTPException(
                 status_code=500,
-                detail="list_submissions_admin() não disponível em app.db; implemente para o painel de controle.",
+                detail="list_submissions_admin() não disponível na camada de banco de dados; implemente no módulo de DB do BFF para habilitar o painel de controle.",
             )
 
         # Normaliza campos para o contrato SubmissionOut/UI
