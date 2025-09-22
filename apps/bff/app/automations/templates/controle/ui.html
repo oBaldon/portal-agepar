@@ -1,4 +1,3 @@
-<!-- app/automations/templates/controle/ui.html -->
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -84,7 +83,7 @@
         <input id="username" placeholder="Ex.: Maria, 12345678901" />
       </div>
       <div class="col">
-        <label for="action">Ação</label>
+        <label for="action">Status</label>
         <!-- será populado dinamicamente -->
         <select id="action">
           <option value="">(Todas)</option>
@@ -129,6 +128,7 @@
           <col style="width:160px"><!-- ALVO -->
           <col style="width:220px"><!-- NOME DO ARQUIVO -->
           <col><!-- ASSUNTO -->
+          <col style="width:120px"><!-- STATUS -->
           <col style="width:180px"><!-- AÇÕES -->
         </colgroup>
         <thead>
@@ -140,13 +140,14 @@
             <th>ALVO</th>
             <th>NOME DO ARQUIVO</th>
             <th>ASSUNTO</th>
+            <th class="nowrap">STATUS</th>
             <th class="nowrap">AÇÕES</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
-    <div class="note" style="margin-top:8px">Dica: os botões de download aparecem quando a ação é “completed”.</div>
+    <div class="note" style="margin-top:8px">Dica: os botões de download aparecem quando o status é “completed”.</div>
   </div>
 </div>
 
@@ -255,6 +256,7 @@
     const alvo      = (payload.diretoriaDemandante || payload.diretoria_demandante || payload.modeloSlug || row.target_kind || "").toString().trim();
     const filename  = (extra.filename || pickFilenameFromResult(result) || "").toString().trim();
     const assunto   = (extra.assunto || result.assunto || buildAssuntoFromPayload(payload) || "").toString().trim();
+    const status    = (row.action || "").toString().trim();
 
     // QUANDO: usa ts do evento; fallback created/updated da submission
     let quando = row.ts;
@@ -263,10 +265,10 @@
     }
 
     const sid = getSid(row);
-    // ação "completed" habilita download
+    // status "completed" habilita download
     const canDownload = !!sid && String(row.action||"").toLowerCase() === "completed";
 
-    return { quando, username, protocolo, numero, alvo, filename, assunto, sid, canDownload };
+    return { quando, username, protocolo, numero, alvo, filename, assunto, status, sid, canDownload };
   }
 
   async function ensureSubmission(sid){
@@ -297,6 +299,7 @@
       <td class="wrap-any js-alvo">—</td>
       <td class="wrap-any js-filename">—</td>
       <td class="wrap-any js-assunto">—</td>
+      <td class="nowrap js-status">—</td>
       <td class="nowrap js-acoes"><span class="note">—</span></td>
     `;
     tbody.appendChild(tr);
@@ -311,6 +314,7 @@
     tr.querySelector(".js-alvo").textContent     = cols.alvo || "—";
     tr.querySelector(".js-filename").textContent = cols.filename || "—";
     tr.querySelector(".js-assunto").textContent  = cols.assunto || "—";
+    tr.querySelector(".js-status").textContent   = cols.status || "—";
 
     const cell = tr.querySelector(".js-acoes");
     cell.innerHTML = "";
