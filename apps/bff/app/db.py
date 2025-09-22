@@ -83,7 +83,7 @@ def init_db() -> None:
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
         WHERE conname = 'chk_submissions_status'
-          AND conrelid = 'submissions'::regclass
+        AND conrelid = 'submissions'::regclass
       ) THEN
         ALTER TABLE submissions
           ADD CONSTRAINT chk_submissions_status
@@ -98,6 +98,13 @@ def init_db() -> None:
     -- Índices GIN opcionais para consultas por campos dentro de JSONB (payload/result).
     CREATE INDEX IF NOT EXISTS ix_submissions_payload_gin ON submissions USING GIN (payload);
     CREATE INDEX IF NOT EXISTS ix_submissions_result_gin  ON submissions USING GIN (result);
+
+    -- Índices por expressão para checagens rápidas de unicidade em DFD
+    -- (campos dentro de payload): numero e protocolo.
+    CREATE INDEX IF NOT EXISTS ix_submissions_kind_payload_numero
+      ON submissions (kind, (payload->>'numero'));
+    CREATE INDEX IF NOT EXISTS ix_submissions_kind_payload_protocolo
+      ON submissions (kind, (payload->>'protocolo'));
     """
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(sql)
@@ -283,3 +290,19 @@ def list_audits(kind: Optional[str] = None, limit: int = 50, offset: int = 0) ->
         cur.execute(sql, params)
         rows = cur.fetchall() or []
         return [dict(r) for r in rows]
+
+# ----------------------------- buscas por duplicidade ----------------
+def exists_submission_payload_value(kind: str, field: str, value: str) -> bool:
+    """
+    Retorna True se existir alguma submissão do 'kind' cujo payload[field] == value.
+    Implementação específica para Postgres usando operador JSONB ->>.
+    Observação: a comparação é exata (sensível a caixa); normalize antes se necessário.
+    """
+    if not kind or not field:
+        return False
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM submissions WHERE kind = %s AND payload ->> %s = %s LIMIT 1",
+            (kind, field, value),
+        )
+        return cur.fetchone() is not None

@@ -21,6 +21,8 @@ from app.db import (
     list_submissions,
     add_audit,
     list_audits,
+    # NOVO: helper para detectar duplicidades no payload
+    exists_submission_payload_value,
 )
 from app.auth.rbac import require_roles_any  # RBAC
 from app.utils.docx_tools import (
@@ -32,7 +34,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "2.3.0"  # adiciona campo obrigatório 'protocolo'
+DFD_VERSION = "2.4.0"  # validação de unicidade: 'numero' e 'protocolo'
 REQUIRED_ROLES = ("automations.dfd",)
 # Papéis elevados que devem poder baixar qualquer arquivo via Controle
 ELEVATED_ROLES = ("admin", "director")
@@ -616,6 +618,39 @@ async def submit_dfd(
     except Exception as ve:
         logger.exception("validation error on submit")
         return err_json(422, code="validation_error", message="Erro de validação.", details=str(ve))
+
+    # === NOVO: checagem de duplicidade no banco ===
+    try:
+        numero_val = (payload.numero or "").strip()
+        protocolo_val = (payload.protocolo or "").strip()
+        if numero_val:
+            if exists_submission_payload_value(KIND, "numero", numero_val):
+                # audita e retorna 409
+                try:
+                    add_audit(KIND, "duplicate_rejected", user, {"field": "numero", "numero": numero_val})
+                except Exception:
+                    logger.exception("audit duplicate (numero) failed (non-blocking)")
+                return err_json(
+                    409,
+                    code="duplicate",
+                    message="Já existe um DFD com este Nº do memorando.",
+                    details={"field": "numero", "value": numero_val},
+                )
+        if protocolo_val:
+            if exists_submission_payload_value(KIND, "protocolo", protocolo_val):
+                try:
+                    add_audit(KIND, "duplicate_rejected", user, {"field": "protocolo", "protocolo": protocolo_val})
+                except Exception:
+                    logger.exception("audit duplicate (protocolo) failed (non-blocking)")
+                return err_json(
+                    409,
+                    code="duplicate",
+                    message="Já existe um DFD com este Protocolo.",
+                    details={"field": "protocolo", "value": protocolo_val},
+                )
+    except Exception as e:
+        logger.exception("duplicate check failed")
+        return err_json(500, code="storage_error", message="Falha ao verificar duplicidade.", details=str(e))
 
     sid = str(uuid4())
     sub = {
