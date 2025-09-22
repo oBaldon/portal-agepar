@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/automations/controle",
     tags=["automations", "controle"],
-    # exige qualquer um dos papéis: diretor OU admin
-    dependencies=[Depends(require_roles_any("director", "admin"))],
+    # exige qualquer um dos papéis: coordenador OU admin
+    dependencies=[Depends(require_roles_any("coordenador", "admin"))],
 )
 
 # Templates (usa pasta local: apps/bff/app/automations/templates)

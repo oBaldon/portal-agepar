@@ -37,7 +37,7 @@ KIND = "dfd"
 DFD_VERSION = "2.4.0"  # validação de unicidade: 'numero' e 'protocolo'
 REQUIRED_ROLES = ("automations.dfd",)
 # Papéis elevados que devem poder baixar qualquer arquivo via Controle
-ELEVATED_ROLES = ("admin", "director")
+ELEVATED_ROLES = ("admin", "coordenador")
 
 # Diretório com os modelos DOCX por diretoria (timbre)
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
@@ -127,7 +127,7 @@ def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
 
 def _can_access_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
     """
-    Dono pode acessar. Além disso, papéis elevados ('admin'/'director')
+    Dono pode acessar. Além disso, papéis elevados ('admin'/'coordenador')
     podem acessar independentemente do autor.
     """
     if _owns_submission(row, user):
@@ -682,14 +682,14 @@ async def submit_dfd(
 
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# DOWNLOADS: agora permitem automations.dfd OU director/admin e ignoram ownership
+# DOWNLOADS: agora permitem automations.dfd OU coordenador/admin e ignoram ownership
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.post("/submissions/{sid}/download")
 async def download_result(
     sid: str,
     request: Request,
-    # permite também director/admin
-    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "director", "admin")),
+    # permite também coordenador/admin
+    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "coordenador", "admin")),
 ):
     """Rota antiga: baixa o arquivo “primário” (PDF se existir, senão DOCX)."""
     try:
@@ -748,8 +748,8 @@ async def download_result_fmt(
     sid: str,
     fmt: str,
     request: Request,
-    # permite também director/admin
-    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "director", "admin")),
+    # permite também coordenador/admin
+    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "coordenador", "admin")),
 ):
     """Novo: baixa especificamente PDF ou DOCX."""
     if fmt not in ("pdf", "docx"):
