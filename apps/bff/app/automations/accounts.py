@@ -256,10 +256,10 @@ def list_users(
     if q:
         only = safe_digits(q)
         if len(only) == 11:
-            wheres.append("cpf = %s")
+            wheres.append("u.cpf = %s")
             params.append(only)
         else:
-            wheres.append("(name ILIKE %s OR email ILIKE %s)")
+            wheres.append("(u.name ILIKE %s OR email ILIKE %s)")
             like = f"%{q}%"
             params.extend([like, like])
 

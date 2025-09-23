@@ -133,7 +133,7 @@
     </div>
     <p class="muted" style="margin-top:8px">Existentes:
     <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre roles herdadas">?</button>
+          <button type="button" class="help" aria-label="Ajuda sobre roles do sistema">?</button>
           <span class="tip">O role <b>admin</b> é obrigatório para superusuários e não pode ser removido. Outros roles podem ser excluídos, mas os vínculos com usuários serão apagados.</span>
         </span>
     </p>
@@ -154,7 +154,7 @@
   <!-- 2) CRUD de contas (abaixo) -->
   <div class="card" style="margin-top:16px">
     <div class="toolbar">
-      <input id="q" class="search" type="search" placeholder="Buscar por nome, email ou CPF…" aria-label="Buscar usuários" oninput="loadUsers()" autocomplete="off"/>
+      <input id="q" class="search" type="search" placeholder="Buscar por nome, email ou CPF…" aria-label="Buscar usuários" autocomplete="off"/>
       <div class="btn-row">
         <button class="btn secondary small" onclick="loadUsers()">Atualizar</button>
       </div>
@@ -330,6 +330,7 @@
       document.getElementById('cu_pwd').value='';
       document.getElementById('cu_roles').value='';
       loadUsers();
+      loadRoles();
     } else {
       showAlert('err', j.message || 'Erro ao criar usuário.');
     }
@@ -344,7 +345,10 @@
     const r = await fetch(`/api/automations/accounts/users/${userId}/roles`, {
       method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ roles })
     });
-    if(r.ok){ loadUsers(); } else {
+   if(r.ok){ 
+     loadUsers(); 
+     loadRoles(); // <- reflete papéis criados automaticamente pelo backend
+   } else {
       const j = await r.json().catch(()=>({}));
       alert(j?.detail || j?.message || 'Erro ao definir roles');
     }
@@ -364,7 +368,10 @@
     if(!confirm('Tem certeza que deseja excluir o usuário? Esta ação é irreversível.')) return;
     const url = `/api/automations/accounts/users/${encodeURIComponent(userId)}`;
     const r = await fetch(url, { method:'DELETE' });
-    if(r.ok){ loadUsers(); } else {
+   if(r.ok){ 
+     loadUsers(); 
+     loadRoles(); // <- opcional: caso exclusões impactem visão agregada de roles
+   } else {
       const j = await r.json().catch(()=>({}));
       alert(j?.detail || j?.message || 'Erro ao excluir.');
     }
@@ -425,6 +432,10 @@
       el.appendChild(wrap);
     });
   }
+
+  // debounce da busca
+  function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+  document.getElementById('q').addEventListener('input', debounce(loadUsers, 250));
 
   // boot
   loadConfig().then(()=>{ loadUsers(); });
