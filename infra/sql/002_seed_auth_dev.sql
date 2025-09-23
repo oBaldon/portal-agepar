@@ -3,9 +3,9 @@
 -- Roles padrão
 INSERT INTO roles (name, description)
 VALUES 
-  ('admin', 'Acesso administrativo'),
-  ('viewer', 'Leitura'),
-  ('compras', 'Processos de compras')
+  ('admin', 'Acesso administrativo')
+  --('viewer', 'Leitura'),
+  --('compras', 'Processos de compras')
 ON CONFLICT (name) DO NOTHING;
 
 -- Usuário dev (email local sem senha; servirá para RBAC e testes manuais depois)
@@ -24,6 +24,6 @@ WITH upsert AS (
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM upsert u
-JOIN roles r ON r.name IN ('admin', 'viewer')
+JOIN roles r ON r.name IN ('admin')--, 'viewer', 'compras')
 ON CONFLICT DO NOTHING;
 -- Nota: senha não é necessária para source='local' se for superuser

@@ -43,7 +43,7 @@
         { "path": "/dfd", "kind": "iframe" }
       ],
       "tags": ["compras", "documentos"],
-      "requiredRoles": ["automations.dfd"],
+      "requiredRoles": ["compras"],
       "order": 10
     },
     {

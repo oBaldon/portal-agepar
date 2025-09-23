@@ -7,7 +7,7 @@ services:
     environment:
       ENV: dev
       AUTH_MODE: mock
-      AUTH_DEFAULT_ROLES: "user,automations.dfd"
+      AUTH_DEFAULT_ROLES: "user,compras"
       EP_MODE: mock
       SESSION_SECRET: dev-secret
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
