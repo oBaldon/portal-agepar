@@ -44,10 +44,14 @@
   .badge { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:2px 6px; border-radius:999px; background:#eef2ff; color:#1e3a8a; margin:2px 6px 2px 0; border:1px solid #e2e8f0; }
   .badge.super { background:#fde68a; color:#7c2d12; border-color:#fcd34d; }
   .pill { display:inline-block; background:#eef2ff; color:#1e3a8a; border:1px solid #e2e8f0; padding:2px 8px; border-radius:999px; font-size:12px; margin:2px 6px 2px 0; }
+  .pill.env { background:#f1f5f9; color:#334155; border-style:dashed; }
+  .legend { font-size:12px; color:#64748b; margin:6px 0 2px; }
 
   .hr { height:1px; background:#e2e8f0; border:0; margin:16px 0; }
 
   table { width:100%; border-collapse: collapse; font-size: 14px; }
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling: touch; }
+  .table-wrap table { min-width: 760px; }
   thead th { text-align:left; padding:10px 8px; border-bottom:1px solid #e2e8f0; color:#334155; font-weight:600; }
   tbody td { padding:10px 8px; border-bottom:1px solid #eef2f7; vertical-align: top; }
   tr:hover { background:#f8fafc; }
@@ -84,23 +88,23 @@
             <span class="tip">Mínimo 2 caracteres.</span>
           </span>
         </label>
-        <input id="cu_name" placeholder="Ex.: Maria Souza" />
+        <input id="cu_name" placeholder="Ex.: Maria Souza" autocomplete="name"/>
       </div>
       <div class="col">
         <label for="cu_email">E-mail <span class="muted">(opcional)</span></label>
-        <input id="cu_email" type="email" placeholder="voce@agepar.pr.gov.br"/>
+        <input id="cu_email" type="email" placeholder="voce@agepar.pr.gov.br" autocomplete="email"/>
       </div>
     </div>
 
     <div class="row">
       <div class="col">
         <label for="cu_cpf">CPF <span class="muted">(opcional)</span></label>
-        <input id="cu_cpf" inputmode="numeric" pattern="[0-9]*" placeholder="00000000000"/>
+        <input id="cu_cpf" inputmode="numeric" pattern="[0-9]*" placeholder="00000000000" autocomplete="off"/>
       </div>
       <div class="col">
         <label for="cu_pwd">Senha</label>
         <div class="row">
-          <input id="cu_pwd" type="password" placeholder="Mínimo 8 caracteres" />
+          <input id="cu_pwd" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password"/>
           <button class="btn secondary small" type="button" onclick="togglePwd()">Mostrar</button>
         </div>
       </div>
@@ -112,7 +116,7 @@
         <span class="tip">Ex.: <code>admin</code>, <code>automations.dfd</code>. É possível deixar em branco.</span>
       </span>
     </label>
-    <input id="cu_roles" placeholder="admin, automations.dfd"/>
+    <input id="cu_roles" placeholder="admin, automations.dfd" autocomplete="off"/>
 
     <div class="btn-row" style="margin-top:12px">
       <button class="btn" onclick="createUser()">Criar conta</button>
@@ -127,26 +131,51 @@
       <input class="col" id="role_desc" placeholder="descrição (opcional)" aria-label="Descrição do role"/>
       <button class="btn secondary" onclick="createRole()">Criar role</button>
     </div>
-    <p class="muted" style="margin-top:8px">Existentes:</p>
+    <p class="muted" style="margin-top:8px">Existentes:
+    <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre roles herdadas">?</button>
+          <span class="tip">O role <b>admin</b> é obrigatório para superusuários e não pode ser removido. Outros roles podem ser excluídos, mas os vínculos com usuários serão apagados.</span>
+        </span>
+    </p>
     <div id="roles_list" class="btn-row" aria-live="polite"></div>
+
+    <div id="envdefaults_wrap" style="margin-top:12px; display:none">
+      <p class="muted" style="margin:8px 0 6px">
+        Herdadas do ambiente (somente leitura)
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre roles herdadas">?</button>
+          <span class="tip">Estas roles vêm da configuração do ambiente (AUTH_DEFAULT_ROLES) e não são editáveis nesta tela.</span>
+        </span>
+      </p>
+      <div id="env_defaults" class="btn-row" aria-live="polite"></div>
+    </div>
   </div>
 
   <!-- 2) CRUD de contas (abaixo) -->
   <div class="card" style="margin-top:16px">
     <div class="toolbar">
-      <input id="q" class="search" type="search" placeholder="Buscar por nome, email ou CPF…" aria-label="Buscar usuários" oninput="loadUsers()"/>
+      <input id="q" class="search" type="search" placeholder="Buscar por nome, email ou CPF…" aria-label="Buscar usuários" oninput="loadUsers()" autocomplete="off"/>
       <div class="btn-row">
         <button class="btn secondary small" onclick="loadUsers()">Atualizar</button>
       </div>
     </div>
+    <div class="table-wrap">
     <table aria-label="Usuários">
       <thead>
         <tr>
-          <th>Nome</th><th>Email</th><th>CPF</th><th>Flags</th><th>Roles</th><th style="width:280px">Ações</th>
+          <th>Nome</th><th>Email</th><th>CPF</th><th>Flags</th>
+          <th>Roles
+            <span class="inline-help">
+              <button type="button" class="help" aria-label="Ajuda sobre roles na lista">?</button>
+              <span class="tip">Mostramos as <b>Atribuídas (BD)</b> e as <b>Herdadas (ambiente)</b>. As herdadas não são editáveis aqui.</span>
+            </span>
+          </th>
+          <th style="width:280px">Ações</th>
         </tr>
       </thead>
       <tbody id="users"></tbody>
     </table>
+    </div>
   </div>
 </div>
 
@@ -174,7 +203,25 @@
   }
 
   function rolePill(name){ const span=document.createElement('span'); span.className='pill'; span.textContent=name; return span; }
-
+  function rolePillEnv(name){ const span=document.createElement('span'); span.className='pill env'; span.textContent=name; return span; }
+  // Config (roles herdadas do ambiente)
+  let ACC_CFG = { default_roles: [] };
+  async function loadConfig(){
+    try{
+      const r = await fetch('/api/automations/accounts/config');
+      const j = await r.json();
+      ACC_CFG.default_roles = j.default_roles || [];
+      const wrap = document.getElementById('envdefaults_wrap');
+      const list = document.getElementById('env_defaults');
+      list.innerHTML = '';
+      if ((ACC_CFG.default_roles||[]).length){
+        ACC_CFG.default_roles.forEach(x=> list.appendChild(rolePillEnv(x)));
+        wrap.style.display = 'block';
+      } else {
+        wrap.style.display = 'none';
+      }
+    }catch(e){ /* silencioso */ }
+  }
   // -------------------------
   // CRUD — Users
   // -------------------------
@@ -192,10 +239,26 @@
         // Flags (is_superuser não editável)
         const flags = document.createElement('div');
         if (u.is_superuser){ const b=document.createElement('span'); b.className='badge super'; b.textContent='superusuário'; flags.appendChild(b); }
-
         const rolesCell = document.createElement('td');
         const rolesWrap = document.createElement('div');
-        (u.roles||[]).forEach(r => rolesWrap.appendChild(rolePill(r)));
+        const assigned = (u.roles||[]);
+        const env = (u.roles_env || ACC_CFG.default_roles || []);
+        // Atribuídas (BD)
+        if (assigned.length){
+          const legendA = document.createElement('div'); legendA.className='legend'; legendA.textContent='Atribuídas (BD):';
+          rolesWrap.appendChild(legendA);
+          const boxA = document.createElement('div');
+          assigned.forEach(r => boxA.appendChild(rolePill(r)));
+          rolesWrap.appendChild(boxA);
+        }
+        // Herdadas (ambiente)
+        if (env.length){
+          const legendE = document.createElement('div'); legendE.className='legend'; legendE.textContent='Herdadas (ambiente):';
+          rolesWrap.appendChild(legendE);
+          const boxE = document.createElement('div');
+          env.forEach(r => boxE.appendChild(rolePillEnv(r)));
+          rolesWrap.appendChild(boxE);
+        }
         rolesCell.appendChild(rolesWrap);
 
         // Ações
@@ -209,14 +272,24 @@
         btnDel.onclick = () => deleteUser(u.id);
         row.appendChild(btnRoles); row.appendChild(btnPwd); row.appendChild(btnDel);
         actions.appendChild(row);
+        // Células seguras (sem innerHTML)
+        const tdName = document.createElement('td'); tdName.textContent = u.name || '';
+        const tdEmail = document.createElement('td'); tdEmail.textContent = u.email || '';
+        const tdCpf = document.createElement('td'); tdCpf.textContent = u.cpf || '';
+        const tdFlags = document.createElement('td'); tdFlags.appendChild(flags);
 
-        tr.innerHTML = `
-          <td>${u.name||''}</td>
-          <td>${u.email||''}</td>
-          <td>${u.cpf||''}</td>
-          <td></td>
-        `;
-        tr.children[3].appendChild(flags);
+        // Caso não haja roles em lugar nenhum, mostra um estado vazio amigável
+        if ((assigned.length === 0) && (env.length === 0)) {
+          const empty = document.createElement('div');
+          empty.className = 'legend';
+          empty.textContent = '— sem roles —';
+          rolesWrap.appendChild(empty);
+        }
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdEmail);
+        tr.appendChild(tdCpf);
+        tr.appendChild(tdFlags);
         tr.appendChild(rolesCell);
         tr.appendChild(actions);
         tbody.appendChild(tr);
@@ -289,7 +362,8 @@
 
   async function deleteUser(userId){
     if(!confirm('Tem certeza que deseja excluir o usuário? Esta ação é irreversível.')) return;
-    const r = await fetch(`/api/automations/accounts/${'users'}/${userId}`, { method:'DELETE' });
+    const url = `/api/automations/accounts/users/${encodeURIComponent(userId)}`;
+    const r = await fetch(url, { method:'DELETE' });
     if(r.ok){ loadUsers(); } else {
       const j = await r.json().catch(()=>({}));
       alert(j?.detail || j?.message || 'Erro ao excluir.');
@@ -353,7 +427,8 @@
   }
 
   // boot
-  loadUsers(); loadRoles();
+  loadConfig().then(()=>{ loadUsers(); });
+  loadRoles();
 </script>
 </body>
 </html>

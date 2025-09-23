@@ -5,6 +5,7 @@ import logging
 import pathlib
 import re
 from typing import Any, Dict, List, Optional, Literal
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -139,6 +140,12 @@ def normalize_roles(input_roles: List[str]) -> List[str]:
         out.append(r2)
     return sorted(set(out))
 
+# Roles herdadas do ambiente (compose). Ex.: AUTH_DEFAULT_ROLES="user,automations.dfd"
+def _env_default_roles() -> List[str]:
+    raw = (os.getenv("AUTH_DEFAULT_ROLES") or "").split(",")
+    return normalize_roles([r for r in raw if isinstance(r, str)])
+
+
 
 # -----------------------------------------------------------------------------
 # Schemas
@@ -220,6 +227,18 @@ def schema() -> Dict[str, Any]:
         ],
         "notes": "Administração de contas e papéis (roles). Somente admins.",
     }
+    
+@router.get("/config")
+def config() -> Dict[str, Any]:
+    """
+    Exibe informações de configuração úteis à UI/admin.
+    - default_roles: papéis herdados do ambiente (somente leitura na UI)
+    """
+    return {
+        "auth_mode": os.getenv("AUTH_MODE", "local"),
+        "default_roles": _env_default_roles(),
+    }
+
 
 
 # -- users: list & get
@@ -264,15 +283,19 @@ def list_users(
         cur.execute(sql, params)
         rows = cur.fetchall() or []
         items = []
+        env_defaults = _env_default_roles()
         for row in rows:
             d = dict(row)
             d["roles"] = list(d.get("roles") or [])
+            # Acrescenta informações para a UI: herdadas do ambiente e efetivas
+            d["roles_env"] = env_defaults
+            d["roles_effective"] = sorted(set(d["roles"]) | set(env_defaults))
             items.append(d)
         return {"items": items, "count": len(items)}
 
 
 @router.get("/users/{user_id}")
-def get_user(user_id: str) -> UserOut:
+def get_user(user_id: str) -> Dict[str, Any]:
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -294,6 +317,9 @@ def get_user(user_id: str) -> UserOut:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
         d = dict(row)
         d["roles"] = list(d.get("roles") or [])
+        env_defaults = _env_default_roles()
+        d["roles_env"] = env_defaults
+        d["roles_effective"] = sorted(set(d["roles"]) | set(env_defaults))
         return d
 
 
@@ -609,7 +635,7 @@ def create_role(payload: RoleIn, request: Request):
     if name_norm in BLOCKED_ROLES:
         raise HTTPException(status_code=400, detail="Role reservado.")
     if not ROLE_OK_RE.match(name_norm):
-        raise HTTPException(statuscode=422, detail="Nome do role inválido (use letras/números/._:-).")
+        raise HTTPException(status_code=422, detail="Nome do role inválido (use letras/números/._:-).")
 
     with _pg() as conn, conn.cursor() as cur:
         try:

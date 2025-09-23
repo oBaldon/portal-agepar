@@ -10,7 +10,7 @@
     { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck",  "hidden": true},
     { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck",  "hidden": true},
     { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true},
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin","director"] }
+    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin","coordenador"] }
   ],
 
   "blocks": [
@@ -58,7 +58,8 @@
       "routes": [
         { "path": "/pca", "kind": "iframe" }
       ],
-      "tags": ["utilitário"]
+      "tags": ["utilitário"],
+      "requiredRoles": ["coordenador", "admin"]
     },
     {
       "name": "controle",
@@ -74,7 +75,7 @@
         { "path": "/controle", "kind": "iframe" }
       ],
       "tags": ["governança", "auditoria"],
-      "requiredRoles": ["director", "admin"],
+      "requiredRoles": ["coordenador", "admin"],
       "order": 1
     },
     {
