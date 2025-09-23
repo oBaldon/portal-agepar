@@ -437,19 +437,45 @@ def update_user(user_id: str, payload: UpdateUserIn, request: Request):
 
 @router.delete("/users/{user_id}")
 def delete_user(user_id: str, request: Request):
+    """
+    Exclusão segura de usuário:
+      - Impede autoexclusão.
+      - Impede excluir o último administrador.
+      - Remove/ajusta dependências (login_attempts, audit_events, user_roles) antes de excluir em users
+        para evitar violação de chave estrangeira e preservar histórico.
+    """
     actor = request.session.get("user") or {}
     if str(actor.get("id") or actor.get("user_id") or "") == user_id:
         raise HTTPException(status_code=400, detail="Você não pode excluir sua própria conta.")
 
     with _pg() as conn, conn.cursor() as cur:
+        # proteger “último admin”
         if is_last_admin(cur, user_id):
             raise HTTPException(status_code=400, detail="Não é possível excluir o último administrador.")
 
+        # limpar dependências conhecidas (ordem importante)
+        # 1) tentativas de login vinculadas
+        try:
+            cur.execute("DELETE FROM login_attempts WHERE user_id = %s", (user_id,))
+        except Exception:
+            # mantém tolerância: se a tabela não existir em alguns ambientes
+            logger.exception("Falha ao remover login_attempts (não bloqueante)")
+
+        # 2) eventos de auditoria: preservar histórico (SET NULL)
+        try:
+            cur.execute("UPDATE audit_events SET actor_user_id = NULL WHERE actor_user_id = %s", (user_id,))
+        except Exception:
+            logger.exception("Falha ao desvincular audit_events (não bloqueante)")
+
+        # 3) vínculos de roles
         cur.execute("DELETE FROM user_roles WHERE user_id = %s", (user_id,))
+
+        # 4) excluir o usuário
         cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
+        # auditoria/submission
         insert_submission(
             {
                 "kind": "accounts",
@@ -583,7 +609,7 @@ def create_role(payload: RoleIn, request: Request):
     if name_norm in BLOCKED_ROLES:
         raise HTTPException(status_code=400, detail="Role reservado.")
     if not ROLE_OK_RE.match(name_norm):
-        raise HTTPException(status_code=422, detail="Nome do role inválido (use letras/números/._:-).")
+        raise HTTPException(statuscode=422, detail="Nome do role inválido (use letras/números/._:-).")
 
     with _pg() as conn, conn.cursor() as cur:
         try:
@@ -620,8 +646,6 @@ def create_role(payload: RoleIn, request: Request):
         return {"ok": True, "role_id": role_id}
 
 
-from fastapi import Query
-
 @router.delete("/roles/{role_name}")
 def delete_role(role_name: str, request: Request):
     role_name = (role_name or "").strip().lower()
@@ -636,13 +660,7 @@ def delete_role(role_name: str, request: Request):
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Role não encontrada.")
-        role_id = row["id"]  # <— aqui estava o problema
-
-        # (opcional) se quiser avisar quando ainda houver vínculos
-        # cur.execute("SELECT COUNT(*) AS c FROM user_roles WHERE role_id = %s", (role_id,))
-        # if (cur.fetchone() or {}).get("c", 0) > 0:
-        #     # não é obrigatório recusar, mas você pode retornar 409 se preferir
-        #     pass
+        role_id = row["id"]  # acesso por chave do dict_row
 
         # desvincula e remove
         cur.execute("DELETE FROM user_roles WHERE role_id = %s", (role_id,))
@@ -664,8 +682,6 @@ def delete_role(role_name: str, request: Request):
             }
         )
         return {"ok": True}
-
-
 
 
 # -----------------------------------------------------------------------------
