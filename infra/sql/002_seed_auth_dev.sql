@@ -3,7 +3,9 @@
 -- Roles padrão
 INSERT INTO roles (name, description)
 VALUES 
-  ('admin', 'Acesso administrativo')
+  ('admin', 'Acesso administrativo'),
+  ('compras', 'Acesso às automações de Compras'),
+  ('coordenador', 'Papel de coordenação')
   --('viewer', 'Leitura'),
   --('compras', 'Processos de compras')
 ON CONFLICT (name) DO NOTHING;
