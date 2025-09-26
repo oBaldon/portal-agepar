@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.automations.dfd import DFD_VERSION as DFD_VER
+from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
 # ---- Automations infra / routers ----
 from app.db import init_db
 from app.automations.form2json import router as form2json_router
@@ -101,6 +102,7 @@ def _startup() -> None:
     init_db()
     logger.info("DB initialized (Postgres)")
     logger.info("DFD engine version: %s", DFD_VER)
+    logger.info("FERIAS engine version: %s", FERIAS_VER)
 
 # ------------------------------------------------------------------------------
 # Helpers
@@ -127,6 +129,7 @@ def version() -> Dict[str, Any]:
         "app": APP.version,
         "env": ENV,
         "dfd_version": DFD_VER,
+        "ferias_version": FERIAS_VER,
         "auth_mode": AUTH_MODE,
         "auth_legacy_mock": AUTH_LEGACY_MOCK,
         "ep_mode": EP_MODE,
@@ -243,6 +246,7 @@ def automations_index() -> Dict[str, Any]:
         "items": [
             {"kind": "form2json", "version": "1.0.0", "title": "Formulário para JSON"},
             {"kind": "dfd", "version": DFD_VER, "title": "DFD — Documento de Formalização da Demanda"},
+            {"kind": "ferias", "version": FERIAS_VER, "title": "Férias — Requerimento + Substituição"},
             {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
         ]
@@ -253,6 +257,7 @@ def automations_index() -> Dict[str, Any]:
 # ------------------------------------------------------------------------------
 APP.include_router(form2json_router)
 APP.include_router(dfd_router)
+APP.include_router(ferias_router)
 APP.include_router(controle_router)
 APP.include_router(accounts_router)
 # (removido) APP.include_router(snake_router)  # já incluído acima

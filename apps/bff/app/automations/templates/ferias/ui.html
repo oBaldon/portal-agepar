@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Férias — Requerimento</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size:16px; margin: 0 0 8px; }
+
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; margin-bottom:16px; }
+  label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+  textarea { min-height: 80px; resize: vertical; }
+  .row { display:flex; gap: 12px; }
+  .col { flex:1; min-width: 0; }
+
+  .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 14px; cursor:pointer; transition:.16s ease; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
+  .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.secondary:hover { background:#f8fafc; }
+  .btn.small { padding:8px 10px; font-size:12px; }
+  .btn.danger { background:#b91c1c; }
+  .btn[disabled] { opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
+  .btn-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  .status { font-size:13px; color: var(--muted); }
+  .note { font-size:12px; color:var(--muted); }
+  .warn { color:#7c2d12; background:#fef3c7; border:1px solid #fde68a; padding:6px 8px; border-radius:8px; font-size:12px; display:inline-block; }
+  .err { color:#7f1d1d; background:#fee2e2; border:1px solid #fecaca; padding:6px 8px; border-radius:8px; font-size:12px; display:inline-block; }
+
+  .item { position: relative; padding:12px; padding-bottom: 56px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
+  .item .meta { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+  .item-actions { position:absolute; right:12px; bottom:12px; display:flex; gap:8px; }
+
+  .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+
+  input[disabled], textarea[disabled], select[disabled] { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; cursor:not-allowed; }
+  @keyframes shake { from{transform:translateX(0)} 33%{transform:translateX(-2px)} 66%{transform:translateX(2px)} to{transform:translateX(0)} }
+  .shake { animation: shake .2s; }
+  table { width:100%; border-collapse: collapse; font-size: 14px; }
+  thead th { text-align:left; padding:10px 8px; border-bottom:1px solid #e2e8f0; color:#334155; font-weight:600; }
+  tbody td { padding:10px 8px; border-bottom:1px solid #eef2f7; vertical-align: top; }
+  td.downloads { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Férias — Requerimento</h1>
+
+  <!-- Cabeçalho -->
+  <div class="card">
+    <h2>Dados do servidor</h2>
+    <div class="row">
+      <div class="col">
+        <label for="nome">Nome</label>
+        <input id="nome" placeholder="Nome do servidor" required />
+      </div>
+      <div class="col">
+        <label for="rg">RG</label>
+        <input id="rg" placeholder="RG" required />
+      </div>
+      <div class="col">
+        <label for="cargo">Cargo</label>
+        <input id="cargo" placeholder="Cargo" required />
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <label for="lf">LF</label>
+        <input id="lf" type="number" inputmode="numeric" placeholder="Número LF" />
+      </div>
+      <div class="col">
+        <label for="nivel">Nível</label>
+        <input id="nivel" placeholder="Nível" />
+      </div>
+      <div class="col">
+        <label for="lotacao">Lotação</label>
+        <input id="lotacao" placeholder="Lotação" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label for="tipoFerias">Tipo das férias</label>
+        <select id="tipoFerias">
+          <option value="terco">Férias de terço</option>
+          <option value="saldo">Férias de saldo</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="exercicio">Exercício (ano)</label>
+        <input id="exercicio" type="number" min="1990" max="2100" step="1" placeholder="ex.: 2026" required />
+      </div>
+      <div class="col">
+        <label for="saldo">Saldo disponível no exercício (dias)</label>
+        <input id="saldo" type="number" min="1" max="30" value="30" />
+      </div>
+    </div>
+    <div class="note">Observação: as férias podem ser gozadas em ano diferente do exercício.</div>
+  </div>
+
+  <!-- Períodos -->
+  <div class="card">
+    <h2>Períodos de férias</h2>
+    <div class="note" style="margin-bottom:8px">
+      Até <b id="maxPeriodosText">3</b> períodos, cada um com <b>mínimo de 10 dias</b>.  
+      O início deve ser <b>≥ hoje + <span id="leadDaysText">30</span> dias</b>.
+    </div>
+
+    <div id="periodos"></div>
+
+    <div class="row" style="justify-content:space-between; align-items:center; margin-top:8px">
+      <div class="status" id="totais"></div>
+    </div>
+  </div>
+
+  <!-- Substituto -->
+  <div class="card">
+    <h2>Indicação de substituto</h2>
+    <div class="row">
+      <div class="col">
+        <label for="despacho">Despacho</label>
+        <select id="despacho">
+          <option value="">-- Selecionar --</option>
+          <option>Favorável</option>
+          <option>Não Favorável</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="necessidadeSubst">Necessidade de substituição</label>
+        <select id="necessidadeSubst">
+          <option value="">-- Selecionar --</option>
+          <option>Sim</option>
+          <option>Não</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="substGroup" style="display:none">
+      <div class="row">
+        <div class="col">
+          <label for="substNome">Substituto</label>
+          <input id="substNome" placeholder="Nome do substituto" />
+        </div>
+        <div class="col">
+          <label for="substPeriodo">Período</label>
+          <input id="substPeriodo" placeholder="Ex.: 05/03 a 20/03" />
+        </div>
+      </div>
+    </div>
+
+    <label for="chefia">Chefia imediata</label>
+    <input id="chefia" placeholder="Nome da chefia imediata" />
+  </div>
+
+  <!-- Ações -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <span class="status" id="msg" aria-live="polite"></span>
+      <div class="btn-row">
+        <button class="btn" id="enviarBtn">Enviar requerimento</button>
+        <!-- Botão 'Atualizar histórico' removido -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Histórico -->
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+      <h2>Histórico (submissions)</h2>
+      <button class="btn secondary small" id="atualizarBtn2">Atualizar</button>
+    </div>
+    <div class="note">Cada submissão pode conter 1 a 3 períodos (um único PDF de requerimento).</div>
+    <div class="table-wrap">
+      <table aria-label="Submissões">
+        <thead>
+          <tr>
+            <th>Quando</th><th>Status</th><th>Exercício</th><th>Dias</th><th>Períodos</th><th id="thDownloads">Downloads</th>
+          </tr>
+        </thead>
+        <tbody id="subs"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------------------- Utils ----------------------
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const DAY = 24*3600*1000;
+  const fmt2d = n => n<10 ? '0'+n : ''+n;
+
+  const splitYMD = (s) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');
+    if(!m) return null;
+    const y=+m[1], mo=+m[2], d=+m[3];
+    if(!y||mo<1||mo>12||d<1||d>31) return null;
+    return {y, m:mo, d};
+  };
+  const dayNumFromStr = (s) => {
+    const p = splitYMD(s); if(!p) return NaN;
+    return Math.floor(Date.UTC(p.y, p.m-1, p.d)/DAY);
+  };
+  const dayNumToStr = (n) => {
+    const dt = new Date(n*DAY);
+    return `${dt.getUTCFullYear()}-${fmt2d(dt.getUTCMonth()+1)}-${fmt2d(dt.getUTCDate())}`;
+  };
+  const ymdAddStr = (s, n) => {
+    const dn = dayNumFromStr(s);
+    if(!isFinite(dn)) return '';
+    return dayNumToStr(dn + n);
+  };
+  const todayYMDLocal = () => {
+    const t = new Date();
+    return `${t.getFullYear()}-${fmt2d(t.getMonth()+1)}-${fmt2d(t.getDate())}`;
+  };
+  const daysInclusiveStr = (s1, s2) => {
+    const a = dayNumFromStr(s1), b = dayNumFromStr(s2);
+    if(!isFinite(a) || !isFinite(b)) return 0;
+    return (b - a) + 1;
+  };
+
+  // ---------------------- Estado ----------------------
+  const periodosEl = $("#periodos");
+  const msgEl = $("#msg");
+  const totaisEl = $("#totais");
+  const enviarBtn = $("#enviarBtn");
+
+  const nomeEl = $("#nome");
+  const rgEl = $("#rg");
+  const cargoEl = $("#cargo");
+  const lfEl = $("#lf");
+  const nivelEl = $("#nivel");
+  const lotacaoEl = $("#lotacao");
+  const exercicioEl = $("#exercicio");
+  const saldoEl = $("#saldo");
+  const tipoFeriasEl = $("#tipoFerias");
+  const leadDaysText = $("#leadDaysText");
+  const maxPeriodosText = $("#maxPeriodosText");
+
+  const despachoEl = $("#despacho");
+  const necessidadeSubstEl = $("#necessidadeSubst");
+  const substGroup = $("#substGroup");
+  const substNomeEl = $("#substNome");
+  const substPeriodoEl = $("#substPeriodo");
+  const chefiaEl = $("#chefia");
+
+  let hasFeriasRole = false;
+  let cardSeq = 0;
+
+  // === AUTO-REFRESH ===
+  const RUN_STATES = new Set(['queued','running']);
+  let tableAutoRefreshTimer = null;
+  const activePollers = new Map();
+  const POLL_INTERVAL_TABLE = 4000;
+  const POLL_INTERVAL_SUB = 2000;
+  const POLL_TIMEOUT_MS   = 5 * 60 * 1000;
+
+  const getLeadDays = () => (tipoFeriasEl.value === 'saldo' ? 10 : 30);
+  const getSaldoMax = () => (tipoFeriasEl.value === 'saldo' ? 20 : 30);
+  const minStartYMD = () => ymdAddStr(todayYMDLocal(), getLeadDays());
+
+  // ---------------------- UI Período ----------------------
+  function buildPeriodoCard(){
+    const idx = cardSeq++;
+    const card = document.createElement('div');
+    card.className = 'item';
+    card.dataset.idx = String(idx);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const badge = document.createElement('span'); badge.className='badge'; badge.textContent='Período';
+    const number = document.createElement('strong'); number.className='item-number'; number.textContent = `#${idx+1}`;
+    const diasInfo = document.createElement('span'); diasInfo.className='note'; diasInfo.style.marginLeft='8px'; diasInfo.textContent='— 0 dia(s)';
+    meta.appendChild(badge); meta.appendChild(number); meta.appendChild(diasInfo);
+
+    const row = document.createElement('div'); row.className='row';
+    const c1 = document.createElement('div'); c1.className='col';
+    const c2 = document.createElement('div'); c2.className='col';
+
+    const lblIni = document.createElement('label'); lblIni.textContent='Início';
+    const ini = document.createElement('input'); ini.type='date'; ini.name=`p[${idx}][inicio]`; ini.id=`p-${idx}-inicio`;
+
+    const lblFim = document.createElement('label'); lblFim.textContent='Fim';
+    const fim = document.createElement('input'); fim.type='date'; fim.name=`p[${idx}][fim]`; fim.id=`p-${idx}-fim`;
+
+    c1.appendChild(lblIni); c1.appendChild(ini);
+    c2.appendChild(lblFim); c2.appendChild(fim);
+    row.appendChild(c1); row.appendChild(c2);
+
+    const actions = document.createElement('div'); actions.className='item-actions';
+    const removeBtn = document.createElement('button'); removeBtn.type='button'; removeBtn.className='btn small danger'; removeBtn.textContent='Remover';
+    const addBtn = document.createElement('button'); addBtn.type='button'; addBtn.className='btn small secondary'; addBtn.textContent='Adicionar período';
+
+    actions.appendChild(removeBtn); actions.appendChild(addBtn);
+
+    function applyMinAttrs(){
+      const minStart = minStartYMD();
+      ini.min = minStart;
+      fim.min = ini.value ? ymdAddStr(ini.value, 9) : ymdAddStr(minStart, 9);
+    }
+
+    function recalc(){
+      applyMinAttrs();
+
+      const minStart = minStartYMD();
+
+      if(ini.value && dayNumFromStr(ini.value) < dayNumFromStr(minStart)){
+        ini.setCustomValidity(`Data mínima: ${minStart}`);
+      } else {
+        ini.setCustomValidity('');
+      }
+
+      if(ini.value && fim.value){
+        const minEnd = ymdAddStr(ini.value, 9);
+        if(dayNumFromStr(fim.value) < dayNumFromStr(minEnd)){
+          fim.setCustomValidity('Período mínimo: 10 dias.');
+          card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),250);
+        } else {
+          fim.setCustomValidity('');
+        }
+      } else {
+        fim.setCustomValidity('');
+      }
+
+      const dias = daysInclusiveStr(ini.value, fim.value);
+      diasInfo.textContent = `— ${isFinite(dias) && dias>0 ? dias : 0} dia(s)`;
+
+      computeTotais();
+      updateAddButtons();
+    }
+
+    ini.addEventListener('input', recalc);
+    fim.addEventListener('input', recalc);
+
+    removeBtn.onclick = ()=>{
+      if(periodosEl.children.length<=1){
+        card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),250);
+        return;
+      }
+      card.remove();
+      recomputeNumbers();
+      computeTotais();
+      updateAddButtons();
+    };
+
+    addBtn.onclick = ()=>{
+      if(!canAddAnother()) return;
+      periodosEl.appendChild(buildPeriodoCard());
+      recomputeNumbers();
+      updateAddButtons();
+      computeTotais();
+      const last = periodosEl.lastElementChild;
+      if(last) last.querySelector('input[type="date"]')?.focus();
+    };
+
+    applyMinAttrs();
+
+    card.appendChild(meta);
+    card.appendChild(row);
+    card.appendChild(actions);
+    return card;
+  }
+
+  function recomputeNumbers(){
+    $$('#periodos .item').forEach((div,i)=>{
+      const num = div.querySelector('.item-number');
+      if(num) num.textContent = `#${i+1}`;
+      div.dataset.idx = String(i);
+      div.querySelectorAll('[name^="p["]').forEach(el=>{
+        el.name = el.name.replace(/p\[\d+\]/, `p[${i}]`);
+      });
+      div.querySelectorAll('[id^="p-"]').forEach(el=>{
+        el.id = el.id.replace(/p-\d+-/, `p-${i}-`);
+      });
+      div.querySelectorAll('label[for^="p-"]').forEach(l=>{
+        l.htmlFor = l.htmlFor.replace(/p-\d+-/, `p-${i}-`);
+      });
+    });
+  }
+
+  function ensureOnePeriodo(){
+    if(periodosEl.children.length===0){
+      periodosEl.appendChild(buildPeriodoCard());
+    }
+  }
+
+  function maxPeriodosBySaldo(saldo){
+    if(Math.floor(saldo/3) >= 10) return 3;
+    if(Math.floor(saldo/2) >= 10) return 2;
+    return 1;
+  }
+
+  function canAddAnother(){
+    const { saldo, diasValidos, maxP } = computeTotais();
+    const cards = $$('#periodos .item').length;
+    if(cards >= maxP) return false;
+    return (saldo - diasValidos) >= 10;
+  }
+
+  function updateAddButtons(){
+    const cards = $$('#periodos .item');
+    const canAdd = canAddAnother();
+
+    cards.forEach((c,i)=>{
+      const addBtn = c.querySelector('.item-actions .btn.secondary');
+      const remBtn = c.querySelector('.item-actions .btn.danger');
+      if(addBtn){
+        addBtn.style.display = (i===cards.length-1) ? '' : 'none';
+        addBtn.disabled = !canAdd;
+        addBtn.title = canAdd ? '' : 'Não é possível adicionar outro período.';
+      }
+      if(remBtn) remBtn.disabled = (cards.length<=1);
+    });
+  }
+
+  function collectPeriodos(){
+    const minStart = minStartYMD();
+
+    return $$('#periodos .item').map(div=>{
+      const inputs = div.querySelectorAll('input[type="date"]');
+      const iniEl = inputs[0], fimEl = inputs[1];
+      const ini = iniEl.value || '';
+      const fim = fimEl.value || '';
+
+      let ok = true, errors = [];
+
+      if(!ini || !fim){ ok = false; errors.push('Preencha início e fim.'); }
+
+      if(ok && dayNumFromStr(ini) < dayNumFromStr(minStart)){
+        ok = false; errors.push(`Início deve ser ≥ ${minStart}.`);
+      }
+
+      if(ok){
+        const minEnd = ymdAddStr(ini, 9);
+        if(dayNumFromStr(fim) < dayNumFromStr(minEnd)){
+          ok = false; errors.push('Período deve ter ao menos 10 dias.');
+        }
+      }
+
+      const dias = ok ? daysInclusiveStr(ini, fim) : 0;
+      return { ini, fim, dias, ok, errors };
+    });
+  }
+
+  // ---- Exercício (ano) ----
+  const MIN_EXERCICIO = 1990;
+  const MAX_EXERCICIO = 2100;
+
+  function validateExercicioField() {
+    const el = exercicioEl;
+    const raw = (el.value || '').trim();
+
+    if (raw === '') {
+      el.setCustomValidity('Informe o Exercício (4 dígitos, mínimo 1990).');
+      return false;
+    }
+    const n = Number(raw);
+    if (!Number.isInteger(n)) { el.setCustomValidity('O Exercício deve ser um número inteiro de 4 dígitos.'); return false; }
+    if (raw.length !== 4) { el.setCustomValidity('Use exatamente 4 dígitos (ex.: 2026).'); return false; }
+    if (n < MIN_EXERCICIO) { el.setCustomValidity(`O Exercício mínimo é ${MIN_EXERCICIO}.`); return false; }
+    if (n > MAX_EXERCICIO) { el.setCustomValidity(`O Exercício máximo é ${MAX_EXERCICIO}.`); return false; }
+    el.setCustomValidity('');
+    return true;
+  }
+
+  function sanitizeExercicioOnInput() {
+    let v = (exercicioEl.value || '').replace(/[^\d]/g, '').slice(0, 4);
+    exercicioEl.value = v;
+    exercicioEl.setCustomValidity('');
+  }
+
+  function clampInt(n, min, max){ if(isNaN(n)) return min; return Math.max(min, Math.min(max, n)); }
+
+  function computeTotais(){
+    const saldoMax = getSaldoMax();
+    let saldoVal = parseInt(saldoEl.value||String(saldoMax),10);
+    saldoVal = clampInt(saldoVal, 1, saldoMax);
+    if(String(saldoVal) !== (saldoEl.value||'')) saldoEl.value = String(saldoVal);
+
+    const ps = collectPeriodos();
+    const diasValidos = ps.filter(p=>p.ok).reduce((acc,p)=>acc+p.dias,0);
+    const qtdValidos = ps.filter(p=>p.ok).length;
+
+    const maxP = maxPeriodosBySaldo(saldoVal);
+    maxPeriodosText.textContent = String(maxP);
+    leadDaysText.textContent = String(getLeadDays());
+
+    let parts = [];
+    parts.push(`Períodos válidos: ${qtdValidos}/${ps.length} (máx. ${maxP})`);
+    parts.push(`Total de dias: ${diasValidos}`);
+
+    let alerts = [];
+    const sobra = saldoVal - diasValidos;
+
+    if(diasValidos > saldoVal){
+      alerts.push(`<span class="err">Excede o saldo (${saldoVal}d) em ${diasValidos - saldoVal} dia(s).</span>`);
+    }
+    if(sobra > 0 && sobra < 10){
+      alerts.push(`<span class="warn">${sobra} dia(s) ficarão indisponíveis, pois o mínimo por período é 10.</span>`);
+    }
+
+    totaisEl.innerHTML = parts.join(' · ') + (alerts.length ? ' — ' + alerts.join(' ') : '');
+    return { saldo: saldoVal, diasValidos, sobra, qtdValidos, ps, maxP };
+  }
+
+  // ---------------------- Downloads ----------------------
+  async function downloadFerias(sid, fmt) {
+    const url = fmt === 'zip'
+      ? `./submissions/${sid}/download`
+      : `./submissions/${sid}/download/${fmt}`;
+
+    const r = await fetch(url, { method: 'POST' });
+    if (!r.ok) {
+      const err = await r.json().catch(()=>({}));
+      alert(err.message || 'Falha no download');
+      return;
+    }
+    const blob = await r.blob();
+    let filename = 'arquivo.bin';
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = /filename="?([^"]+)"?/.exec(cd);
+    if (m) filename = m[1];
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  }
+  window.downloadFerias = downloadFerias;
+
+  // ---------------------- Substituto toggle ----------------------
+  necessidadeSubstEl.addEventListener('change', ()=>{
+    const show = (necessidadeSubstEl.value === 'Sim');
+    substGroup.style.display = show ? '' : 'none';
+    if(!show){ substNomeEl.value=''; substPeriodoEl.value=''; }
+  });
+
+  // === AUTO-REFRESH: polling por submissionId (após envio) ===
+  async function pollSubmissionUntilDone(sid){
+    if (!sid || activePollers.has(sid)) return;
+    const startedAt = Date.now();
+    const timer = setInterval(async ()=>{
+      try{
+        const r = await fetch(`./submissions/${sid}`);
+        if(!r.ok){ throw new Error('poll fail'); }
+        const row = await r.json();
+        const st = (row && row.status) || '';
+        if (!RUN_STATES.has(st)) {
+          clearInterval(timer);
+          activePollers.delete(sid);
+          await loadSubs();
+        }
+        if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+          clearInterval(timer);
+          activePollers.delete(sid);
+        }
+      }catch{}
+    }, POLL_INTERVAL_SUB);
+    activePollers.set(sid, timer);
+  }
+
+  // === AUTO-REFRESH: tabela enquanto houver queued/running ===
+  function ensureTableAutoRefresh(rows){
+    const hasRunning = (rows||[]).some(s => RUN_STATES.has((s.status||'').toLowerCase()));
+    if (hasRunning && !tableAutoRefreshTimer) {
+      tableAutoRefreshTimer = setInterval(loadSubs, POLL_INTERVAL_TABLE);
+    } else if (!hasRunning && tableAutoRefreshTimer) {
+      clearInterval(tableAutoRefreshTimer);
+      tableAutoRefreshTimer = null;
+    }
+  }
+
+  // ---------------------- Enviar (UMA submissão com VÁRIOS períodos) ----------------------
+  async function enviar(){
+    msgEl.textContent = 'Validando…';
+
+    if(!nomeEl.value.trim()){ nomeEl.focus(); msgEl.textContent='Preencha o Nome.'; return; }
+    if(!rgEl.value.trim()){ rgEl.focus(); msgEl.textContent='Preencha o RG.'; return; }
+    if(!cargoEl.value.trim()){ cargoEl.focus(); msgEl.textContent='Preencha o Cargo.'; return; }
+
+    if (!validateExercicioField()) {
+      exercicioEl.focus();
+      msgEl.textContent = exercicioEl.validationMessage || 'Informe o Exercício corretamente.';
+      return;
+    }
+    const exercicio = parseInt((exercicioEl.value || '').trim(), 10);
+
+    const { saldo, diasValidos, sobra, ps } = computeTotais();
+    const validos = ps.filter(p=>p.ok);
+
+    if(validos.length===0){ msgEl.textContent='Inclua ao menos um período válido (mínimo 10 dias, início ≥ hoje + lead dinâmico).'; return; }
+    if(diasValidos > saldo){ msgEl.textContent='A soma de dias ultrapassa o saldo disponível.'; return; }
+
+    const cabecalhoObs = [
+      `Nome: ${nomeEl.value.trim()}`,
+      `RG: ${rgEl.value.trim()}`,
+      `Cargo: ${cargoEl.value.trim()}`,
+      lfEl.value ? `LF: ${lfEl.value.trim()}` : null,
+      nivelEl.value ? `Nível: ${nivelEl.value.trim()}` : null,
+      lotacaoEl.value ? `Lotação: ${lotacaoEl.value.trim()}` : null,
+      `Exercício: ${exercicio}`,
+      `Tipo: ${tipoFeriasEl.options[tipoFeriasEl.selectedIndex].text}`,
+      despachoEl.value ? `Despacho: ${despachoEl.value}` : null,
+      necessidadeSubstEl.value ? `Necessidade de substituição: ${necessidadeSubstEl.value}` : null,
+      (substGroup.style.display!=='none' && substNomeEl.value) ? `Substituto: ${substNomeEl.value.trim()}` : null,
+      (substGroup.style.display!=='none' && substPeriodoEl.value) ? `Período substituto: ${substPeriodoEl.value.trim()}` : null,
+      chefiaEl.value ? `Chefia imediata: ${chefiaEl.value.trim()}` : null,
+      (sobra>0 && sobra<10) ? `Aviso: ${sobra} dia(s) serão perdidos.` : null
+    ].filter(Boolean).join(' | ');
+
+    const payload = {
+      exercicio,
+      tipo: tipoFeriasEl.value,
+      observacoes: cabecalhoObs,
+      substituto: (necessidadeSubstEl.value==='Sim' && substNomeEl.value.trim())
+        ? { nome: substNomeEl.value.trim() }
+        : null,
+      periodos: validos.map(p => ({ inicio: p.ini, fim: p.fim }))
+    };
+
+    enviarBtn.disabled = true;
+    msgEl.textContent = 'Enviando…';
+
+    try{
+      const r = await fetch('./submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok){
+        msgEl.textContent = (j && j.message) || 'Erro ao enviar.';
+      } else {
+        msgEl.textContent = `Enviado com ${validos.length} período(s). Gerando PDFs…`;
+        await loadSubs();
+        if (j && j.submissionId) {
+          pollSubmissionUntilDone(j.submissionId);
+        }
+      }
+    }catch(e){
+      msgEl.textContent = 'Falha ao enviar. Tente novamente.';
+    } finally {
+      enviarBtn.disabled = false;
+    }
+  }
+
+  // ---------------------- Histórico ----------------------
+  function formatBR(iso){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); if(!m) return iso||'';
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  }
+
+  function periodsCell(res, px){
+    const arr = (res && res.periodos) || (px && px.periodos);
+    if (Array.isArray(arr) && arr.length){
+      return arr.map(p => `${formatBR(p.inicio)} → ${formatBR(p.fim)}`).join('<br>');
+    }
+    const ini = (res && res.inicio) || (px && px.inicio);
+    const fim = (res && res.fim) || (px && px.fim);
+    if (ini && fim) return `${ini} → ${fim}`;
+    return '';
+  }
+
+  function downloadsCellHtml(sid, status) {
+    if (!hasFeriasRole) return '<span class="note">sem permissão</span>';
+    if (status !== 'done') return '<span class="note">aguardando…</span>';
+    return `
+      <button class="btn small" onclick="downloadFerias('${sid}','zip')">ZIP</button>
+      <button class="btn small secondary" onclick="downloadFerias('${sid}','requerimento')">Requerimento</button>
+      <button class="btn small secondary" onclick="downloadFerias('${sid}','substituicao')">Substituição</button>
+    `;
+  }
+
+  async function loadSubs(){
+    const tbody = $("#subs");
+    tbody.innerHTML = '';
+    try{
+      const r = await fetch('./submissions?limit=50');
+      const j = await r.json();
+      const items = (j.items||[]);
+      items.forEach(s=>{
+        const tr = document.createElement('tr');
+        const res = (typeof s.result==='string') ? (JSON.parse(s.result||'{}')||{}) : (s.result||{});
+        const px = (typeof s.payload==='string') ? (JSON.parse(s.payload||'{}')||{}) : (s.payload||{});
+        const dias = res.dias_total || res.dias || '';
+        const exer = px.exercicio || '';
+        tr.innerHTML = `
+          <td>${s.created_at||''}</td>
+          <td>${s.status||''}</td>
+          <td>${exer}</td>
+          <td>${dias||''}</td>
+          <td>${periodsCell(res, px)}</td>
+          <td class="downloads">${downloadsCellHtml(s.id, (s.status||'').toLowerCase())}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      ensureTableAutoRefresh(items);
+    }catch(e){
+      const tr = document.createElement('tr'); tr.innerHTML = '<td colspan="6">Erro ao carregar histórico.</td>'; tbody.appendChild(tr);
+    }
+  }
+
+  // ---------------------- Boot ----------------------
+  async function boot(){
+    try{
+      const r = await fetch('/api/me');
+      if(r.ok){
+        const me = await r.json();
+        const n = (me && (me.nome || me.name)) || '';
+        if(n) document.getElementById('nome').value = n;
+        const roles = (me && (me.roles || [])) || [];
+        hasFeriasRole = roles.includes('ferias');
+        if (!hasFeriasRole) {
+          const th = document.getElementById('thDownloads');
+          if (th) th.innerHTML = 'Downloads <span class="note">(requer role "ferias")</span>';
+        }
+      }
+    }catch{}
+
+    exercicioEl.addEventListener('input', sanitizeExercicioOnInput);
+    exercicioEl.addEventListener('blur', validateExercicioField);
+    function updateEnviarState() { enviarBtn.disabled = !validateExercicioField(); }
+    exercicioEl.addEventListener('input', updateEnviarState);
+    exercicioEl.addEventListener('blur', updateEnviarState);
+    sanitizeExercicioOnInput(); updateEnviarState();
+
+    function applyTipoRules(){
+      const max = getSaldoMax();
+      saldoEl.max = String(max);
+      if(!saldoEl.value) saldoEl.value = String(max);
+      else saldoEl.value = String(Math.max(1, Math.min(max, parseInt(saldoEl.value,10)||max)));
+
+      document.getElementById('leadDaysText').textContent = String(getLeadDays());
+
+      $$('#periodos .item').forEach(div=>{
+        const ini = div.querySelector('input[type="date"]:first-of-type');
+        const fim = div.querySelector('input[type="date"]:last-of-type');
+        if(ini && fim){
+          ini.dispatchEvent(new Event('input', {bubbles:true}));
+          fim.dispatchEvent(new Event('input', {bubbles:true}));
+        }
+      });
+
+      updateAddButtons();
+      computeTotais();
+    }
+
+    document.getElementById('tipoFerias').addEventListener('change', applyTipoRules);
+    document.getElementById('saldo').addEventListener('input', ()=>{
+      const max = getSaldoMax();
+      const v = Math.max(1, Math.min(max, parseInt(document.getElementById('saldo').value||String(max),10)));
+      if(String(v)!==document.getElementById('saldo').value) document.getElementById('saldo').value = String(v);
+      updateAddButtons();
+      computeTotais();
+    });
+
+    document.getElementById('enviarBtn').addEventListener('click', (e)=>{ e.preventDefault(); enviar(); });
+    // Removido: listener do botão 'Atualizar histórico' (fora do bloco de histórico)
+    document.getElementById('atualizarBtn2').addEventListener('click', (e)=>{ e.preventDefault(); loadSubs(); });
+
+    ensureOnePeriodo();
+    applyTipoRules();
+    loadSubs();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

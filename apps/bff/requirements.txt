@@ -9,3 +9,4 @@ psycopg[binary]>=3.2,<3.3
 argon2-cffi>=23.1,<24.0
 reportlab>=4.2,<5.0
 docxtpl>=0.16,<0.17
+pdfrw==0.4

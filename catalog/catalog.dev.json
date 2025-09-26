@@ -7,10 +7,11 @@
 
   "categories": [
     { "id": "cat1", "label": "Compras", "icon": "ShoppingCart" },
-    { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck",  "hidden": true},
-    { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck",  "hidden": true},
-    { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true},
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin","coordenador"] }
+    { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck", "hidden": true },
+    { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck", "hidden": true },
+    { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true },
+    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] },
+    { "id": "ferias", "label": "Férias", "icon": "CalendarDays" }
   ],
 
   "blocks": [
@@ -94,7 +95,6 @@
       "requiredRoles": ["automations.form2json"],
       "hidden": true
     },
-
     {
       "name": "automacao2",
       "displayName": "Automação 2",
@@ -156,6 +156,23 @@
       ],
       "tags": ["admin", "rbac", "usuários"],
       "requiredRoles": ["admin"]
+    },
+    {
+      "name": "ferias",
+      "displayName": "Férias",
+      "version": "0.1.0",
+      "categoryId": "ferias",
+      "description": "Requerimento + Substituição em um único fluxo (gera dois PDFs).",
+      "ui": { "type": "iframe", "url": "/api/automations/ferias/ui" },
+      "navigation": [
+        { "label": "Férias", "path": "/ferias", "icon": "CalendarDays" }
+      ],
+      "routes": [
+        { "path": "/ferias", "kind": "iframe" }
+      ],
+      "tags": ["RH", "férias"],
+      "requiredRoles": ["ferias"],
+      "order": 20
     }
   ]
 }
