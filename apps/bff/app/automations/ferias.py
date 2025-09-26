@@ -140,7 +140,7 @@ def _mark_exclusive(options: Dict[str, str], pick: str) -> Dict[str, str]:
 logger = logging.getLogger(__name__)
 
 KIND = "ferias"
-FERIAS_VERSION = "0.2.1"
+FERIAS_VERSION = "0.2.2"
 REQUIRED_ROLES = ("ferias",)
 ELEVATED_ROLES = ("admin", "coordenador")
 
@@ -271,6 +271,7 @@ class FeriasIn(BaseModel):
     """
     Modelo da UI nova: um requerimento com 1..3 períodos.
     Campos:
+      - protocolo: string (obrigatório)
       - periodos: [{inicio, fim}] (1..3)
       - exercicio: int (ano)
       - tipo: 'terco' | 'saldo'
@@ -278,6 +279,7 @@ class FeriasIn(BaseModel):
       - substituto: { nome } | null
     """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    protocolo: str = Field(..., min_length=3)
     periodos: List[Periodo] = Field(..., min_length=1, max_length=3)
     exercicio: int = Field(..., ge=1990, le=2100)
     tipo: str = Field("terco")
@@ -305,6 +307,7 @@ SCHEMA = {
     "title": "Férias — Requerimento + Substituição (UI custom, multi-períodos)",
     "version": FERIAS_VERSION,
     "fields": [
+        {"name": "protocolo", "type": "text", "label": "Protocolo"},
         {"name": "periodos[].inicio", "type": "date", "label": "Início do período"},
         {"name": "periodos[].fim", "type": "date", "label": "Fim do período"},
         {"name": "exercicio", "type": "number", "label": "Exercício"},
@@ -315,6 +318,7 @@ SCHEMA = {
 }
 
 # ==== FIELD MAPS ====
+# Ajuste as strings abaixo para os nomes REAIS dos campos do seu PDF.
 REQ_FIELD_MAP = {
     "nome": "Caixa de texto 1_3",
     "rg": "Caixa de texto 1_4",
@@ -329,6 +333,8 @@ REQ_FIELD_MAP = {
     "local": "Caixa de texto 1_7",
     "data": "Caixa de texto 1_8",
     "servidor": "Caixa de texto 1_9",
+    # Novo campo - ajuste para o nome do seu AcroForm:
+    "protocolo": "Protocolo",  # ex.: "Protocolo" ou "Caixa de texto 1_10"
 }
 
 SUB_FIELD_MAP = {
@@ -341,6 +347,8 @@ SUB_FIELD_MAP = {
     "local": "Caixa de texto 1_2",
     "data": "Caixa de texto 1_3",
     "chefia_imediata": "Caixa de texto 1_4",
+    # Novo campo - ajuste para o nome do seu AcroForm:
+    "protocolo": "Protocolo",  # ex.: "Protocolo" ou outro nome
 }
 
 # ---------------------- Router ----------------------
@@ -418,8 +426,8 @@ def _parse_observacoes(obs: Optional[str]) -> Dict[str, str]:
 def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None:
     """Gera 2 PDFs (requerimento + substituicao) a partir do payload multi-períodos."""
     try:
-        update_submission(sid, status="running")
-        add_audit(KIND, "running", actor, {"sid": sid})
+        update_submission(sid, status="running", error=None)
+        add_audit(KIND, "running", actor, {"sid": sid, "protocolo": body.protocolo})
     except Exception as e:
         logger.exception("update to running failed")
         try:
@@ -427,7 +435,7 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
         except Exception:
             pass
         try:
-            add_audit(KIND, "failed", actor, {"sid": sid, "error": f"storage: {e}"})
+            add_audit(KIND, "failed", actor, {"sid": sid, "error": f"storage: {e}", "protocolo": getattr(body, "protocolo", None)})
         except Exception:
             pass
         return
@@ -457,6 +465,7 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
         necessidade_txt = obs_map.get("necessidade de substituição", "")
         substituto_nome = (raw.get("substituto") or {}).get("nome") or obs_map.get("substituto", "")
         periodo_subst_txt = obs_map.get("período substituto", obs_map.get("periodo substituto", ""))
+        protocolo = raw.get("protocolo") or ""
 
         # Caminho de saída
         out_dir = f"/app/data/files/{KIND}/{sid}"
@@ -491,6 +500,10 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
             REQ_FIELD_MAP["data"]: today_br,
             REQ_FIELD_MAP["servidor"]: ident_nome,
         }
+        # Protocolo (se mapeado)
+        if "protocolo" in REQ_FIELD_MAP and REQ_FIELD_MAP["protocolo"]:
+            req_fields[REQ_FIELD_MAP["protocolo"]] = protocolo
+
         # Preenche as 3 linhas conforme a quantidade de períodos, INCLUINDO o campo de DIAS
         for i in range(3):
             if i < len(periods):
@@ -534,6 +547,9 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
         sub_fields[SUB_FIELD_MAP["local"]] = "Curitiba / PR"
         sub_fields[SUB_FIELD_MAP["data"]] = today_br
         sub_fields[SUB_FIELD_MAP["chefia_imediata"]] = chefia_imediata
+        # Protocolo (se mapeado)
+        if "protocolo" in SUB_FIELD_MAP and SUB_FIELD_MAP["protocolo"]:
+            sub_fields[SUB_FIELD_MAP["protocolo"]] = protocolo
 
         sub_out = os.path.join(out_dir, "substituicao.pdf")
         _pdf_fill_acroform(str(SUB_PDF), sub_out, sub_fields)
@@ -541,6 +557,7 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
         manifest = {
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "engine": f"{KIND}@{FERIAS_VERSION}",
+            "protocolo": protocolo,
             "periodos": periods,
             "dias_total": dias_total,
             "exercicio": raw.get("exercicio"),
@@ -550,7 +567,7 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
             ],
         }
         update_submission(sid, status="done", result=manifest, error=None)
-        add_audit(KIND, "completed", actor, {"sid": sid})
+        add_audit(KIND, "completed", actor, {"sid": sid, "protocolo": protocolo})
 
     except Exception as e:
         logger.exception("processing error")
@@ -559,7 +576,7 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
         except Exception:
             pass
         try:
-            add_audit(KIND, "failed", actor, {"sid": sid, "error": str(e)})
+            add_audit(KIND, "failed", actor, {"sid": sid, "error": str(e), "protocolo": getattr(body, "protocolo", None)})
         except Exception:
             pass
 
@@ -579,6 +596,7 @@ async def submit_ferias(
         if ini or fim:
             periodos = [{"inicio": ini, "fim": fim}]
     raw = {
+        "protocolo": (body.get("protocolo") or "").strip(),
         "periodos": periodos or [],
         "exercicio": body.get("exercicio"),
         "tipo": (body.get("tipo") or "terco").strip(),
@@ -611,8 +629,10 @@ async def submit_ferias(
         try:
             lead = 30 if (payload.tipo or "terco") == "terco" else 10
             today_sp = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
-            logger.info("[FERIAS][SUBMIT] validated periodos=%s tipo=%s today_sp=%s lead=%s",
-                        json.dumps(payload.model_dump().get("periodos")), (payload.tipo or "terco"),
+            logger.info("[FERIAS][SUBMIT] validated periodos=%s tipo=%s protocolo=%s today_sp=%s lead=%s",
+                        json.dumps(payload.model_dump().get("periodos")),
+                        (payload.tipo or "terco"),
+                        payload.protocolo,
                         today_sp.isoformat(), lead)
         except Exception:
             logger.exception("[FERIAS][SUBMIT] failed to log validated summary")
@@ -632,14 +652,14 @@ async def submit_ferias(
     }
     try:
         insert_submission(sub)
-        add_audit(KIND, "submitted", user, {"sid": sid})
+        add_audit(KIND, "submitted", user, {"sid": sid, "protocolo": payload.protocolo})
     except Exception as e:
         logger.exception("insert_submission failed")
         return err_json(500, code="storage_error", message="Falha ao salvar a submissão.", details=str(e))
 
-    logger.info("[FERIAS] Submissão %s criada por %s (%s)", sid, user.get("nome"), user.get("cpf"))
+    logger.info("[FERIAS] Submissão %s criada por %s (%s) proto=%s", sid, user.get("nome"), user.get("cpf"), payload.protocolo)
     background.add_task(_process_submission, sid, payload, user)
-    return {"submissionId": sid, "status": "queued"}
+    return {"submissionId": sid, "status": "queued", "protocolo": payload.protocolo}
 
 
 # -------- DOWNLOADS --------
@@ -678,7 +698,7 @@ async def download_zip(
     mem.seek(0)
 
     try:
-        add_audit(KIND, "download", user, {"sid": sid, "fmt": "zip"})
+        add_audit(KIND, "download", user, {"sid": sid, "fmt": "zip", "protocolo": result.get("protocolo")})
     except Exception:
         logger.exception("audit (download) failed (non-blocking)")
 
@@ -728,7 +748,7 @@ async def download_one(
         data = f.read()
 
     try:
-        add_audit(KIND, "download", user, {"sid": sid, "fmt": fmt, "bytes": len(data)})
+        add_audit(KIND, "download", user, {"sid": sid, "fmt": fmt, "bytes": len(data), "protocolo": result.get("protocolo")})
     except Exception:
         logger.exception("audit (download fmt) failed (non-blocking)")
 
