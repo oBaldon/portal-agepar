@@ -10,8 +10,8 @@
     { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck", "hidden": true },
     { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck", "hidden": true },
     { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true },
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] },
-    { "id": "ferias", "label": "Férias", "icon": "CalendarDays" }
+    { "id": "ferias", "label": "Férias", "icon": "CalendarDays" },
+    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] }
   ],
 
   "blocks": [
@@ -159,7 +159,7 @@
     },
     {
       "name": "ferias",
-      "displayName": "Férias",
+      "displayName": "Férias - Requerimento e Substituição",
       "version": "0.1.0",
       "categoryId": "ferias",
       "description": "Requerimento + Substituição em um único fluxo (gera dois PDFs).",
