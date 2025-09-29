@@ -64,7 +64,7 @@
 <div class="wrap">
   <div class="header">
     <h1>Painel de Controle — Auditoria</h1>
-    <span class="note">Somente leitura • Diretores/Admin</span>
+    <span class="note">Somente leitura • Coordenadores/Admin</span>
   </div>
 
   <!-- Filtros -->
@@ -72,10 +72,11 @@
     <h2 id="filtros-title" style="font-size:16px; margin:0 0 8px">Filtros</h2>
     <div class="row">
       <div class="col">
-        <label for="kind">Tipo</label>
+        <label for="kind">Tipo (alvo)</label>
         <select id="kind">
-          <option value="dfd" selected>DFD</option>
-          <option value="">(Todos)</option>
+          <option value="" selected>(Todos)</option>
+          <option value="dfd">DFD</option>
+          <option value="ferias">Férias</option>
         </select>
       </div>
       <div class="col">
@@ -83,7 +84,7 @@
         <input id="username" placeholder="Ex.: Maria, 12345678901" />
       </div>
       <div class="col">
-        <label for="action">Status</label>
+        <label for="action">Ação/Status</label>
         <!-- será populado dinamicamente -->
         <select id="action">
           <option value="">(Todas)</option>
@@ -122,24 +123,20 @@
       <table id="tbl" aria-describedby="status">
         <colgroup>
           <col style="width:160px"><!-- QUANDO -->
-          <col style="width:180px"><!-- SERVIDOR -->
+          <col style="width:220px"><!-- SERVIDOR -->
           <col style="width:160px"><!-- PROTOCOLO -->
-          <col style="width:130px"><!-- MEMORANDO -->
-          <col style="width:160px"><!-- ALVO -->
-          <col style="width:220px"><!-- NOME DO ARQUIVO -->
-          <col><!-- ASSUNTO -->
+          <col style="width:140px"><!-- ALVO -->
+          <col style="width:260px"><!-- NOME DO ARQUIVO -->
           <col style="width:120px"><!-- STATUS -->
-          <col style="width:180px"><!-- AÇÕES -->
+          <col style="width:220px"><!-- AÇÕES -->
         </colgroup>
         <thead>
           <tr>
             <th class="nowrap">QUANDO</th>
             <th>SERVIDOR</th>
             <th>PROTOCOLO</th>
-            <th>MEMORANDO</th>
             <th>ALVO</th>
             <th>NOME DO ARQUIVO</th>
-            <th>ASSUNTO</th>
             <th class="nowrap">STATUS</th>
             <th class="nowrap">AÇÕES</th>
           </tr>
@@ -147,16 +144,12 @@
         <tbody></tbody>
       </table>
     </div>
-    <div class="note" style="margin-top:8px">Dica: os botões de download aparecem quando o status é “completed”.</div>
+    <div class="note" style="margin-top:8px">Dica: quando houver link disponível, os botões “baixar” e “ver” aparecem em AÇÕES.</div>
   </div>
 </div>
 
 <script>
-  const DEBUG = false;
   const qs = (sel) => document.querySelector(sel);
-
-  // cache de submissões para evitar N chamadas repetidas
-  const subCache = new Map();
 
   function fmtTs(s){
     if(!s) return "";
@@ -169,49 +162,10 @@
     const d = new Date(dtLocalStr);
     return isNaN(d) ? "" : d.toISOString();
   }
-  function toObj(x){
-    if(!x) return {};
-    if(typeof x === "string"){ try { return JSON.parse(x); } catch { return {}; } }
-    if(typeof x === "object") return x;
-    return {};
-  }
-  function buildAssuntoFromPayload(p){
-    const assunto = (p.assunto || "").toString().trim();
-    const ano = (p.pcaAno || p.pca_ano || "").toString().trim();
-    if(assunto && ano) return `DFD - PCA ${ano} - ${assunto}`;
-    return assunto || (p.objeto || "");
-  }
-  function getSid(row){
-    const extra = row.extra || {};
-    return extra.sid || extra.submissionId || extra.id || row.target_id || null;
-  }
-  function pickFilenameFromResult(r){
-    return r.filename_pdf || r.filename_docx || r.filename || "";
-  }
-
-  async function downloadFmt(sid, fmt){
-    try{
-      const url = fmt ? `/api/automations/dfd/submissions/${encodeURIComponent(sid)}/download/${fmt}`
-                      : `/api/automations/dfd/submissions/${encodeURIComponent(sid)}/download`;
-      const r = await fetch(url, { method: 'POST', credentials: 'include' });
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      const blob = await r.blob();
-      const a = document.createElement('a');
-      const name = (fmt==='pdf' ? `dfd_${sid}.pdf` : `dfd_${sid}.docx`);
-      a.href = URL.createObjectURL(blob);
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      if (DEBUG) console.info("[controle] download ok", { sid, fmt, size: blob.size });
-    }catch(e){
-      console.error("[controle] download error", { sid, fmt, error: e });
-      alert('Não foi possível baixar o arquivo.');
-    }
-  }
 
   async function loadActions(){
     const sel = qs("#action");
-    const keep = sel.value;
+    const keep = sel.value; // caso usuário já tenha escolhido algo antes
     try{
       const r = await fetch(`/api/automations/controle/actions`, { credentials: "include" });
       if(!r.ok) throw new Error();
@@ -226,9 +180,15 @@
         o.value = a; o.textContent = a;
         sel.appendChild(o);
       }
-      if(items.includes("completed")) sel.value = "completed";
-      else if(keep) sel.value = keep;
+      // preferir 'completed' como padrão, a menos que já haja escolha anterior
+      if (!keep) {
+        if (items.includes("completed")) sel.value = "completed";
+        else sel.value = ""; // fica em (Todas) se não houver
+      } else {
+        sel.value = keep;
+      }
     }catch(_){
+      // fallback com opções padrão e completed pré-setado
       const defaults = ["submitted","running","completed","failed","download"];
       sel.innerHTML = "";
       const optAll = document.createElement("option");
@@ -243,97 +203,72 @@
     }
   }
 
-  function computeColumnsFromAudit(row, submission /* opcional */){
-    const extra = row.extra ?? {};
-    // dados da submissão (se já estiver em cache)
-    const sub = submission || null;
-    const payload = sub ? toObj(sub.payload) : toObj(extra.payload);
-    const result  = sub ? toObj(sub.result)  : (toObj(extra.result) || {});
-    const username = row.username || "";
-
-    const protocolo = (payload.protocolo || "").toString().trim();
-    const numero    = (payload.numero || "").toString().trim();
-    const alvo      = (payload.diretoriaDemandante || payload.diretoria_demandante || payload.modeloSlug || row.target_kind || "").toString().trim();
-    const filename  = (extra.filename || pickFilenameFromResult(result) || "").toString().trim();
-    const assunto   = (extra.assunto || result.assunto || buildAssuntoFromPayload(payload) || "").toString().trim();
-    const status    = (row.action || "").toString().trim();
-
-    // QUANDO: usa ts do evento; fallback created/updated da submission
-    let quando = row.ts;
-    if(!quando && sub){
-      quando = sub.updated_at || sub.created_at || null;
-    }
-
-    const sid = getSid(row);
-    // status "completed" habilita download
-    const canDownload = !!sid && String(row.action||"").toLowerCase() === "completed";
-
-    return { quando, username, protocolo, numero, alvo, filename, assunto, status, sid, canDownload };
-  }
-
-  async function ensureSubmission(sid){
-    if(!sid) return null;
-    if(subCache.has(sid)) return subCache.get(sid);
-    try{
-      const r = await fetch(`/api/automations/controle/submissions/${encodeURIComponent(sid)}`, { credentials:'include' });
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      subCache.set(sid, data);
-      return data;
-    }catch(e){
-      if (DEBUG) console.warn("[controle] fetch submission failed", sid, e);
-      subCache.set(sid, null);
-      return null;
-    }
-  }
-
-  function renderSkeletonRow(row){
-    const tbody = qs("#tbl tbody");
+  function renderRow(it){
     const tr = document.createElement("tr");
-    tr.dataset.rowId = String(row.id || "");
-    tr.innerHTML = `
-      <td class="nowrap js-quando"></td>
-      <td class="wrap-any js-servidor"></td>
-      <td class="wrap-any js-protocolo">—</td>
-      <td class="wrap-any js-memorando">—</td>
-      <td class="wrap-any js-alvo">—</td>
-      <td class="wrap-any js-filename">—</td>
-      <td class="wrap-any js-assunto">—</td>
-      <td class="nowrap js-status">—</td>
-      <td class="nowrap js-acoes"><span class="note">—</span></td>
-    `;
-    tbody.appendChild(tr);
+
+    const quando = fmtTs(it.ts || it.created_at || it.updated_at);
+    const servidor = it.username || "";
+    const protocolo = it.protocolo || ((it.extra && (it.extra.protocolo || it.extra.processo || it.extra.process_number)) || "");
+    const alvo = it.alvo || it.target_kind || ((it.extra && it.extra.kind) || "");
+    const filename = it.filename || ((it.extra && it.extra.filename) || "");
+    const status = it.status || it.action || "";
+
+    const tdQuando = `<td class="nowrap">${esc(quando)}</td>`;
+    const tdServidor = `<td class="wrap-any">${esc(servidor)}</td>`;
+    const tdProtocolo = `<td class="wrap-any">${esc(protocolo || "—")}</td>`;
+    const tdAlvo = `<td class="wrap-any">${esc(alvo || "—")}</td>`;
+    const tdFile = `<td class="wrap-any">${esc(filename || "—")}</td>`;
+    const tdStatus = `<td class="nowrap">${esc(status || "—")}</td>`;
+
+    // Ações: usar URLs prontas do backend quando disponíveis
+    const actions = [];
+    if (it.download_url){
+      const b = document.createElement("button");
+      b.type="button"; b.className="btn small";
+      b.textContent="baixar";
+      b.addEventListener("click", ()=> doDownload(it.download_url, it.filename || "arquivo"));
+      actions.push(b);
+    }
+    if (it.submission_url){
+      const a = document.createElement("a");
+      a.className="btn small secondary";
+      a.textContent="ver";
+      a.href = it.submission_url;
+      a.target = "_blank"; a.rel = "noopener";
+      actions.push(a);
+    }
+    const tdAcoes = document.createElement("td");
+    tdAcoes.className = "nowrap";
+    if (actions.length){
+      const wrap = document.createElement("div");
+      wrap.className = "btn-row";
+      actions.forEach(el => wrap.appendChild(el));
+      tdAcoes.appendChild(wrap);
+    } else {
+      tdAcoes.innerHTML = `<span class="note">—</span>`;
+    }
+
+    tr.innerHTML = tdQuando + tdServidor + tdProtocolo + tdAlvo + tdFile + tdStatus;
+    tr.appendChild(tdAcoes);
     return tr;
   }
 
-  function fillRow(tr, cols){
-    tr.querySelector(".js-quando").textContent   = fmtTs(cols.quando);
-    tr.querySelector(".js-servidor").textContent = cols.username || "";
-    tr.querySelector(".js-protocolo").textContent= cols.protocolo || "—";
-    tr.querySelector(".js-memorando").textContent= cols.numero || "—";
-    tr.querySelector(".js-alvo").textContent     = cols.alvo || "—";
-    tr.querySelector(".js-filename").textContent = cols.filename || "—";
-    tr.querySelector(".js-assunto").textContent  = cols.assunto || "—";
-    tr.querySelector(".js-status").textContent   = cols.status || "—";
-
-    const cell = tr.querySelector(".js-acoes");
-    cell.innerHTML = "";
-    const wrap = document.createElement("div"); wrap.className = "btn-row";
-    if(cols.canDownload){
-      const bPdf = document.createElement("button");
-      bPdf.type="button"; bPdf.className="btn small"; bPdf.textContent="PDF";
-      bPdf.addEventListener("click", ()=> downloadFmt(cols.sid, "pdf"));
-
-      const bDocx = document.createElement("button");
-      bDocx.type="button"; bDocx.className="btn small secondary"; bDocx.textContent="DOCX";
-      bDocx.addEventListener("click", ()=> downloadFmt(cols.sid, "docx"));
-
-      wrap.appendChild(bPdf); wrap.appendChild(bDocx);
-    } else {
-      const span = document.createElement("span"); span.className="note"; span.textContent="—";
-      wrap.appendChild(span);
+  async function doDownload(url, suggestedName){
+    try{
+      const r = await fetch(url, { method: 'POST', credentials: 'include' });
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      // tenta manter extensão se vier no nome
+      const name = suggestedName && /\.[a-z0-9]{2,5}$/i.test(suggestedName) ? suggestedName : `arquivo_${Date.now()}`;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }catch(e){
+      console.error("[controle] download error", e);
+      alert('Não foi possível baixar o arquivo.');
     }
-    cell.appendChild(wrap);
   }
 
   async function load(){
@@ -371,30 +306,15 @@
   }
 
   function renderRows(rows){
-    const tbody = qs("#tbl tbody");
+    const tbody = document.querySelector("#tbl tbody");
     tbody.innerHTML = "";
-
-    rows?.forEach(async (row) => {
-      const tr = renderSkeletonRow(row);
-
-      // 1ª passada: tenta preencher só com dados do próprio evento/extra
-      const prim = computeColumnsFromAudit(row, null);
-      fillRow(tr, prim);
-
-      // Se faltam dados essenciais, tenta enriquecer com a submissão
-      const needProto = !prim.protocolo;
-      const needMemo  = !prim.numero;
-      const needAlvo  = !prim.alvo;
-      const needFile  = !prim.filename;
-      const needAss   = !prim.assunto;
-
-      const sid = getSid(row);
-      if (sid && (needProto || needMemo || needAlvo || needFile || needAss || !prim.quando)) {
-        const sub = await ensureSubmission(sid);
-        const cols = computeColumnsFromAudit(row, sub);
-        fillRow(tr, cols);
-      }
-    });
+    if(!rows || !rows.length){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="7" class="note">Nenhum registro.</td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+    rows.forEach(r => tbody.appendChild(renderRow(r)));
   }
 
   function exportCsv(){
@@ -431,9 +351,9 @@
   qs("#btnCsv").addEventListener("click", exportCsv);
 
   async function bootstrap(){
-    await loadActions();
+    await loadActions();   // aqui já deixa 'completed' como default
     initDefaults();
-    await load();
+    await load();          // primeira carga já virá com action=completed (quando disponível)
   }
   bootstrap();
 </script>

@@ -43,6 +43,13 @@ class AuditOut(BaseModel):
     ip: Optional[str] = None
     user_agent: Optional[str] = None
     extra: Optional[Dict[str, Any]] = None
+    # ---- Campos para a UI enxuta ----
+    protocolo: Optional[str] = None   # número padrão do processo
+    alvo: Optional[str] = None        # automação/processo (ex.: dfd, ferias, ...)
+    filename: Optional[str] = None
+    status: Optional[str] = None
+    download_url: Optional[str] = None
+    submission_url: Optional[str] = None
 
 
 class SubmissionOut(BaseModel):
@@ -86,7 +93,7 @@ def get_ui(request: Request):
 def get_schema():
     return {
         "filters": {
-            "kind": {"type": "string", "enum": ["dfd", ""], "default": "dfd"},
+            "kind": {"type": "string", "description": "Opcional: filtra por automação de origem (alvo)"},
             "username": {"type": "string"},
             "action": {"type": "string"},
             "since": {"type": "datetime"},
@@ -94,7 +101,7 @@ def get_schema():
             "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
             "offset": {"type": "integer", "minimum": 0, "default": 0},
         },
-        "notes": "Automação de controle é somente leitura. Use DFD para gerar ou baixar artefatos.",
+        "notes": "Painel de controle é somente leitura. Baixes/ver ações na automação de origem.",
     }
 
 
@@ -148,70 +155,166 @@ def _to_obj(x: Any) -> Dict[str, Any]:
             return {}
     return {}
 
+
 def _digits(s: Optional[str]) -> str:
     return "".join(ch for ch in str(s or "") if ch.isdigit())
 
-def _build_assunto_from_payload(payload: Dict[str, Any]) -> str:
-    assunto = (payload.get("assunto") or "").strip()
-    ano = (payload.get("pcaAno") or payload.get("pca_ano") or "").strip()
-    if assunto and ano:
-        return f"DFD - PCA {ano} - {assunto}"
-    return assunto
+
+def _status_label(action: Optional[str], status: Optional[str]) -> str:
+    """
+    Normaliza o status exibido na UI.
+    - Prioriza 'action' do audit quando existir (completed, running, submitted, failed, download)
+    - Mapeia status da submission para os rótulos antigos.
+    """
+    def norm(x: Optional[str]) -> str:
+        return str(x or "").strip().lower()
+
+    a = norm(action)
+    s = norm(status)
+
+    known = {"completed", "running", "submitted", "failed", "download"}
+    if a in known:
+        return a
+
+    map_status = {
+        "done": "completed",
+        "ok": "completed",
+        "success": "completed",
+        "processing": "running",
+        "in_progress": "running",
+        "queued": "submitted",
+        "pending": "submitted",
+        "error": "failed",
+        "failed": "failed",
+        "timeout": "failed",
+    }
+    if s in map_status:
+        return map_status[s]
+
+    return a or s or ""
 
 
 def _sid_from_audit_row(row: Dict[str, Any]) -> Optional[str]:
     extra = row.get("extra") or {}
     return (
-        extra.get("sid")
-        or extra.get("submissionId")
-        or extra.get("id")
+        (extra.get("sid") if isinstance(extra, dict) else None)
+        or (extra.get("submissionId") if isinstance(extra, dict) else None)
+        or (extra.get("id") if isinstance(extra, dict) else None)
         or row.get("target_id")
         or None
     )
 
 
+def _guess_filename(payload: Dict[str, Any], result: Dict[str, Any], extra: Dict[str, Any]) -> str:
+    """
+    Tenta descobrir um nome de arquivo de forma genérica.
+    Procura por chaves filename*, ou strings terminando em extensões comuns.
+    """
+    def first_filename(d: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(d, dict):
+            return None
+        # chaves filename* mais comuns
+        for k, v in d.items():
+            ks = str(k).lower()
+            if ks.startswith("filename") and isinstance(v, str) and v.strip():
+                return v.strip()
+        # scan simples por extensões
+        for _, v in d.items():
+            if isinstance(v, str) and any(v.lower().endswith(ext) for ext in [".pdf", ".docx", ".xlsx", ".zip"]):
+                return v.strip()
+        return None
+
+    return first_filename(result) or first_filename(extra) or first_filename(payload) or ""
+
+
+def _guess_protocolo(payload: Dict[str, Any], result: Dict[str, Any], extra: Dict[str, Any]) -> str:
+    """
+    Descobre o número padrão de processo (protocolo) salvo nas telas.
+    Heurística: checa chaves usuais em result/payload/extra.
+    """
+    def first_proto(d: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(d, dict):
+            return None
+        candidates = [
+            "protocolo", "processo", "numero_processo", "n_processo", "num_processo",
+            "process_number", "protocol", "protocol_number", "protocolo_alvo",
+            "processo_alvo", "protocolo_numero",
+        ]
+        for k in candidates:
+            v = d.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        # às vezes vem dentro de extra.target_id mas é um protocolo
+        v = d.get("target_id")
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        return None
+
+    return first_proto(result) or first_proto(payload) or first_proto(extra) or ""
+
+
+def _normalize_kind(kind: Optional[str]) -> Optional[str]:
+    if not kind:
+        return None
+    k = str(kind).strip().lower()
+    if k.startswith("automations/"):
+        k = k.split("/", 1)[1]
+    return k or None
+
+
 def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
     """
-    Enriquecer in-place: tenta preencher extra.assunto / extra.objeto / extra.filename
-    usando submissions.payload/result quando possível.
+    Enriquecer in-place de forma genérica:
+    - alvo: kind normalizado (dfd, ferias, ...)
+    - protocolo: número de processo armazenado
+    - filename/status
+    - URLs de ação (download/submission) quando (kind,sid) forem conhecidos
     """
     for it in rows:
         extra = it.get("extra") or {}
-        if extra.get("assunto"):
-            continue  # já está enriquecido
-
         sid = _sid_from_audit_row(it)
-        if not sid:
-            continue
+        sub = None
+        if sid:
+            try:
+                sub = db.get_submission(sid)
+            except Exception:
+                sub = None
 
-        try:
-            sub = db.get_submission(sid)
-        except Exception:
-            sub = None
+        payload = _to_obj(sub.get("payload")) if sub else {}
+        result = _to_obj(sub.get("result")) if sub else {}
+        extra_obj = extra if isinstance(extra, dict) else {}
 
-        if not sub:
-            continue
-
-        payload = _to_obj(sub.get("payload"))
-        result = _to_obj(sub.get("result"))
-
-        assunto = result.get("assunto") or _build_assunto_from_payload(payload) or ""
-        objeto = (payload.get("objeto") or "").strip()
-        filename = (
-            result.get("filename_pdf")
-            or result.get("filename_docx")
-            or result.get("filename")
-            or extra.get("filename")
-            or ""
+        # alvo (kind)
+        kind = (
+            it.get("target_kind")
+            or extra_obj.get("kind")
+            or (sub.get("kind") if sub else None)
         )
+        alvo = _normalize_kind(kind)
 
-        extra.update({"assunto": assunto})
-        if objeto and not extra.get("objeto"):
-            extra["objeto"] = objeto
-        if filename and not extra.get("filename"):
-            extra["filename"] = filename
+        # protocolo
+        protocolo = _guess_protocolo(payload, result, extra_obj)
 
-        it["extra"] = extra  # grava de volta
+        # filename e status
+        filename = it.get("filename") or extra_obj.get("filename") or _guess_filename(payload, result, extra_obj)
+        raw_action = it.get("action")
+        raw_status = (sub.get("status") if sub else None) or it.get("status")
+        status = _status_label(raw_action, raw_status)
+
+        # URLs de apoio
+        download_url = None
+        submission_url = None
+        if alvo and sid:
+            download_url = f"/api/automations/{alvo}/submissions/{sid}/download"
+            submission_url = f"/api/automations/{alvo}/submissions/{sid}"
+
+        it["alvo"] = alvo or ""
+        it["protocolo"] = protocolo or ""
+        it["filename"] = filename or ""
+        it["status"] = status or ""
+        it["download_url"] = download_url
+        it["submission_url"] = submission_url
+        it["extra"] = extra_obj
 
 
 # --------------------------
@@ -252,7 +355,7 @@ def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
 # --------------------------
 @router.get("/audits", response_model=Page[AuditOut])
 def list_audits_api(
-    kind: Optional[str] = Query(default="dfd"),
+    kind: Optional[str] = Query(default=None),
     username: Optional[str] = Query(default=None),
     action: Optional[str] = Query(default=None),
     since: Optional[datetime] = Query(default=None),
@@ -266,7 +369,7 @@ def list_audits_api(
     try:
         # Carrega eventos crus do DB (automation_audits)
         try:
-            raw = db.list_audits(kind=kind, limit=limit + offset)
+            raw = db.list_audits(kind=kind, limit=limit + offset) if kind is not None else db.list_audits(limit=limit + offset)
         except TypeError:
             # assinatura sem limit/kind
             raw = db.list_audits()
@@ -291,7 +394,6 @@ def list_audits_api(
             })
 
         # Filtros adicionais (username/action) + datas
-        # --- CHANGE: ainda em list_audits_api(), na função match()
         def match(it: Dict[str, Any]) -> bool:
             if username:
                 term = (username or "").strip().lower()
@@ -318,12 +420,11 @@ def list_audits_api(
                     return False
             if kind:
                 tk = it.get("target_kind")
-                if tk not in (kind, f"automations/{kind}", "dfd" if kind == "dfd" else kind):
-                    ek = (it.get("extra") or {}).get("kind")
-                    if ek != kind:
-                        return False
+                ek = (it.get("extra") or {}).get("kind") if isinstance(it.get("extra"), dict) else None
+                # aceita "automations/{kind}" e normalizado
+                if tk not in (kind, f"automations/{kind}") and _normalize_kind(ek) != _normalize_kind(kind):
+                    return False
             return True
-
 
         filtered = [it for it in items if match(it)]
         filtered = _filter_dates(filtered, since, until)
@@ -331,7 +432,7 @@ def list_audits_api(
         # paginação antes do enriquecimento para evitar N consultas desnecessárias
         sliced = filtered[offset: offset + limit]
 
-        # Enriquecer com dados da submission quando faltar assunto/objeto/filename
+        # Enriquecer com dados da submission (protocolo/alvo/filename/status/URLs)
         _enrich_with_submission(sliced)
 
         return {"count": len(filtered), "items": sliced}
@@ -344,7 +445,7 @@ def list_audits_api(
 
 @router.get("/audits.csv")
 def list_audits_csv(
-    kind: Optional[str] = Query(default="dfd"),
+    kind: Optional[str] = Query(default=None),
     username: Optional[str] = Query(default=None),
     action: Optional[str] = Query(default=None),
     since: Optional[datetime] = Query(default=None),
@@ -396,7 +497,7 @@ def list_audits_csv(
 # --------------------------
 @router.get("/submissions", response_model=Page[SubmissionOut])
 def list_submissions_api(
-    kind: Optional[str] = Query(default="dfd"),
+    kind: Optional[str] = Query(default=None),
     username: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     since: Optional[datetime] = Query(default=None),
@@ -405,7 +506,7 @@ def list_submissions_api(
     offset: int = Query(default=0, ge=0),
 ):
     """
-    Lista submissões (ex.: DFD) com filtros.
+    Lista submissões (genérico) com filtros.
     """
     try:
         # Usa o método admin (não exige actor_*), aplicando filtros server-side
@@ -482,7 +583,7 @@ def get_submission_api(sid: str):
 def submit_not_supported():
     raise HTTPException(
         status_code=409,
-        detail="controle é somente leitura; use a automação de origem (ex.: dfd) para submeter.",
+        detail="controle é somente leitura; use a automação de origem para submeter.",
     )
 
 
@@ -492,6 +593,6 @@ def download_not_supported(sid: str):
         status_code=409,
         detail=(
             "download deve ser feito na automação de origem "
-            "(ex.: /api/automations/dfd/submissions/{id}/download)."
+            "(ex.: /api/automations/{kind}/submissions/{id}/download)."
         ),
     )

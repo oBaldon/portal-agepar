@@ -67,7 +67,7 @@
       "displayName": "Painel de Controle (Auditoria)",
       "version": "1.0.0",
       "categoryId": "governanca",
-      "description": "Auditoria de ações dos servidores (foco atual: DFD).",
+      "description": "Auditoria de ações dos servidores.",
       "ui": { "type": "iframe", "url": "/api/automations/controle/ui" },
       "navigation": [
         { "label": "Painel de Controle", "path": "/controle", "icon": "Shield" }
