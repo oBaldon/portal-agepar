@@ -11,8 +11,8 @@
     { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck", "hidden": true },
     { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true },
     { "id": "ferias", "label": "Férias", "icon": "CalendarDays" },
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] },
-    { "id": "util", "label": "Utilidades", "icon": "Upload" }
+    { "id": "util", "label": "Utilidades", "icon": "Upload" },
+    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] }
   ],
 
   "blocks": [
