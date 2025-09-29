@@ -11,7 +11,8 @@
     { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck", "hidden": true },
     { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true },
     { "id": "ferias", "label": "Férias", "icon": "CalendarDays" },
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] }
+    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] },
+    { "id": "util", "label": "Utilidades", "icon": "Upload" }
   ],
 
   "blocks": [
@@ -175,6 +176,23 @@
       "tags": ["RH", "férias"],
       "requiredRoles": ["ferias"],
       "order": 20
+    },
+    {
+      "name": "fileshare",
+      "displayName": "Uploader temporário",
+      "version": "0.1.0",
+      "categoryId": "util",
+      "description": "Área comunitária para envio/compartilhamento temporário de arquivos (TTL 1 dia/semana/mês, opção de chave secreta).",
+      "ui": { "type": "iframe", "url": "/api/automations/fileshare/ui" },
+      "navigation": [
+        { "label": "Uploader temporário", "path": "/fileshare", "icon": "Upload" }
+      ],
+      "routes": [
+        { "path": "/fileshare", "kind": "iframe" }
+      ],
+      "tags": ["utilitário", "arquivos", "temporário"],
+      "order": 5
     }
+
   ]
 }

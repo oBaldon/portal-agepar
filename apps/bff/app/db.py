@@ -1,9 +1,11 @@
-# app/db.py — versão Postgres (unifica storage das automações)
+# app/db.py — versão Postgres (unifica storage das automações + fileshare)
 from __future__ import annotations
 import os
 import json
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
+from pathlib import Path
+from datetime import datetime, timezone
 
 import psycopg
 from psycopg.rows import dict_row
@@ -54,6 +56,22 @@ def init_db() -> None:
       meta       JSONB
     );
 
+    -- Tabela de arquivos temporários (fileshare)
+    CREATE TABLE IF NOT EXISTS fileshare_items (
+      id           TEXT PRIMARY KEY,
+      filename     TEXT NOT NULL,
+      size         BIGINT NOT NULL,
+      content_type TEXT,
+      path         TEXT NOT NULL,
+      owner_id     TEXT,
+      owner_name   TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at   TIMESTAMPTZ NOT NULL,
+      secret_hash  TEXT,
+      downloads    INTEGER NOT NULL DEFAULT 0,
+      deleted_at   TIMESTAMPTZ
+    );
+
     -- Índices básicos
     CREATE INDEX IF NOT EXISTS ix_submissions_created_at            ON submissions (created_at DESC);
     CREATE INDEX IF NOT EXISTS ix_submissions_kind_created          ON submissions (kind, created_at DESC);
@@ -67,6 +85,12 @@ def init_db() -> None:
       ON submissions (kind, actor_email, created_at DESC);
 
     CREATE INDEX IF NOT EXISTS ix_automation_audits_at ON automation_audits (at DESC);
+
+    -- Índices fileshare
+    CREATE INDEX IF NOT EXISTS ix_fileshare_created_at ON fileshare_items (created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_fileshare_expires_at ON fileshare_items (expires_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_fileshare_owner      ON fileshare_items (owner_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_fileshare_deleted    ON fileshare_items (deleted_at, expires_at);
 
     -- Trigger de atualização de updated_at
     CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
@@ -124,7 +148,10 @@ def _to_json_value(v: Any) -> Optional[Json]:
             return Json(v)
     return Json(v)
 
-# ----------------------------- API ----------------------------------
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+# ----------------------------- API submissions ----------------------
 def insert_submission(sub: Dict[str, Any]) -> None:
     sub = dict(sub)  # cópia defensiva
     # Garante ID quando não informado (coluna é NOT NULL e PRIMARY KEY)
@@ -255,6 +282,7 @@ def list_submissions_admin(
         rows = cur.fetchall() or []
         return [dict(r) for r in rows]
 
+# ----------------------------- auditoria ----------------------------
 def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any]) -> None:
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(
@@ -270,6 +298,14 @@ def add_audit(kind: str, action: str, actor: Dict[str, Any], meta: Dict[str, Any
                 _to_json_value(meta),
             ),
         )
+
+# alias para compatibilidade com chamadas db.audit_log(...)
+def audit_log(actor: Dict[str, Any], action: str, kind: str, target_id: Optional[str] = None, meta: Optional[Dict[str, Any]] = None) -> None:
+    m = dict(meta or {})
+    if target_id is not None:
+        # guardar target_id dentro de meta (o schema de audits não tem coluna dedicada)
+        m.setdefault("target_id", target_id)
+    add_audit(kind=kind, action=action, actor=actor, meta=m)
 
 def list_audits(kind: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
     params: List[Any] = []
@@ -306,3 +342,90 @@ def exists_submission_payload_value(kind: str, field: str, value: str) -> bool:
             (kind, field, value),
         )
         return cur.fetchone() is not None
+
+# ----------------------------- fileshare ----------------------------
+def fileshare_create(rec: Dict[str, Any]) -> None:
+    """
+    Cria registro para arquivo temporário (metadados). 'rec' deve conter:
+    id, filename, size, content_type?, path, owner_id?, owner_name?, created_at (ISO),
+    expires_at (ISO), secret_hash?, downloads (int), deleted_at?
+    """
+    q = """
+    INSERT INTO fileshare_items
+      (id, filename, size, content_type, path, owner_id, owner_name,
+       created_at, expires_at, secret_hash, downloads, deleted_at)
+    VALUES
+      (%(id)s, %(filename)s, %(size)s, %(content_type)s, %(path)s, %(owner_id)s, %(owner_name)s,
+       %(created_at)s, %(expires_at)s, %(secret_hash)s, %(downloads)s, %(deleted_at)s)
+    """
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(q, rec)
+
+def fileshare_get(item_id: str) -> Optional[Dict[str, Any]]:
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM fileshare_items WHERE id = %s LIMIT 1", (item_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+def fileshare_list(owner_id: Optional[str], q: Optional[str], limit: int, offset: int) -> List[Dict[str, Any]]:
+    """
+    Lista arquivos não deletados. Se owner_id for informado, filtra por dono.
+    Se q informado, filtra por filename ILIKE.
+    """
+    where = ["deleted_at IS NULL"]
+    params: List[Any] = []
+    if owner_id:
+        where.append("owner_id = %s")
+        params.append(owner_id)
+    if q:
+        where.append("filename ILIKE %s")
+        params.append(f"%{q}%")
+
+    sql = f"""
+        SELECT *
+        FROM fileshare_items
+        WHERE {' AND '.join(where)}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([limit, offset])
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall() or []
+        return [dict(r) for r in rows]
+
+def fileshare_inc_downloads(item_id: str) -> None:
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute("UPDATE fileshare_items SET downloads = downloads + 1 WHERE id = %s", (item_id,))
+
+def fileshare_soft_delete(item_id: str) -> None:
+    now = _utcnow()
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute("UPDATE fileshare_items SET deleted_at = %s WHERE id = %s AND deleted_at IS NULL", (now, item_id))
+
+def fileshare_cleanup_expired(limit: int = 200) -> int:
+    """
+    Marca como deletados e remove fisicamente arquivos expirados (best-effort).
+    Retorna quantidade afetada.
+    """
+    now = _utcnow()
+    with _pg() as conn, conn.cursor() as cur:
+        # seleciona candidatos
+        cur.execute(
+            "SELECT id, path FROM fileshare_items WHERE deleted_at IS NULL AND expires_at < %s LIMIT %s",
+            (now, limit),
+        )
+        rows = cur.fetchall() or []
+        count = 0
+        for r in rows:
+            # marca como deletado
+            cur.execute("UPDATE fileshare_items SET deleted_at = %s WHERE id = %s", (now, r["id"]))
+            # remove arquivo (best-effort)
+            try:
+                p = Path(r["path"])
+                if p.exists():
+                    p.unlink(missing_ok=True)
+            except Exception:
+                pass
+            count += 1
+        return count

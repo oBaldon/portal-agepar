@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Fileshare — Uploader temporário</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; }
+  * { box-sizing:border-box } html,body { margin:0; background:var(--bg); color:var(--fg); font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
+  .wrap { max-width: 960px; margin: 20px auto; padding: 0 16px; }
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  h1 { font-size:18px; margin:0 0 10px }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 6px; }
+  input, select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; background:#fff; }
+  .row { display:flex; gap:12px; }
+  .row > * { flex:1; }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 14px; cursor:pointer; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn[disabled] { opacity:.55; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; background:#fff; }
+  th, td { padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left; }
+  th { font-size:12px; color:#64748b; background:#f8fafc; }
+  .nowrap { white-space:nowrap }
+  .muted { color:#64748b; font-size:12px; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Uploader temporário (Fileshare)</h1>
+
+  <div class="card">
+    <form id="frm" enctype="multipart/form-data">
+      <label>Arquivo</label>
+      <input type="file" name="file" required />
+
+      <div class="row">
+        <div>
+          <label>Tempo de vida</label>
+          <select name="ttl">
+            <option value="1d">1 dia</option>
+            <option value="7d" selected>1 semana</option>
+            <option value="30d">1 mês</option>
+          </select>
+        </div>
+        <div>
+          <label>Chave secreta (opcional)</label>
+          <input name="secret" placeholder="Senha para baixar" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px" class="btn-row">
+        <button class="btn" type="submit">Enviar</button>
+        <button class="btn secondary" type="button" id="btnRefresh">Atualizar lista</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="row">
+      <div>
+        <label>Mostrar</label>
+        <select id="owner">
+          <option value="all" selected>Todos</option>
+          <option value="me">Meus</option>
+        </select>
+      </div>
+      <div>
+        <label>Busca</label>
+        <input id="q" placeholder="nome do arquivo..." />
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn" id="btnApply">Aplicar</button>
+      <span class="muted" id="status"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ARQUIVO</th>
+            <th class="nowrap">TAMANHO</th>
+            <th class="nowrap">EXPIRA</th>
+            <th class="nowrap">DONO</th>
+            <th class="nowrap">AÇÕES</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = sel => document.querySelector(sel);
+  const fmtSize = n => !n && n!==0 ? "—" : (n<1024? `${n} B` : n<1024**2? `${(n/1024).toFixed(1)} KB` : `${(n/1024**2).toFixed(1)} MB`);
+  const fmtDate = s => new Date(s).toLocaleString();
+
+  let currentUserId = null;
+  let isSuperuser = false;
+
+  async function getMe(){
+    try{
+      const r = await fetch("/api/me", { credentials:"include" });
+      if(!r.ok) return;
+      const me = await r.json();
+      currentUserId = me?.cpf || null;
+      isSuperuser = !!me?.is_superuser;
+    }catch(_){}
+  }
+
+  async function upload(ev){
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    const r = await fetch("/api/automations/fileshare/submit", { method:"POST", body: fd, credentials:"include" });
+    if (!r.ok){ alert("Falha no upload"); return; }
+    await load();
+    ev.target.reset();
+  }
+
+  async function load(){
+    const owner = $("#owner").value;
+    const q = $("#q").value.trim();
+    const url = `/api/automations/fileshare/items?owner=${encodeURIComponent(owner)}&limit=100${q?`&q=${encodeURIComponent(q)}`:""}`;
+    const r = await fetch(url, { credentials:"include" });
+    const data = await r.json();
+    $("#status").textContent = `${data.count} item(ns)`;
+    render(data.items || []);
+  }
+
+  function render(items){
+    const tb = $("#rows"); tb.innerHTML = "";
+    for(const it of items){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${it.filename}${it.has_secret?' 🔒':''}</td>
+        <td class="nowrap">${fmtSize(it.size)}</td>
+        <td class="nowrap">${fmtDate(it.expires_at)}</td>
+        <td class="nowrap">${it.owner_name || it.owner_id || "—"}</td>
+        <td class="nowrap"></td>
+      `;
+      const actions = document.createElement("div"); actions.className = "btn-row";
+
+      // Baixar (sempre visível; superuser baixa sem senha)
+      const btnDown = document.createElement("button");
+      btnDown.className="btn"; btnDown.type="button"; btnDown.textContent="Baixar";
+      btnDown.onclick = async ()=>{
+        const fd = new FormData();
+        if(it.has_secret && !isSuperuser){
+          const s = prompt("Informe a chave secreta para baixar:");
+          if(s===null) return;
+          fd.set("secret", s);
+        }
+        const r = await fetch(`/api/automations/fileshare/items/${it.id}/download`, { method:"POST", body: fd, credentials:"include" });
+        if(!r.ok){ alert("Não foi possível baixar (verifique a chave)"); return; }
+        const blob = await r.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = it.filename; a.click();
+        URL.revokeObjectURL(a.href);
+      };
+      actions.appendChild(btnDown);
+
+      const isOwner = currentUserId && it.owner_id && String(currentUserId) === String(it.owner_id);
+      const canOwnerActions = isOwner || isSuperuser;
+
+      // Link (apenas dono ou superuser)
+      if (canOwnerActions) {
+        const btnShare = document.createElement("button");
+        btnShare.className="btn secondary"; btnShare.type="button"; btnShare.textContent="Link";
+        btnShare.onclick = async ()=>{
+          const fd = new FormData();
+          const expires = prompt("Validade do link: 1d, 7d ou 30d", "7d") || "7d";
+          fd.set("expires", expires);
+          if (it.has_secret && !isSuperuser) {
+            const s = prompt("Informe a senha do arquivo para gerar o link:");
+            if (s === null || s.trim() === "") { alert("Senha é obrigatória para gerar link deste arquivo."); return; }
+            fd.set("secret", s.trim());
+          }
+          const r = await fetch(`/api/automations/fileshare/items/${it.id}/share`, { method:"POST", body: fd, credentials:"include" });
+          if(!r.ok){
+            const msg = await r.text().catch(()=> "");
+            alert("Falha ao gerar link: " + (msg || r.status));
+            return;
+          }
+          const data = await r.json();
+          await navigator.clipboard.writeText(location.origin + data.download_url);
+          alert("Link copiado para a área de transferência!");
+        };
+        actions.appendChild(btnShare);
+      }
+
+      // Excluir (apenas dono ou superuser)
+      if (canOwnerActions) {
+        const btnDel = document.createElement("button");
+        btnDel.className="btn secondary"; btnDel.type="button"; btnDel.textContent="Excluir";
+        btnDel.onclick = async ()=>{
+          if(!confirm("Excluir este arquivo?")) return;
+          const r = await fetch(`/api/automations/fileshare/items/${it.id}/delete`, { method:"POST", credentials:"include" });
+          if(!r.ok){ alert("Falha ao excluir"); return; }
+          load();
+        };
+        actions.appendChild(btnDel);
+      }
+
+      tr.querySelector("td:last-child").appendChild(actions);
+      tb.appendChild(tr);
+    }
+  }
+
+  $("#frm").addEventListener("submit", upload);
+  $("#btnRefresh").addEventListener("click", load);
+  $("#btnApply").addEventListener("click", load);
+
+  document.addEventListener("DOMContentLoaded", async ()=>{
+    $("#owner").value = "all";     // pré-seta para ver todos
+    await getMe();                 // pega cpf e is_superuser
+    await load();
+  });
+</script>
+</body>
+</html>

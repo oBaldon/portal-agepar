@@ -19,8 +19,9 @@ from app.db import init_db
 from app.automations.form2json import router as form2json_router
 from app.automations.dfd import router as dfd_router
 from app.automations.controle import router as controle_router
-from app.automations.controle_ferias import router as controle_ferias_router  # <-- NOVO
+from app.automations.controle_ferias import router as controle_ferias_router  # calendário de férias (aba do controle)
 from app.automations.accounts import router as accounts_router
+from app.automations.fileshare import router as fileshare_router              # uploader temporário
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
@@ -89,17 +90,18 @@ APP.add_middleware(
     session_cookie="portal_agepar_session",
 )
 
-# Routers
+# Routers básicos de infra/autenticação
 APP.include_router(snake_router)
 APP.include_router(auth_router)          # /api/auth/login (POST), /api/auth/logout (POST), /api/auth/register...
 APP.include_router(auth_sessions_router) # /api/auth/sessions[...]
+APP.include_router(fileshare_router)     # /api/automations/fileshare/...
 
 # ------------------------------------------------------------------------------
 # Startup
 # ------------------------------------------------------------------------------
 @APP.on_event("startup")
 def _startup() -> None:
-    # Inicializa o banco (Postgres) usado pelas automações (submissions/audits)
+    # Inicializa o banco (Postgres) usado pelas automações (submissions/audits/fileshare)
     init_db()
     logger.info("DB initialized (Postgres)")
     logger.info("DFD engine version: %s", DFD_VER)
@@ -173,7 +175,6 @@ if AUTH_LEGACY_MOCK:
             "is_superuser": bool(superuser),
         }
         request.session["user"] = user
-        # Não cria sessão no banco — uso apenas temporário em DEV.
         logger.info("[LEGACY_MOCK] Sessão criada para %s (roles=%s)", user["nome"], ",".join(user["roles"]))
         return user
 
@@ -249,6 +250,7 @@ def automations_index() -> Dict[str, Any]:
             {"kind": "dfd", "version": DFD_VER, "title": "DFD — Documento de Formalização da Demanda"},
             {"kind": "ferias", "version": FERIAS_VER, "title": "Férias — Requerimento + Substituição"},
             {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
+            {"kind": "fileshare", "version": "0.1.0", "title": "Área Comunitária — Arquivos Temporários"},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
         ]
     }
@@ -260,7 +262,7 @@ APP.include_router(form2json_router)
 APP.include_router(dfd_router)
 APP.include_router(ferias_router)
 APP.include_router(controle_router)
-APP.include_router(controle_ferias_router)  # <-- NOVO: calendário de férias
+APP.include_router(controle_ferias_router)  # calendário de férias (aba dentro do controle)
 APP.include_router(accounts_router)
 # (removido) APP.include_router(snake_router)  # já incluído acima
 
