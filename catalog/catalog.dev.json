@@ -70,8 +70,10 @@
       "description": "Auditoria de ações dos servidores.",
       "ui": { "type": "iframe", "url": "/api/automations/controle/ui" },
       "navigation": [
-        { "label": "Painel de Controle", "path": "/controle", "icon": "Shield" }
-      ],
+         { "label": "Painel (Auditoria)", "href": "/api/automations/controle/ui" }
+
+        ,{ "label": "Férias (Calendário)", "href": "/api/automations/controle/ferias/ui" }
+       ],
       "routes": [
         { "path": "/controle", "kind": "iframe" }
       ],

@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Painel de Controle — Férias (Calendário)</title>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
+  * { box-sizing:border-box }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif; }
+  .wrap { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+
+  /* Cabeçalho no mesmo formato do controle */
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+  .note { font-size:12px; color:var(--muted); }
+  .tabs { display:flex; gap:8px; }
+  .tab { display:inline-flex; align-items:center; padding:8px 12px; border-radius:999px; font-size:12px; border:1px solid #cbd5e1; color:#334155; background:#fff; text-decoration:none; }
+  .tab:hover { background:#f1f5f9; }
+  .tab.active { background:var(--pri); color:#fff; border-color:transparent; }
+
+  .grid { display:grid; grid-template-columns: 1fr 300px; gap:16px; }
+  @media (max-width: 1024px){ .grid { grid-template-columns: 1fr; } }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+
+  /* Filtros */
+  label { display:block; font-size:12px; color:#64748b; margin:8px 0 4px; }
+  input, select { width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; min-width:0; }
+  input[type="date"] { min-width:0; max-width:100%; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; min-width:0; }
+
+  .legend { display:flex; flex-direction:column; gap:6px; max-height:280px; overflow:auto; margin-top:8px; }
+  .legend-item { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; }
+  .dot { width:12px; height:12px; border-radius:50%; border:1px solid rgba(0,0,0,.15); }
+  .legend-btn { background:none; border:0; padding:6px 8px; border-radius:8px; cursor:pointer; text-align:left; flex:1; }
+  .legend-btn:hover { background:#f1f5f9; }
+  .legend-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; max-width:200px; }
+
+  .actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; padding:8px 10px; border-radius:10px; cursor:pointer; font-size:13px; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+
+  .pulse { animation: pulse 1.2s ease-out 1; box-shadow: 0 0 0 0 rgba(37, 99, 235, .7); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(37,99,235,.8); }
+    70% { box-shadow: 0 0 0 10px rgba(37,99,235,0); }
+    100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Painel de Controle — Férias</h1>
+    <nav class="tabs" aria-label="Navegação do Controle">
+      <a class="tab" href="/api/automations/controle/ui">Auditoria</a>
+      <a class="tab active" href="/api/automations/controle/ferias/ui" title="Calendário de férias">Férias (Calendário)</a>
+    </nav>
+  </div>
+  <span class="note">Somente leitura • Coordenadores/Admin</span>
+
+  <div class="grid" style="margin-top:10px">
+    <div class="card">
+      <div id="calendar"></div>
+    </div>
+    <div class="card" aria-labelledby="filtros">
+      <h2 id="filtros" style="font-size:16px; margin:0 0 6px">Filtros</h2>
+
+      <label>Servidor</label>
+      <input id="f-servidor" placeholder="Nome contém..." />
+
+      <div class="row">
+        <div>
+          <label>Desde</label>
+          <input id="f-since" type="date" />
+        </div>
+        <div>
+          <label>Até</label>
+          <input id="f-until" type="date" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>List (semana) — Critério</label>
+          <select id="list-criterion" title="Como a visão de lista semanal decide o que mostrar">
+            <option value="intersect" selected>Interseção (padrão)</option>
+            <option value="start">Começa na semana</option>
+          </select>
+        </div>
+        <div>
+          <label style="visibility:hidden">.</label>
+          <button id="btn-apply" class="btn" style="width:100%">Aplicar</button>
+        </div>
+      </div>
+
+      <!-- Linha apenas com LIMPAR -->
+      <div class="actions">
+        <button id="btn-clear" class="btn secondary">Limpar</button>
+      </div>
+
+      <!-- Linha abaixo com os dois botões de exportação, lado a lado -->
+      <div class="actions">
+        <a id="btn-csv" class="btn secondary" href="#" target="_blank" rel="noopener">Exportar CSV</a>
+        <a id="btn-ics" class="btn secondary" href="#" target="_blank" rel="noopener">Exportar ICS</a>
+      </div>
+
+      <div style="margin-top:10px">
+        <div class="note">Legenda (clique para avançar pelos períodos do servidor):</div>
+        <div id="legend" class="legend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // -------- utils de cor --------
+  const PALETTE = [
+    "#2563eb","#059669","#dc2626","#7c3aed","#ea580c","#16a34a","#d97706","#0ea5e9",
+    "#ef4444","#22c55e","#e11d48","#14b8a6","#9333ea","#f59e0b","#84cc16","#06b6d4",
+    "#fb7185","#10b981","#8b5cf6","#f97316","#3b82f6","#a3e635","#eab308","#64748b",
+    "#34d399","#60a5fa","#f43f5e","#38bdf8","#c084fc","#f87171","#2dd4bf","#4ade80",
+    "#facc15","#94a3b8","#22d3ee","#a78bfa"
+  ];
+  function hashCode(s){ let h=0; for(let i=0;i<s.length;i++){ h=((h<<5)-h)+s.charCodeAt(i); h|=0;} return Math.abs(h); }
+  function colorFor(key){ const k = (key || "anon").toLowerCase(); return PALETTE[hashCode(k)%PALETTE.length]; }
+
+  let calendar;
+  let highlightId = null;
+  const cycleIndexByServer = new Map(); // nome -> índice atual
+  let suppressAutoRefresh = false;
+
+  function buildQuery(){
+    const p = new URLSearchParams();
+    const s = document.getElementById("f-servidor").value.trim();
+    const since = document.getElementById("f-since").value;
+    const until = document.getElementById("f-until").value;
+    if(s) p.set("servidor", s);
+    if(since) p.set("since", since + "T00:00:00-03:00");
+    if(until) p.set("until", until + "T23:59:59-03:00");
+    p.set("limit","5000");
+    return p;
+  }
+
+  function buildExportHref(kind){
+    return `/api/automations/controle/ferias/events.${kind}?` + buildQuery().toString();
+  }
+
+  async function loadEvents(){
+    const url = `/api/automations/controle/ferias/events?` + buildQuery().toString();
+    const res = await fetch(url, { credentials: "include" });
+    if(!res.ok) throw new Error("Erro ao carregar eventos");
+    const data = await res.json();
+    return data.items || [];
+  }
+
+  function rebuildLegend(events){
+    const box = document.getElementById("legend");
+    box.innerHTML = "";
+
+    // agrupar por servidor
+    const byServer = new Map();
+    for(const ev of events){
+      const nm = ev.servidor || "—";
+      if(!byServer.has(nm)) byServer.set(nm, []);
+      byServer.get(nm).push(ev);
+    }
+
+    for(const [name, items] of byServer){
+      items.sort((a,b)=> new Date(a.start) - new Date(b.start));
+      const color = colorFor(items[0].colorKey || name);
+      const row = document.createElement("div");
+      row.className = "legend-item";
+
+      const left = document.createElement("div");
+      left.style.display = "flex";
+      left.style.alignItems = "center";
+      left.style.gap = "8px";
+      left.innerHTML = `<span class="dot" style="background:${color}"></span>`;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "legend-btn";
+      btn.title = "Clique repetidas vezes para avançar pelos períodos";
+      btn.innerHTML = `<span class="legend-name">${name}</span>`;
+      btn.addEventListener("click", ()=> jumpToNextCycle(name));
+
+      left.appendChild(btn);
+
+      const count = document.createElement("span");
+      count.className = "note";
+      count.textContent = `${items.length}`;
+
+      row.appendChild(left);
+      row.appendChild(count);
+      box.appendChild(row);
+
+      if (!cycleIndexByServer.has(name)) cycleIndexByServer.set(name, -1);
+    }
+  }
+
+  function fcEventsAdapter(events){
+    // FullCalendar usa end-exclusive → somar +1 dia ao fim.
+    const toDate = (s)=> new Date(s + "T00:00:00");
+    return events.map(ev => {
+      const end = new Date(toDate(ev.end).getTime() + 24*3600*1000);
+      const color = colorFor(ev.colorKey || ev.servidor);
+      const title = ev.servidor + (ev.setor ? ` — ${ev.setor}` : "");
+      return {
+        id: ev.id,
+        title,
+        start: ev.start,
+        end: end.toISOString().slice(0,10),
+        allDay: true,
+        display: "block",
+        backgroundColor: color,
+        borderColor: color,
+        textColor: "#fff",
+        extendedProps: { servidor: ev.servidor, status: ev.status || "", setor: ev.setor || "", obs: ev.obs || "" }
+      };
+    });
+  }
+
+  function filterStartsInsideVisibleRange(fcevents){
+    const start = calendar.view.currentStart; // Date
+    const end   = calendar.view.currentEnd;   // Date (exclusivo)
+    return fcevents.filter(ev => {
+      const evStart = new Date(ev.start + "T00:00:00");
+      return evStart >= start && evStart < end;
+    });
+  }
+
+  async function refresh(){
+    const events = await loadEvents();
+    let fc = fcEventsAdapter(events);
+
+    const crit = document.getElementById("list-criterion").value;
+    const isListWeek = calendar?.view?.type === "listWeek";
+    if (isListWeek && crit === "start") {
+      fc = filterStartsInsideVisibleRange(fc);
+    }
+
+    rebuildLegend(events);
+    calendar.removeAllEvents();
+    calendar.addEventSource(fc);
+
+    document.getElementById("btn-csv").href = buildExportHref("csv");
+    document.getElementById("btn-ics").href = buildExportHref("ics");
+  }
+
+  function jumpToNextCycle(serverName){
+    const events = calendar.getEvents().filter(e => e.extendedProps.servidor === serverName);
+    if(!events.length) return;
+    events.sort((a,b)=> new Date(a.startStr) - new Date(b.startStr));
+
+    const curr = cycleIndexByServer.has(serverName) ? cycleIndexByServer.get(serverName) : -1;
+    const nextIdx = (curr + 1) % events.length;
+    cycleIndexByServer.set(serverName, nextIdx);
+
+    const target = events[nextIdx];
+    highlightId = target.id;
+
+    suppressAutoRefresh = true;
+    calendar.gotoDate(target.startStr);
+
+    setTimeout(()=> {
+      const els = document.querySelectorAll(`[data-event-id="${CSS.escape(target.id)}"]`);
+      els.forEach(el => {
+        el.classList.add("pulse");
+        setTimeout(()=> el.classList.remove("pulse"), 1400);
+      });
+    }, 60);
+  }
+
+  document.getElementById("btn-apply").addEventListener("click", refresh);
+  document.getElementById("btn-clear").addEventListener("click", ()=>{
+    ["f-servidor","f-since","f-until"].forEach(id=> document.getElementById(id).value="");
+    document.getElementById("list-criterion").value="intersect";
+    refresh();
+  });
+
+  document.getElementById("list-criterion").addEventListener("change", ()=>{
+    if (calendar?.view?.type === "listWeek") refresh();
+  });
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const el = document.getElementById("calendar");
+    calendar = new FullCalendar.Calendar(el, {
+      initialView: "dayGridMonth",
+      headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,dayGridWeek,listWeek" },
+      locale: "pt-br",
+      height: "auto",
+      firstDay: 0,
+      expandRows: true,
+      dayMaxEventRows: true,
+      eventDisplay: "block",
+      datesSet: () => {
+        if (suppressAutoRefresh) { suppressAutoRefresh = false; return; }
+        const isListWeek = calendar?.view?.type === "listWeek";
+        if (isListWeek) refresh();
+      },
+      eventDidMount: (info)=>{
+        const { status, setor, obs } = info.event.extendedProps || {};
+        const el = info.el;
+        el.title = `${info.event.title}\n${status?`Status: ${status}\n`:''}${setor?`Setor: ${setor}\n`:''}${obs?`Obs: ${obs}`:''}`;
+        el.style.borderWidth = "1px";
+        el.style.boxShadow = "inset 0 -1px 0 rgba(0,0,0,.12)";
+        el.setAttribute("data-event-id", info.event.id);
+      },
+    });
+    calendar.render();
+    refresh().catch(console.error);
+  });
+</script>
+</body>
+</html>
