@@ -195,7 +195,7 @@
     },
     {
       "name": "whoisonline",
-     "displayName": "WhoisOnline (Superuser)",
+      "displayName": "Usuários Online (Superuser)",
       "version": "0.1.0",
       "categoryId": "governanca",
       "description": "Sessões ativas, idle, agentes e revogação — somente superuser.",
