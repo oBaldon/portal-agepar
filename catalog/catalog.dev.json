@@ -149,7 +149,7 @@
       "displayName": "Admin — Contas & Roles",
       "version": "1.0.0",
       "categoryId": "governanca",
-      "description": "Gerenciar usuários (criar, editar, excluir) e delegar roles.",
+      "description": "Gerenciar usuários (criar, editar, excluir) e delegar roles — somente superuser.",
       "ui": { "type": "iframe", "url": "/api/automations/accounts/ui" },
       "navigation": [
         { "label": "Admin — Contas & Roles", "path": "/admin/accounts", "icon": "Users" }
@@ -157,8 +157,8 @@
       "routes": [
         { "path": "/admin/accounts", "kind": "iframe" }
       ],
-      "tags": ["admin", "rbac", "usuários"],
-      "requiredRoles": ["admin"]
+      "tags": ["rbac", "superuser", "contas"],
+      "superuserOnly": true
     },
     {
       "name": "ferias",
@@ -195,13 +195,13 @@
     },
     {
       "name": "whoisonline",
-      "displayName": "Usuários Online (Superuser)",
+      "displayName": "Admin — Usuários Online",
       "version": "0.1.0",
       "categoryId": "governanca",
       "description": "Sessões ativas, idle, agentes e revogação — somente superuser.",
       "ui": { "type": "iframe", "url": "/api/automations/whoisonline/ui" },
       "navigation": [
-        { "label": "Quem está online", "path": "/admin/whoisonline", "icon": "Activity" }
+        { "label": "Admin — Usuários Online", "path": "/admin/whoisonline", "icon": "Activity" }
       ],
       "routes": [
         { "path": "/admin/whoisonline", "kind": "iframe" }
