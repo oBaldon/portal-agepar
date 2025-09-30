@@ -192,7 +192,23 @@
       ],
       "tags": ["utilitário", "arquivos", "temporário"],
       "order": 5
+    },
+    {
+      "name": "whoisonline",
+     "displayName": "WhoisOnline (Superuser)",
+      "version": "0.1.0",
+      "categoryId": "governanca",
+      "description": "Sessões ativas, idle, agentes e revogação — somente superuser.",
+      "ui": { "type": "iframe", "url": "/api/automations/whoisonline/ui" },
+      "navigation": [
+        { "label": "Quem está online", "path": "/admin/whoisonline", "icon": "Activity" }
+      ],
+      "routes": [
+        { "path": "/admin/whoisonline", "kind": "iframe" }
+      ],
+      "tags": ["governança", "superuser", "sessões", "monitoramento"],
+      "superuserOnly": true,
+      "order": 0
     }
-
   ]
 }

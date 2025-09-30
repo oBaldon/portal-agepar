@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Quem está online — Superuser</title>
+  <style>
+    :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; --ok:#16a34a; --warn:#b45309; --bad:#b91c1c; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
+    .wrap { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+
+    .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; margin-bottom:16px; }
+    .row { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .col { flex:1; min-width: 0; }
+
+    input, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+    .toolbar input { max-width: 320px; }
+    .toolbar select { max-width: 200px; }
+
+    .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 14px; cursor:pointer; transition:.16s ease; }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
+    .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+    .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+    .btn.secondary:hover { background:#f8fafc; }
+    .btn.small { padding:8px 10px; font-size:12px; }
+    .btn.danger { background:#dc2626; }
+    .btn[disabled] { opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    .status { font-size:13px; color: var(--muted); }
+    .note { font-size:12px; color:var(--muted); }
+    .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+    .chip  { display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#e2e8f0; color:#1f2937; margin:0 6px 4px 0; }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace }
+
+    .kpis { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px }
+    .kpi { border:1px solid #e2e8f0; border-radius:12px; padding:12px; background:#fff; }
+    .kpi h3 { margin:0; font-size:12px; color:var(--muted) }
+    .kpi div { font-size:22px; font-weight:700; }
+
+    .table-wrap { overflow-x: visible; border:1px solid #e2e8f0; border-radius:12px; }
+    table { width:100%; border-collapse: collapse; background:#fff; table-layout: fixed; }
+    th, td { padding:10px 12px; border-bottom:1px solid #eef2f7; vertical-align: top; text-align:left; }
+    thead th { font-size:12px; color:#64748b; background:#f8fafc; position:sticky; top:0; z-index:1; }
+    tbody tr:hover td { background:#fbfdff; }
+    .nowrap { white-space: nowrap; }
+    td.right { text-align:right; }
+
+    /* IP e Agente: sem cortes */
+    .ip-cell { white-space: normal; overflow-wrap: anywhere; word-break: break-word; font-variant-numeric: tabular-nums; }
+    .ua { white-space: normal; overflow-wrap: anywhere; word-break: break-word; display:block; }
+
+    /* ===== Full-bleed para a caixa de usuários ===== */
+    .fullbleed {
+      width: 100vw;
+      position: relative;
+      left: 50%;
+      right: 50%;
+      margin-left: -50vw;
+      margin-right: -50vw;
+      border-radius: 0;
+      border-left: 0;
+      border-right: 0;
+    }
+    .wide-wrap { max-width: 1600px; margin: 0 auto; padding: 0 16px; }
+
+    /* Responsivo (ajustes leves nas porcentagens) */
+    @media (max-width: 1200px){
+      .wide-wrap { max-width: 1200px; }
+    }
+    @media (max-width: 1024px){
+      .wide-wrap { max-width: 1024px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Quem está online <span class="note">(somente superuser)</span></h1>
+
+    <!-- Toolbar / filtros -->
+    <div class="card">
+      <div class="row toolbar" style="gap:8px">
+        <div class="col" style="flex:1">
+          <input id="q" placeholder="Filtrar por nome, e-mail, CPF, IP, agente…" aria-label="Filtro"/>
+        </div>
+        <div class="col" style="flex:0 0 220px">
+          <select id="refresh" aria-label="Auto-atualização">
+            <option value="0">Atualização manual</option>
+            <option value="5">Atualizar a cada 5s</option>
+            <option value="10">Atualizar a cada 10s</option>
+            <option value="30" selected>Atualizar a cada 30s</option>
+          </select>
+        </div>
+        <div class="col" style="flex:0 0 auto; display:flex; gap:8px">
+          <button class="btn secondary" id="btn-clear">Limpar</button>
+          <button class="btn" id="btn-refresh">Atualizar</button>
+        </div>
+      </div>
+      <div class="kpis" id="kpis" style="margin-top:8px"></div>
+      <div class="status" id="msg" aria-live="polite" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- Caixa de visualização de usuários em FULL-BLEED -->
+  <div class="card fullbleed">
+    <div class="wide-wrap">
+      <div class="table-wrap">
+        <table id="tbl" aria-label="Sessões ativas">
+          <colgroup>
+            <!-- Larguras em % somando ~100% para evitar scroll horizontal -->
+            <col style="width:29%"><!-- Usuário -->
+            <col style="width:13%"><!-- Login/Idle -->
+            <col style="width:13%"><!-- Expira -->
+            <col style="width:10%"><!-- IP -->
+            <col style="width:27%"><!-- Agente -->
+            <col style="width:8%"><!-- Ações -->
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Usuário</th>
+              <th class="nowrap">Login / Idle</th>
+              <th class="nowrap">Expira</th>
+              <th class="nowrap">IP</th>
+              <th>Agente</th>
+              <th class="right nowrap">Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+const apiBase = "/api/automations/whoisonline";
+let timer = null;
+
+function setMsg(t){ const el = document.getElementById('msg'); if (el) el.textContent = t || ''; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtDateTime2Lines(iso){
+  if(!iso) return "-";
+  const d = new Date(iso);
+  if(!isNaN(d)){
+    const dd = pad2(d.getDate()), mm = pad2(d.getMonth()+1), yyyy = d.getFullYear();
+    const hh = pad2(d.getHours()), mi = pad2(d.getMinutes()), ss = pad2(d.getSeconds());
+    return `${dd}/${mm}/${yyyy}<br>${hh}:${mi}:${ss}`;
+  }
+  const s = String(iso);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/);
+  return m ? `${m[1]}<br>${m[2]}` : esc(s);
+}
+function fmtAgent2Lines(ua){
+  if(!ua) return "-";
+  const s = String(ua).trim();
+  let main = "", rest = "";
+  const m = s.match(/^([^\s\(\);]+(?:\/[^\s\(\);]+)?)/);
+  if (m) { main = m[1]; rest = s.slice(m[1].length).trim(); }
+  else {
+    const p = s.indexOf(" ");
+    if (p > 0) { main = s.slice(0,p); rest = s.slice(p+1).trim(); }
+    else { main = s; rest = ""; }
+  }
+  return `${esc(main)}${rest ? "<br>"+esc(rest) : ""}`;
+}
+function fmtAgo(iso) {
+  if (!iso) return "-";
+  const dt = new Date(iso), now = new Date();
+  const sec = Math.max(0, Math.floor((now - dt)/1000));
+  if (sec < 60) return sec + "s";
+  const m = Math.floor(sec/60), s = sec%60;
+  if (m < 60) return m + "m " + s + "s";
+  const h = Math.floor(m/60), mm = m%60;
+  return h + "h " + mm + "m";
+}
+function fmtLeft(iso) {
+  if (!iso) return "-";
+  const dt = new Date(iso), now = new Date();
+  const sec = Math.max(0, Math.floor((dt - now)/1000));
+  if (sec <= 0) return "expirada";
+  if (sec < 60) return sec + "s";
+  const m = Math.floor(sec/60), s = sec%60;
+  if (m < 60) return m + "m " + s + "s";
+  const h = Math.floor(m/60), mm = m%60;
+  return h + "h " + mm + "m";
+}
+function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+async function fetchJSON(path) {
+  const r = await fetch(path, { credentials: "include" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return await r.json();
+}
+
+async function refresh() {
+  setMsg('Carregando…');
+  const q = document.getElementById("q").value.trim();
+  const qs = q ? ("?q=" + encodeURIComponent(q)) : "";
+  try{
+    const [stats, online] = await Promise.all([
+      fetchJSON(apiBase + "/stats"),
+      fetchJSON(apiBase + "/online" + qs)
+    ]);
+    // KPIs
+    const k = document.getElementById("kpis");
+    k.innerHTML = `
+      <div class="kpi"><h3>Sessões ativas</h3><div>${stats.sessions}</div></div>
+      <div class="kpi"><h3>Usuários online</h3><div>${stats.users}</div></div>
+      <div class="kpi"><h3>Primeiro login</h3><div>${esc(stats.window?.oldest_login || "-")}</div></div>
+      <div class="kpi"><h3>Último visto</h3><div>${esc(stats.window?.latest_seen || "-")}</div></div>
+    `;
+
+    // Tabela
+    const tb = document.querySelector("#tbl tbody");
+    tb.innerHTML = "";
+    if (!online || online.length === 0){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="6" class="note">Nenhuma sessão ativa encontrada.</td>`;
+      tb.appendChild(tr);
+    } else {
+      for (const s of online) {
+        const roles = (s.roles || []).map(r => `<span class="chip">${esc(r)}</span>`).join("");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <div><span class="badge">Usuário</span> <strong>${esc(s.nome || "(sem nome)")}</strong> ${s.is_superuser ? '<span class="chip">superuser</span>' : ''}</div>
+            <div class="note">${esc(s.email || "-")} · CPF: ${esc(s.cpf || "-")}</div>
+            <div class="mono note">sessão ${esc(s.session_id.slice(0,8))}…</div>
+            <div style="margin-top:4px">${roles}</div>
+          </td>
+          <td class="nowrap">
+            <div>${fmtDateTime2Lines(s.created_at)}</div>
+            <div class="note" style="margin-top:4px">idle ${fmtAgo(s.last_seen_at)}</div>
+          </td>
+          <td class="nowrap">
+            <div>${fmtDateTime2Lines(s.expires_at)}</div>
+            <div class="note" style="margin-top:4px">restam ${fmtLeft(s.expires_at)}</div>
+          </td>
+          <td class="mono ip-cell" title="${esc(s.ip || "-")}">${esc(s.ip || "-")}</td>
+          <td class="ua note" title="${esc(s.user_agent || "-")}">${fmtAgent2Lines(s.user_agent)}</td>
+          <td class="right">
+            <button class="btn small danger" data-revoke="${esc(s.session_id)}">Revogar</button>
+          </td>
+        `;
+        tb.appendChild(tr);
+      }
+    }
+    setMsg('');
+  }catch(e){
+    setMsg('Falha ao carregar dados.');
+  }
+}
+
+async function revoke(sessionId) {
+  const ok = confirm("Revogar sessão " + sessionId.slice(0,8) + "…?");
+  if (!ok) return;
+  const r = await fetch(apiBase + "/sessions/" + encodeURIComponent(sessionId) + "/revoke", {
+    method: "POST", credentials: "include"
+  });
+  if (r.status === 204) await refresh();
+  else alert("Falha ao revogar (HTTP " + r.status + ")");
+}
+
+document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-revoke]");
+  if (btn) revoke(btn.getAttribute("data-revoke"));
+});
+document.getElementById("btn-refresh").addEventListener("click", refresh);
+document.getElementById("refresh").addEventListener("change", (ev) => {
+  const v = parseInt(ev.target.value, 10);
+  if (timer) { clearInterval(timer); timer = null; }
+  if (v > 0) { timer = setInterval(refresh, v*1000); }
+});
+document.getElementById("q").addEventListener("keydown", (e) => { if (e.key === "Enter") refresh(); });
+document.getElementById("btn-clear").addEventListener("click", () => {
+  const q = document.getElementById("q");
+  if (q.value) q.value = "";
+  refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>

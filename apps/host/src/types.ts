@@ -82,6 +82,8 @@ export type Block = {
    * A checagem é responsabilidade da UI (helpers abaixo podem ajudar).
    */
   requiredRoles?: string[];
+  /** Se true, apenas superusers visualizam (admin NÃO basta). */
+  superuserOnly?: boolean;
 };
 
 /** Catálogo entregue pelo BFF e consumido pelo host. */
@@ -190,6 +192,10 @@ export function groupBlocksByCategory(
  */
 export function userCanSeeBlock(user: User | null, block: Block): boolean {
   if (block.hidden) return false;
+  // Regra prioritária: somente superuser
+  if (block.superuserOnly) {
+    return !!(user && user.is_superuser === true);
+  }
 
   const required = block.requiredRoles ?? [];
   if (required.length === 0) return true;

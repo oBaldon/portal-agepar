@@ -1,4 +1,5 @@
 import type { Catalog, Category, Block, User } from "@/types";
+import { userCanSeeBlock } from "@/types";
 
 export async function loadCatalog(): Promise<Catalog> {
   const url = import.meta.env.VITE_CATALOG_URL || "/catalog/dev";
@@ -18,14 +19,8 @@ export const anyRole = (userRoles: string[] = [], required?: string[]): boolean 
 
 /** Blocos visíveis ao usuário (RBAC + hidden), preservando a ordem declarada no catálogo */
 export const visibleBlocks = (catalog: Catalog, user?: User): Block[] => {
-  const roles = user?.roles ?? [];
   const blocks = catalog?.blocks ?? [];
-  return blocks.filter((b) => {
-    const hidden = (b as any).hidden as boolean | undefined;
-    if (hidden) return false;
-    if (!anyRole(roles, b.requiredRoles)) return false;
-    return true;
-  });
+  return blocks.filter((b) => userCanSeeBlock(user ?? null, b));
 };
 
 /** Categorias visíveis: não-hidden, RBAC ok e com pelo menos 1 bloco visível dentro */
