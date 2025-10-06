@@ -178,6 +178,22 @@
       "order": 20
     },
     {
+      "name": "support",
+      "displayName": "Suporte & Feedback",
+      "version": "1.0.0",
+      "categoryId": "util",
+      "description": "Relate bugs e melhorias (módulo impactado, gravidade, passos, anexos).",
+      "ui": { "type": "iframe", "url": "/api/automations/support/ui" },
+      "navigation": [
+        { "label": "Suporte & Feedback", "path": "/support", "icon": "LifeBuoy" }
+      ],
+      "routes": [
+        { "path": "/support", "kind": "iframe" }
+      ],
+      "tags": ["suporte", "feedback", "qualidade"],
+      "order": 2
+    },
+    {
       "name": "fileshare",
       "displayName": "Uploader temporário",
       "version": "0.1.0",

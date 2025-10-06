@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Suporte & Feedback — Portal AGEPAR</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --ok:#16a34a; --err:#dc2626; }
+  * { box-sizing:border-box }
+  html,body { margin:0; background:var(--bg); color:var(--fg); font:14px system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
+  .wrap { max-width: 960px; margin: 20px auto; padding: 0 16px; }
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  h1 { font-size:18px; margin:0 0 10px }
+  p.help { color:var(--muted); margin: 6px 0 16px }
+  label { display:block; font-size:12px; color:var(--muted); margin: 10px 0 6px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; background:#fff; }
+  textarea { min-height: 110px; resize: vertical; }
+  .row { display:flex; gap:12px; }
+  .row > * { flex:1; }
+  button { appearance:none; border:none; background:var(--pri); color:#fff; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer; }
+  button[disabled] { opacity:.7; cursor:progress; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
+  .pill { display:inline-block; background:#eef2ff; border:1px solid #e2e8f0; padding:4px 8px; border-radius:999px; font-size:12px; }
+  .counter { font-size:12px; color:var(--muted); float:right; margin-top:4px; }
+  .invalid { border-color: var(--err) !important; outline-color: var(--err) !important; }
+  .checkline { display:flex; align-items:center; gap:8px; margin-top:10px; user-select:none; cursor:pointer; }
+  .checkline input[type="checkbox"] { width:16px; height:16px; accent-color: var(--pri); margin:0; }
+  @media (max-width: 640px) { .row { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Suporte & Feedback</h1>
+  <p class="help">Relate problemas ou melhorias. Descreva o módulo impactado, a gravidade no processo e como reproduzir.</p>
+
+  <div class="card">
+    <form id="frm" novalidate>
+      <div class="row">
+        <div>
+          <label for="module">Módulo/Bloco</label>
+          <select id="module" name="module" required>
+            {% for m in modules %}
+            <option value="{{m.name}}">{{m.displayName}} ({{m.name}})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="severity">Gravidade (impacto no processo)</label>
+          <select id="severity" name="severity" required>
+            {% for s in severities %}
+            <option value="{{s.id}}">{{s.label}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <label for="summary">Resumo</label>
+      <input id="summary" type="text" name="summary" placeholder="Ex.: Erro ao gerar PDF do DFD" required minlength="8" />
+      <div class="counter" data-for="summary">0/8</div>
+
+      <label for="description">Descrição detalhada</label>
+      <textarea id="description" name="description" placeholder="O que aconteceu? Onde? Quando? Inclua mensagens de erro." required minlength="10"></textarea>
+      <div class="counter" data-for="description">0/10</div>
+
+      <div class="row">
+        <div>
+          <label for="reproducibility">Reprodutibilidade</label>
+          <select id="reproducibility" name="reproducibility">
+            {% for r in repro %}
+            <option value="{{r.id}}">{{r.label}}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="environment">Ambiente</label>
+          <input id="environment" type="text" name="environment" placeholder="Navegador/SO/dispositivo/VPN" />
+        </div>
+      </div>
+
+      <label for="steps">Passos para reproduzir</label>
+      <textarea id="steps" name="steps_to_reproduce" placeholder="1) ... 2) ... 3) ..."></textarea>
+
+      <div class="row">
+        <div>
+          <label for="expected_result">Esperado</label>
+          <input id="expected_result" type="text" name="expected_result" placeholder="Ex.: PDF gerado com sucesso" />
+        </div>
+        <div>
+          <label for="actual_result">Obtido</label>
+          <input id="actual_result" type="text" name="actual_result" placeholder="Ex.: HTTP 500 ao gerar" />
+        </div>
+      </div>
+
+      <label for="attachments">Links/Anexos (opcional)</label>
+      <input id="attachments" type="text" name="attachments" placeholder="Cole links (Fileshare, etc.), separados por espaço" />
+
+      <div class="row">
+        <div>
+          <label for="contact_email">E-mail para contato (opcional)</label>
+          <input id="contact_email" type="email" name="contact_email" placeholder="nome@agepar.pr.gov.br" />
+        </div>
+        <div>
+          <label for="contact_phone">Telefone/Ramal</label>
+          <input id="contact_phone" type="text" name="contact_phone" placeholder="(41) 3333-3333 / Ramal 1234" />
+        </div>
+      </div>
+
+      <label class="checkline" for="consent_contact">
+        <input id="consent_contact" type="checkbox" name="consent_contact" checked />
+        <span>Aceito ser contatado para esclarecimentos</span>
+      </label>
+
+      <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
+        <button id="btnSubmit" type="submit">Enviar relato</button>
+        <span id="msg" class="muted" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+
+  <p class="help">Dicas: inclua <span class="pill">passos</span>, <span class="pill">resultado esperado/obtido</span>, <span class="pill">capturas de tela</span> e o <span class="pill">módulo</span>.</p>
+</div>
+
+<script>
+(function(){
+  const $ = (s,el=document)=>el.querySelector(s);
+  const frm = $("#frm");
+  const msg = $("#msg");
+  const btn = $("#btnSubmit");
+  const summaryEl = frm.elements["summary"];
+  const descriptionEl = frm.elements["description"];
+
+  function refreshCounter(el, min) {
+    const len = (el.value || "").trim().length;
+    const c = document.querySelector(`.counter[data-for="${el.name}"]`);
+    if (c) c.textContent = `${len}/${min}`;
+  }
+  function validateLive() {
+    refreshCounter(summaryEl, 8);
+    refreshCounter(descriptionEl, 10);
+  }
+  summaryEl.addEventListener("input", validateLive);
+  descriptionEl.addEventListener("input", validateLive);
+  document.addEventListener("DOMContentLoaded", validateLive);
+
+  frm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // Validação HTML5 rápida antes do fetch
+    const summaryOk = (summaryEl.value || "").trim().length >= 8;
+    const descOk = (descriptionEl.value || "").trim().length >= 10;
+    validateLive();
+    if (!summaryOk || !descOk) {
+      msg.textContent = "Preencha os campos obrigatórios (Resumo ≥ 8, Descrição ≥ 10).";
+      msg.className = "err";
+      return;
+    }
+
+    msg.textContent = "Enviando…";
+    msg.className = "muted";
+    btn.disabled = true;
+    frm.setAttribute("aria-busy", "true");
+
+    const fd = new FormData(frm);
+    // Transformar attachments em array
+    const attachments = (fd.get("attachments")||"").toString().split(/[\s,]+/).filter(Boolean);
+    const body = {
+      module: fd.get("module"),
+      summary: (fd.get("summary")||"").toString().trim(),
+      description: (fd.get("description")||"").toString().trim(),
+      severity: fd.get("severity"),
+      reproducibility: fd.get("reproducibility"),
+      steps_to_reproduce: fd.get("steps_to_reproduce"),
+      expected_result: fd.get("expected_result"),
+      actual_result: fd.get("actual_result"),
+      environment: fd.get("environment"),
+      attachments,
+      contact_email: fd.get("contact_email") || null,
+      contact_phone: fd.get("contact_phone") || null,
+      consent_contact: !!fd.get("consent_contact"),
+    };
+
+    try {
+      const res = await fetch("/api/automations/support/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        // Mostra erros do FastAPI (422) de forma amigável
+        let detail = "";
+        try {
+          const err = await res.json();
+          if (Array.isArray(err?.detail)) {
+            detail = err.detail.map(e => {
+              const path = Array.isArray(e.loc) ? e.loc.slice(1).join(".") : "";
+              return `${path}: ${e.msg}`;
+            }).join(" | ");
+          } else if (err?.message) {
+            detail = err.message;
+          }
+        } catch(_) {}
+        throw new Error(detail || `Falha no envio (HTTP ${res.status})`);
+      }
+
+      const out = await res.json();
+      msg.textContent = "Relato recebido! ID: " + out.id;
+      msg.className = "ok";
+      frm.reset();
+      validateLive();
+    } catch (e) {
+      console.error(e);
+      msg.textContent = "Erro: " + (e.message || e);
+      msg.className = "err";
+    } finally {
+      btn.disabled = false;
+      frm.removeAttribute("aria-busy");
+    }
+  });
+})();
+</script>
+</body>
+</html>

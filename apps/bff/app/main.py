@@ -23,6 +23,7 @@ from app.automations.controle_ferias import router as controle_ferias_router  # 
 from app.automations.accounts import router as accounts_router
 from app.automations.fileshare import router as fileshare_router
 from app.automations.whoisonline import router as whoisonline_router
+from app.automations.support import router as support_router
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
@@ -252,6 +253,7 @@ def automations_index() -> Dict[str, Any]:
             {"kind": "ferias", "version": FERIAS_VER, "title": "Férias — Requerimento + Substituição"},
             {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
             {"kind": "fileshare", "version": "0.1.0", "title": "Área Comunitária — Arquivos Temporários"},
+            {"kind": "support", "version": "1.0.0", "title": "Suporte & Feedback"},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
             {"kind": "whoisonline", "version": "0.1.0", "title": "Quem está online (Superuser)"},
         ]
@@ -265,6 +267,7 @@ APP.include_router(dfd_router)
 APP.include_router(ferias_router)
 APP.include_router(controle_router)
 APP.include_router(controle_ferias_router)  # calendário de férias (aba dentro do controle)
+APP.include_router(support_router)
 APP.include_router(accounts_router)
 APP.include_router(whoisonline_router)
 # (removido) APP.include_router(snake_router)  # já incluído acima
