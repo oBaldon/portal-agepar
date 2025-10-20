@@ -12,7 +12,7 @@
   .wrap { max-width: 1080px; margin: 24px auto; padding: 0 16px; }
 
   h1 { font-size: 20px; margin: 0 0 12px; }
-  h2 { font-size: 16px; margin: 0 0 8px; }
+  h2 { font-size: 16px; margin: 0 0 8px; display:flex; align-items:center; gap:8px; }
 
   .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
   .muted { color: var(--muted); }
@@ -37,12 +37,15 @@
   .btn.danger { background:#b91c1c; }
   .btn.link { background:transparent; color:#1f2937; border:1px solid #e2e8f0; }
   .btn.icon { display:inline-flex; align-items:center; gap:6px; }
+  .btn[disabled] { opacity:.6; cursor:not-allowed; box-shadow:none; transform:none; }
 
   .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
   .toolbar .search { flex:1; }
 
   .badge { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:2px 6px; border-radius:999px; background:#eef2ff; color:#1e3a8a; margin:2px 6px 2px 0; border:1px solid #e2e8f0; }
   .badge.super { background:#fde68a; color:#7c2d12; border-color:#fcd34d; }
+  .badge.legacy { background:#fee2e2; color:#7f1d1d; border-color:#fecaca; }
+
   .pill { display:inline-block; background:#eef2ff; color:#1e3a8a; border:1px solid #e2e8f0; padding:2px 8px; border-radius:999px; font-size:12px; margin:2px 6px 2px 0; }
   .pill.env { background:#f1f5f9; color:#334155; border-style:dashed; }
   .legend { font-size:12px; color:#64748b; margin:6px 0 2px; }
@@ -62,6 +65,9 @@
   .inline-help .tip { position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px; background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px; box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none; opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
   .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
 
+  .banner { margin:10px 0 12px; padding:10px 12px; border-radius:12px; border:1px solid; font-size:14px; }
+  .banner.warn { background:#fff7ed; color:#7c2d12; border-color:#fed7aa; }
+
   @media (max-width: 900px){
     .row { flex-direction: column; }
   }
@@ -74,10 +80,10 @@
     <span class="muted" id="status" role="status" aria-live="polite"></span>
   </div>
 
-  <!-- 1) Criar usuário (acima) -->
-  <div class="card" aria-labelledby="create-title">
-    <h2 id="create-title">Criar usuário</h2>
-
+  <!-- 1) Criar usuário — CARD CONDICIONAL (só aparece se legacy estiver habilitado) -->
+  <div id="create_card" class="card" aria-labelledby="create-title" style="display:none">
+    <h2 id="create-title">Criar usuário <span class="badge legacy">LEGADO</span></h2>
+    <div id="legacy_banner" class="banner warn" role="status" aria-live="polite"></div>
     <div id="alerts"></div>
 
     <div class="row">
@@ -119,23 +125,24 @@
     <input id="cu_roles" placeholder="admin, automations.dfd" autocomplete="off"/>
 
     <div class="btn-row" style="margin-top:12px">
-      <button class="btn" onclick="createUser()">Criar conta</button>
+      <button id="btn_create" class="btn" onclick="createUser()">Criar conta</button>
       <span id="cu_msg" class="muted" aria-live="polite"></span>
     </div>
+  </div>
 
-    <hr class="hr"/>
-
-    <h2 style="margin-top:0">Roles do sistema</h2>
+  <!-- 1b) Roles do sistema — CARD SEMPRE VISÍVEL -->
+  <div class="card" style="margin-top:16px">
+    <h2>Roles do sistema</h2>
     <div class="row" aria-label="Criar novo role">
       <input class="col" id="role_name" placeholder="nome do role ex.: automations.dfd" aria-label="Nome do role"/>
       <input class="col" id="role_desc" placeholder="descrição (opcional)" aria-label="Descrição do role"/>
       <button class="btn secondary" onclick="createRole()">Criar role</button>
     </div>
     <p class="muted" style="margin-top:8px">Existentes:
-    <span class="inline-help">
-          <button type="button" class="help" aria-label="Ajuda sobre roles do sistema">?</button>
-          <span class="tip">O role <b>admin</b> é obrigatório para superusuários e não pode ser removido. Outros roles podem ser excluídos, mas os vínculos com usuários serão apagados.</span>
-        </span>
+      <span class="inline-help">
+        <button type="button" class="help" aria-label="Ajuda sobre roles do sistema">?</button>
+        <span class="tip">O role <b>admin</b> é obrigatório para superusuários e não pode ser removido. Outros roles podem ser excluídos, mas os vínculos com usuários serão apagados.</span>
+      </span>
     </p>
     <div id="roles_list" class="btn-row" aria-live="polite"></div>
 
@@ -160,21 +167,21 @@
       </div>
     </div>
     <div class="table-wrap">
-    <table aria-label="Usuários">
-      <thead>
-        <tr>
-          <th>Nome</th><th>Email</th><th>CPF</th><th>Flags</th>
-          <th>Roles
-            <span class="inline-help">
-              <button type="button" class="help" aria-label="Ajuda sobre roles na lista">?</button>
-              <span class="tip">Mostramos as <b>Atribuídas (BD)</b> e as <b>Herdadas (ambiente)</b>. As herdadas não são editáveis aqui.</span>
-            </span>
-          </th>
-          <th style="width:280px">Ações</th>
-        </tr>
-      </thead>
-      <tbody id="users"></tbody>
-    </table>
+      <table aria-label="Usuários">
+        <thead>
+          <tr>
+            <th>Nome</th><th>Email</th><th>CPF</th><th>Flags</th>
+            <th>Roles
+              <span class="inline-help">
+                <button type="button" class="help" aria-label="Ajuda sobre roles na lista">?</button>
+                <span class="tip">Mostramos as <b>Atribuídas (BD)</b> e as <b>Herdadas (ambiente)</b>. As herdadas não são editáveis aqui.</span>
+              </span>
+            </th>
+            <th style="width:280px">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="users"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -185,6 +192,7 @@
   // -------------------------
   function showAlert(kind, text){
     const el = document.getElementById('alerts');
+    if(!el) return;
     const div = document.createElement('div');
     const base = "margin:8px 0; border-radius:10px; padding:8px 10px; font-size:14px; border:1px solid;";
     const byKind = kind==='ok'
@@ -196,42 +204,70 @@
     el.appendChild(div);
     setTimeout(()=>div.remove(), 4000);
   }
-  function setStatus(text){ document.getElementById('status').textContent = text || ''; }
+  function setStatus(text){ const s=document.getElementById('status'); if(s) s.textContent = text || ''; }
   function togglePwd(){
     const input = document.getElementById('cu_pwd');
+    if(!input) return;
     input.type = input.type === 'password' ? 'text' : 'password';
   }
 
   function rolePill(name){ const span=document.createElement('span'); span.className='pill'; span.textContent=name; return span; }
   function rolePillEnv(name){ const span=document.createElement('span'); span.className='pill env'; span.textContent=name; return span; }
-  // Config (roles herdadas do ambiente)
-  let ACC_CFG = { default_roles: [] };
+
+  // Config (roles herdadas do ambiente + legado criação)
+  let ACC_CFG = { default_roles: [], legacy: { create_user: { enabled: false, since: '' } } };
+
+  function applyLegacyUI(){
+    const enabled = !!(ACC_CFG.legacy && ACC_CFG.legacy.create_user && ACC_CFG.legacy.create_user.enabled);
+    const since = (ACC_CFG.legacy && ACC_CFG.legacy.create_user && ACC_CFG.legacy.create_user.since) || '';
+    const card = document.getElementById('create_card');
+    const banner = document.getElementById('legacy_banner');
+    if(!card) return;
+
+    if(enabled){
+      card.style.display = 'block';
+      if(banner){ banner.textContent = `Aviso: a criação de contas é um recurso LEGADO e será removida. Utilize preferencialmente o SSO/OIDC. ${since ? 'Desde: '+since : ''}`; }
+    } else {
+      // Mantém o card completamente oculto quando desabilitado
+      card.style.display = 'none';
+    }
+  }
+
   async function loadConfig(){
     try{
       const r = await fetch('/api/automations/accounts/config');
       const j = await r.json();
       ACC_CFG.default_roles = j.default_roles || [];
+      ACC_CFG.legacy = (j.legacy || { create_user: { enabled:false, since:'' } });
+
       const wrap = document.getElementById('envdefaults_wrap');
       const list = document.getElementById('env_defaults');
-      list.innerHTML = '';
+      if(list){ list.innerHTML = ''; }
       if ((ACC_CFG.default_roles||[]).length){
         ACC_CFG.default_roles.forEach(x=> list.appendChild(rolePillEnv(x)));
-        wrap.style.display = 'block';
+        if(wrap){ wrap.style.display = 'block'; }
       } else {
-        wrap.style.display = 'none';
+        if(wrap){ wrap.style.display = 'none'; }
       }
-    }catch(e){ /* silencioso */ }
+      applyLegacyUI();
+    }catch(e){
+      // Falha em /config => mantemos a criação oculta (display:none por padrão)
+      applyLegacyUI();
+    }
   }
+
   // -------------------------
   // CRUD — Users
   // -------------------------
   async function loadUsers(){
-    const q = document.getElementById('q').value;
+    const qEl = document.getElementById('q');
+    const q = qEl ? qEl.value : '';
     setStatus('Carregando...');
     try{
       const resp = await fetch(`/api/automations/accounts/users?q=${encodeURIComponent(q||'')}`);
       const data = await resp.json();
       const tbody = document.getElementById('users');
+      if(!tbody) return;
       tbody.innerHTML = '';
       for(const u of (data.items||[])){
         const tr = document.createElement('tr');
@@ -272,13 +308,12 @@
         btnDel.onclick = () => deleteUser(u.id);
         row.appendChild(btnRoles); row.appendChild(btnPwd); row.appendChild(btnDel);
         actions.appendChild(row);
-        // Células seguras (sem innerHTML)
+        // Células seguras
         const tdName = document.createElement('td'); tdName.textContent = u.name || '';
         const tdEmail = document.createElement('td'); tdEmail.textContent = u.email || '';
         const tdCpf = document.createElement('td'); tdCpf.textContent = u.cpf || '';
         const tdFlags = document.createElement('td'); tdFlags.appendChild(flags);
 
-        // Caso não haja roles em lugar nenhum, mostra um estado vazio amigável
         if ((assigned.length === 0) && (env.length === 0)) {
           const empty = document.createElement('div');
           empty.className = 'legend';
@@ -295,13 +330,20 @@
         tbody.appendChild(tr);
       }
     }catch(e){
-      showAlert('err','Falha ao carregar usuários.');
+      // evita crash de UI em caso de erro
     }finally{
       setStatus('');
     }
   }
 
   async function createUser(){
+    // Segurança extra: se o card está oculto, não permite ação
+    const card = document.getElementById('create_card');
+    if(!card || card.style.display === 'none'){
+      alert('Criação de contas desativada (LEGADO).');
+      return;
+    }
+
     const payload = {
       name: document.getElementById('cu_name').value.trim(),
       email: (document.getElementById('cu_email').value||'').trim() || null,
@@ -310,10 +352,10 @@
       roles: (document.getElementById('cu_roles').value||'').split(',').map(s=>s.trim()).filter(Boolean)
     };
 
-    if ((payload.name||'').length < 2) return showAlert('err', 'Nome deve ter ao menos 2 caracteres.');
-    if (!payload.password || payload.password.length < 8) return showAlert('err','Senha deve ter no mínimo 8 caracteres.');
+    if ((payload.name||'').length < 2) return alert('Nome deve ter ao menos 2 caracteres.');
+    if (!payload.password || payload.password.length < 8) return alert('Senha deve ter no mínimo 8 caracteres.');
     if (!payload.email && !(payload.cpf && /^\d{11}$/.test(payload.cpf))) {
-      return showAlert('err','Informe ao menos e-mail ou CPF (11 dígitos).');
+      return alert('Informe ao menos e-mail ou CPF (11 dígitos).');
     }
 
     const r = await fetch('/api/automations/accounts/users', {
@@ -323,7 +365,7 @@
     });
     const j = await r.json().catch(()=>({}));
     if(r.ok){
-      showAlert('ok','Usuário criado com sucesso.');
+      alert('Usuário criado com sucesso. (Recurso LEGADO)');
       document.getElementById('cu_name').value='';
       document.getElementById('cu_email').value='';
       document.getElementById('cu_cpf').value='';
@@ -332,7 +374,11 @@
       loadUsers();
       loadRoles();
     } else {
-      showAlert('err', j.message || 'Erro ao criar usuário.');
+      alert(j.message || 'Erro ao criar usuário.');
+      if (r.status === 410) {
+        // backend desativou — esconde card imediatamente
+        card.style.display = 'none';
+      }
     }
   }
 
@@ -345,10 +391,10 @@
     const r = await fetch(`/api/automations/accounts/users/${userId}/roles`, {
       method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ roles })
     });
-   if(r.ok){ 
-     loadUsers(); 
-     loadRoles(); // <- reflete papéis criados automaticamente pelo backend
-   } else {
+    if(r.ok){ 
+      loadUsers(); 
+      loadRoles();
+    } else {
       const j = await r.json().catch(()=>({}));
       alert(j?.detail || j?.message || 'Erro ao definir roles');
     }
@@ -368,10 +414,10 @@
     if(!confirm('Tem certeza que deseja excluir o usuário? Esta ação é irreversível.')) return;
     const url = `/api/automations/accounts/users/${encodeURIComponent(userId)}`;
     const r = await fetch(url, { method:'DELETE' });
-   if(r.ok){ 
-     loadUsers(); 
-     loadRoles(); // <- opcional: caso exclusões impactem visão agregada de roles
-   } else {
+    if(r.ok){ 
+      loadUsers(); 
+      loadRoles();
+    } else {
       const j = await r.json().catch(()=>({}));
       alert(j?.detail || j?.message || 'Erro ao excluir.');
     }
@@ -388,12 +434,12 @@
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, description })
     });
     if(r.ok){
-      showAlert('ok','Role criado.');
+      alert('Role criado.');
       document.getElementById('role_name').value=''; document.getElementById('role_desc').value='';
       loadRoles();
     } else {
       const j = await r.json().catch(()=>({}));
-      showAlert('err', j.message || 'Erro ao criar role.');
+      alert(j.message || 'Erro ao criar role.');
     }
   }
 
@@ -404,12 +450,12 @@
     const url = `/api/automations/accounts/roles/${encodeURIComponent(roleName)}`;
     const r = await fetch(url, { method:'DELETE' });
     if(r.ok){
-      showAlert('ok', `Role "${roleName}" removido.`);
+      alert(`Role "${roleName}" removido.`);
       loadRoles();
-      loadUsers(); // atualiza lista de usuários (papéis podem ter mudado)
+      loadUsers();
     } else {
       const j = await r.json().catch(()=>({}));
-      showAlert('err', j?.detail || j?.message || `Erro ao remover role "${roleName}".`);
+      alert(j?.detail || j?.message || `Erro ao remover role "${roleName}".`);
     }
   }
 
@@ -417,6 +463,7 @@
     const r = await fetch('/api/automations/accounts/roles');
     const j = await r.json();
     const el = document.getElementById('roles_list');
+    if(!el) return;
     el.innerHTML = '';
     (j.items||[]).forEach(x=>{
       const wrap = document.createElement('span'); wrap.className='badge'; wrap.title = x.description || '';
@@ -435,7 +482,8 @@
 
   // debounce da busca
   function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-  document.getElementById('q').addEventListener('input', debounce(loadUsers, 250));
+  const qEl = document.getElementById('q');
+  if(qEl) qEl.addEventListener('input', debounce(loadUsers, 250));
 
   // boot
   loadConfig().then(()=>{ loadUsers(); });

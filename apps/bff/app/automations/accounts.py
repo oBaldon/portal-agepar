@@ -35,6 +35,40 @@ router = APIRouter(
 hasher = PasswordHasher()
 
 # -----------------------------------------------------------------------------
+# LEGADO: criação de contas
+# -----------------------------------------------------------------------------
+# Tornamos **apenas** a criação de contas (POST /users) um recurso LEGADO.
+# - Por padrão, fica DESLIGADO (retorna 410 Gone), podendo ser reabilitado por flag.
+# - Quando habilitado, responde com headers de depreciação, para sinalizar compatibilidade.
+LEGACY_CREATE_ENABLED = (os.getenv("ACCOUNTS_CREATE_LEGACY_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"})
+LEGACY_CREATE_SINCE = "2025-10-20"  # data da depreciação (YYYY-MM-DD)
+
+
+def _legacy_gone(message: str = "A criação de contas via automação 'accounts' é LEGADO e foi desativada."):
+    return JSONResponse(
+        status_code=410,
+        content={
+            "error": "deprecated",
+            "message": message,
+            "hint": "Use o provedor de identidade oficial (OIDC/SSO) ou peça a um administrador para criar a conta pelo fluxo suportado.",
+            "since": LEGACY_CREATE_SINCE,
+            "action": "create_user",
+        },
+        headers={
+            "Deprecation": "true",
+            "X-Deprecated": "accounts.create_user",
+        },
+    )
+
+
+def _with_deprecation_headers(payload: Dict[str, Any]) -> JSONResponse:
+    resp = JSONResponse(content=payload)
+    resp.headers["Deprecation"] = "true"
+    resp.headers["X-Deprecated"] = "accounts.create_user"
+    return resp
+
+
+# -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
 CPF_RE = re.compile(r"\D+")
@@ -217,6 +251,7 @@ def schema() -> Dict[str, Any]:
         "name": "accounts",
         "version": "1.0.0",
         "actions": [
+            # "create_user" permanece listado para compatibilidade, porém marcado como LEGADO.
             "create_user",
             "update_user",
             "delete_user",
@@ -225,7 +260,13 @@ def schema() -> Dict[str, Any]:
             "create_role",
             "delete_role",
         ],
-        "notes": "Administração de contas e papéis (roles). Somente admins.",
+        "deprecated_actions": {
+            "create_user": {
+                "since": LEGACY_CREATE_SINCE,
+                "enabled": LEGACY_CREATE_ENABLED,  # true => compat (com headers), false => 410 Gone
+            }
+        },
+        "notes": "Administração de contas e papéis (roles). Somente admins. A criação de contas é LEGADO.",
     }
     
 @router.get("/config")
@@ -233,10 +274,17 @@ def config() -> Dict[str, Any]:
     """
     Exibe informações de configuração úteis à UI/admin.
     - default_roles: papéis herdados do ambiente (somente leitura na UI)
+    - legacy.create_user: status do modo legado da criação de contas
     """
     return {
         "auth_mode": os.getenv("AUTH_MODE", "local"),
         "default_roles": _env_default_roles(),
+        "legacy": {
+            "create_user": {
+                "since": LEGACY_CREATE_SINCE,
+                "enabled": LEGACY_CREATE_ENABLED,
+            }
+        },
     }
 
 
@@ -325,6 +373,10 @@ def get_user(user_id: str) -> Dict[str, Any]:
 
 @router.post("/users")
 def create_user(payload: CreateUserIn, request: Request):
+    # LEGADO: por padrão, a criação de contas está desativada (410 Gone).
+    if not LEGACY_CREATE_ENABLED:
+        return _legacy_gone()
+
     try:
         payload.normalize()
     except HTTPException as e:
@@ -394,14 +446,16 @@ def create_user(payload: CreateUserIn, request: Request):
                     "email": str(payload.email) if payload.email else None,
                     "cpf": payload.cpf,
                     "roles": roles,
+                    "deprecated": True,
+                    "since": LEGACY_CREATE_SINCE,
                 },
                 "status": "done",
                 "result": {"user_id": user_id},
                 "error": None,
             }
         )
-        add_audit("accounts", "create_user", actor, {"user_id": user_id, "roles": roles})
-        return {"ok": True, "user_id": user_id}
+        add_audit("accounts", "create_user", actor, {"user_id": user_id, "roles": roles, "deprecated": True})
+        return _with_deprecation_headers({"ok": True, "user_id": user_id})
 
 
 @router.put("/users/{user_id}")

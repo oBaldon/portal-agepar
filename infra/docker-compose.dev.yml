@@ -16,6 +16,7 @@ services:
       AUTH_RATE_LIMIT_WINDOW_MINUTES: "10"
       AUTH_RATE_LIMIT_MAX_ATTEMPTS: "7"
       LOG_LEVEL: INFO
+      ACCOUNTS_CREATE_LEGACY_ENABLED: "false"  # LEGADO: criação de contas desativada (true => habilita compat)
     volumes:
       - ../apps/bff:/app
       - ../catalog:/catalog:ro
