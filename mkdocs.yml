@@ -1,6 +1,6 @@
 site_name: "Portal AGEPAR — Documentação Técnica"
 site_description: "Docs técnicos do monorepo: BFF (FastAPI), Host (React/Vite/TS), Catálogo e Infra."
-site_url: "http://localhost:5173/docs/"
+site_url: "http://localhost:5173"
 repo_url: "https://github.com/oBaldon/portal-agepar"
 use_directory_urls: true
 

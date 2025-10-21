@@ -108,7 +108,7 @@ export default function Login() {
                   Criar conta
                 </Link>
               ) : (
-                <span className="text-slate-500">Contate o RH para cadastrados</span>
+                <span className="text-slate-500">Ramal 4895 para cadastrados</span>
               )}
             </div>
           </div>
