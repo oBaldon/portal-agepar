@@ -2,6 +2,8 @@
 import type { User } from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
+export const SELF_REGISTER_ENABLED = ENABLE_SELF_REGISTER;
 
 /* =========================
  * Interceptadores globais
@@ -41,14 +43,15 @@ async function ensureOk(res: Response): Promise<void> {
   if (res.status === 401 && onUnauthorized) onUnauthorized(401);
   if (res.status === 403 && onForbidden) onForbidden();
   const msg = await extractErrorMessage(res);
-  throw new Error(`HTTP ${res.status}: ${msg || res.statusText}`);
+  const friendly =
+    msg || (res.status === 410 ? "Funcionalidade descontinuada" : res.statusText);
+  throw new Error(`HTTP ${res.status}: ${friendly}`);
 }
 
 async function j<T>(res: Response): Promise<T> {
   await ensureOk(res);
   return (await res.json()) as T;
 }
-
 
 /* =========================
  * Auth (real, server-side)
@@ -98,13 +101,22 @@ export type RegisterResponse = {
   status: string;
 };
 
-/** Registro (POST /api/auth/register) */
+/**
+ * Registro (POST /api/auth/register)
+ * @deprecated Auto-registro desativado por padrão. Controlado por VITE_ENABLE_SELF_REGISTER.
+ */
 export async function registerUser(params: {
   name: string;
   email?: string;
   cpf?: string;
   password: string;
 }): Promise<RegisterResponse> {
+  if (!ENABLE_SELF_REGISTER) {
+    // curto-circuito no front para UX melhor quando a funcionalidade estiver desligada
+    throw new Error(
+      "Auto-registro desativado. Solicite a criação de conta a um administrador do sistema."
+    );
+  }
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
     credentials: "include",

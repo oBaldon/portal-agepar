@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 
+const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
+
 export default function Login() {
   const nav = useNavigate();
   const { user, login } = useAuth();
@@ -101,9 +103,13 @@ export default function Login() {
             <div className="flex items-center gap-3 text-sm">
               {/* (opcional) rota de recuperação de senha no futuro */}
               {/* <Link to="/recuperar" className="text-sky-700 hover:underline">Esqueci a senha</Link> */}
-              <Link to="/registrar" className="text-sky-700 hover:underline">
-                Criar conta
-              </Link>
+              {ENABLE_SELF_REGISTER ? (
+                <Link to="/registrar" className="text-sky-700 hover:underline">
+                  Criar conta
+                </Link>
+              ) : (
+                <span className="text-slate-500">Contate o RH para cadastrados</span>
+              )}
             </div>
           </div>
 

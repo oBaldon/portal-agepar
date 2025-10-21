@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User } from "@/types";
-import { getMe, loginWithPassword, logout as apiLogout, configureApiHandlers } from "@/lib/api";
+import { getMe, loginWithPassword, logout as apiLogout/*, configureApiHandlers*/ } from "@/lib/api";
 
 type AuthCtx = {
   user: User | null;
@@ -23,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setErr] = useState<string | null>(null);
 
   // Interceptadores globais para 401/403
-  useEffect(() => {
+  /*useEffect(() => {
     configureApiHandlers({
       onUnauthorized: () => {
         // sessão inválida/expirada → zera estado e manda para /login
@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         nav("/403", { replace: true });
       },
     });
-  }, [nav]);
+  }, [nav]);*/
 
   const refresh = async () => {
     setLoading(true);

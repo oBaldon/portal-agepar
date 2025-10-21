@@ -23,6 +23,8 @@ import AccountSessions from "@/pages/AccountSessions";
 import Forbidden from "@/pages/Forbidden";
 import { useAuth } from "@/auth/AuthProvider";
 
+const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
+
 /* ---------------------------------------------------------------------------
  * Ícones de categorias
  * -------------------------------------------------------------------------*/
@@ -88,19 +90,25 @@ export default function App() {
 
   const nav = useNavigate();
   const loc = useLocation();
+  // Rotas públicas (não devem redirecionar em 401)
+  const isPublicPath = (p: string) => p === "/login" || p === "/registrar" || p === "/403";
 
   // Interceptadores globais: 401/403
   useEffect(() => {
     configureApiHandlers({
       onUnauthorized: () => {
-        void doLogout();
-        nav("/login?reason=session_expired", { replace: true });
+        // Só tenta encerrar sessão se havia usuário autenticado
+        if (user) void doLogout();
+        // Não redireciona se já estiver em rota pública (ex.: /registrar)
+        if (!isPublicPath(loc.pathname)) {
+          nav("/login?reason=session_expired", { replace: true });
+        }
       },
       onForbidden: () => {
         nav("/403", { replace: true });
       },
     });
-  }, [doLogout, nav]);
+  }, [doLogout,  nav, loc.pathname, user]);
 
   // Carrega catálogo após autenticação
   useEffect(() => {
@@ -253,12 +261,14 @@ export default function App() {
                 <NavLink to="/login" className={activeCls}>
                   Entrar
                 </NavLink>
-                <Link
-                  to="/registrar"
-                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
-                >
-                  Criar conta
-                </Link>
+                {ENABLE_SELF_REGISTER && (
+                  <Link
+                    to="/registrar"
+                    className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
+                  >
+                    Criar conta
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -280,7 +290,7 @@ export default function App() {
           path="/registrar"
           element={
             <AuthPageGate user={user}>
-              <LazyRegister />
+              {ENABLE_SELF_REGISTER ? <LazyRegister /> : <LazyRegisterDisabled />}
             </AuthPageGate>
           }
         />
@@ -303,18 +313,18 @@ export default function App() {
           // não monta rotas de blocos explicitamente escondidos
           .filter((b: any) => !b?.hidden)
           .map((b) =>
-          b.routes?.map((r) => (
-            <Route
-              key={`${b.name}:${r.path}`}
-              path={r.path}
-              element={
-                <RequireRoles user={user} block={b}>
-                  {routeElementFor(b, r)}
-                </RequireRoles>
-              }
-            />
-          ))
-        )}
+            b.routes?.map((r) => (
+              <Route
+                key={`${b.name}:${r.path}`}
+                path={r.path}
+                element={
+                  <RequireRoles user={user} block={b}>
+                    {routeElementFor(b, r)}
+                  </RequireRoles>
+                }
+              />
+            ))
+          )}
 
         {/* Ping (smoke) — opcional visualizar em /__ping */}
         <Route path="/__ping" element={<PingView />} />
@@ -344,6 +354,17 @@ function LazyRegister() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
     import("@/pages/Register").then((m) => setComp(() => m.default));
+  }, []);
+  return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
+}
+
+/* ============================================================================
+ * Lazy loader do RegisterDisabled (aviso quando auto-registro está desativado)
+ * ==========================================================================*/
+function LazyRegisterDisabled() {
+  const [Comp, setComp] = useState<null | React.ComponentType>(null);
+  useEffect(() => {
+    import("@/pages/RegisterDisabled").then((m) => setComp(() => m.default));
   }, []);
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }

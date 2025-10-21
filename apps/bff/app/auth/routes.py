@@ -30,6 +30,19 @@ AUTH_DEFAULT_ROLES: List[str] = [
     r.strip() for r in os.getenv("AUTH_DEFAULT_ROLES", "").split(",") if r.strip()
 ]
 
+# Toggle de auto-registro (preferência para AUTH_ENABLE_SELF_REGISTER; compat com ACCOUNTS_CREATE_LEGACY_ENABLED)
+# - AUTH_ENABLE_SELF_REGISTER = "true" | "false"
+# - ACCOUNTS_CREATE_LEGACY_ENABLED = "true" | "false"  (compat legado)
+_auth_enable_self_register = os.getenv("AUTH_ENABLE_SELF_REGISTER")
+_accounts_create_legacy_enabled = os.getenv("ACCOUNTS_CREATE_LEGACY_ENABLED")
+if _auth_enable_self_register is not None:
+    SELF_REGISTER_ENABLED = _auth_enable_self_register.lower() in ("1", "true", "yes", "y")
+elif _accounts_create_legacy_enabled is not None:
+    SELF_REGISTER_ENABLED = _accounts_create_legacy_enabled.lower() in ("1", "true", "yes", "y")
+else:
+    # Desativado por padrão
+    SELF_REGISTER_ENABLED = False
+
 ph = PasswordHasher()  # Argon2id
 CPF_RE = re.compile(r"^\d{11}$")
 
@@ -205,9 +218,20 @@ class LoginOut(BaseModel):
 @router.post(
     "/api/auth/register",
     response_model=RegisterOut,
-    responses={400: {"description": "Erro de validação"}, 409: {"description": "Conflito (email/CPF já em uso)"}, 422: {"description": "Entrada inválida"}},
+    responses={
+        400: {"description": "Erro de validação"},
+        403: {"description": "Auto-registro desativado"},
+        409: {"description": "Conflito (email/CPF já em uso)"},
+        410: {"description": "Funcionalidade descontinuada"},
+        422: {"description": "Entrada inválida"},
+    },
 )
 def register_user(payload: RegisterIn, request: Request):
+    # Gate por flag — quando desativado, retorna 410 (Gone) para indicar descontinuação
+    # (Pode-se trocar para 403 se preferir semântica de forbidden)
+    if not SELF_REGISTER_ENABLED:
+        raise HTTPException(status_code=410, detail="Auto-registro desativado.")
+
     payload.validate_business()
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
