@@ -67,7 +67,9 @@ logger.info("CORS_ORIGINS=%s | CATALOG_FILE=%s", ",".join(CORS_ORIGINS), str(CAT
 # ------------------------------------------------------------------------------
 # App
 # ------------------------------------------------------------------------------
-APP = FastAPI(title="Portal AGEPAR BFF", version="0.3.0", docs_url="/docs", redoc_url="/redoc")
+# Importante: expurgamos o MkDocs do host. Para evitar colisão com /docs do host,
+# movemos a UI do FastAPI para o prefixo /api, que já é proxied pelo Vite.
+APP = FastAPI(title="Portal AGEPAR BFF", version="0.3.0", docs_url="/api/docs", redoc_url="/api/redoc")
 
 # CORS primeiro (fica mais interno após os próximos add_middleware)
 APP.add_middleware(

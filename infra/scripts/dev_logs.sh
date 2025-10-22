@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INFRA_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 docker compose \
-  -f docker-compose.dev.yml \
-  -f docker-compose.pg.yml \
+  -f "${INFRA_DIR}/docker-compose.dev.yml" \
+  -f "${INFRA_DIR}/docker-compose.pg.yml" \
   logs -f

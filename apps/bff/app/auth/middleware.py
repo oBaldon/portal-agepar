@@ -12,9 +12,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 SESSION_SLIDING = os.getenv("SESSION_SLIDING", "1") in ("1", "true", "True")
 SESSION_RENEW_BEFORE_MINUTES = int(os.getenv("SESSION_RENEW_BEFORE_MINUTES", "30"))
 
-# Prefixos que pulamos (docs, estáticos etc.)
-# Observação: incluímos "/openapi.json" explicitamente para evitar tocar no schema.
-_raw_skips = os.getenv("SESSION_MW_SKIP_PREFIXES") or "/openapi,/openapi.json,/docs,/redoc,/static,/catalog"
+# Prefixos que pulamos (estáticos, schema e UIs do FastAPI)
+# Observação: o FastAPI mantém o schema em /openapi.json mesmo após mover docs/redoc.
+_raw_skips = os.getenv("SESSION_MW_SKIP_PREFIXES") or "/openapi,/openapi.json,/api/docs,/api/redoc,/static,/catalog"
 SKIP_PREFIXES: Iterable[str] = tuple(p.strip() for p in _raw_skips.split(",") if p.strip())
 
 

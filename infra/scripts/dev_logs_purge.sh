@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Trunca os arquivos de log JSON do Docker (requer sudo em Linux).
-# Útil se você quer limpar logs sem recriar containers.
-# Observação: funciona com log driver "json-file".
-
+# Trunca os arquivos de log JSON do Docker (Linux).
 if [[ "$(uname -s)" != "Linux" ]]; then
-  echo "⚠️ Este script foi pensado para Linux (caminho /var/lib/docker/containers)."
+  echo "⚠️ Script pensado para Linux (/var/lib/docker/containers)."
   echo "Use o dev_fresh.sh para limpar via recriação em macOS/Windows."
   exit 1
 fi
