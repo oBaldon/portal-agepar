@@ -1,0 +1,8 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["../host/src"],
+  "tsconfig": "../host/tsconfig.json",
+  "out": "docs/host/typedoc",
+  "hideGenerator": true,
+  "excludeExternals": false
+}

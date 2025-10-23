@@ -48,9 +48,34 @@ services:
       - portal_agepar_node_modules:/workspace/node_modules
     ports:
       - "5173:5173"
+    # usa npm ci se houver lockfile; senão npm install; depois inicia o Vite
     command: sh -lc 'test -f package-lock.json && npm ci || npm install; npm run dev -- --host 0.0.0.0 --port 5173'
     depends_on:
       - bff
+      - docs       # garante que o DNS "docs" exista quando o proxy subir
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  docs:
+    image: node:20-alpine
+    container_name: portal-agepar-docs
+    working_dir: /work/apps/docs-site
+    environment:
+      NODE_ENV: development
+      CI: "true"
+    volumes:
+      - ../:/work
+    ports:
+      - "9000:8000"                # opcional (acesso direto além do proxy)
+    command: >
+      sh -lc "
+        (test -f package-lock.json && npm ci --quiet) || npm install --quiet &&
+        npm run start -- --host 0.0.0.0 --port 8000
+      "
     restart: unless-stopped
     logging:
       driver: json-file

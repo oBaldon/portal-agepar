@@ -1,0 +1,61 @@
+{
+  "name": "apps-docs-site",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "serve": "docusaurus serve",
+    "deploy": "docusaurus deploy",
+    "swizzle": "docusaurus swizzle",
+    "clear": "docusaurus clear",
+    "write-translations": "docusaurus write-translations",
+    "write-heading-ids": "docusaurus write-heading-ids",
+    "typecheck": "tsc",
+    "gen:openapi": "mkdir -p static/openapi && curl -s http://bff:8000/api/openapi.json > static/openapi/bff.json",
+    "gen:typedoc": "typedoc --options typedoc.json",
+    "gen:py": "pdoc ../../apps/bff/app -o docs/bff/python-api --docformat google",
+    "dev:all": "pnpm gen:openapi && pnpm gen:typedoc && pnpm start"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.9.2",
+    "@docusaurus/preset-classic": "3.9.2",
+    "@docusaurus/theme-mermaid": "3.9.2",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.0.0",
+    "docusaurus-plugin-openapi-docs": "^4.5.1",
+    "prism-react-renderer": "^2.3.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.9.2",
+    "@docusaurus/tsconfig": "3.9.2",
+    "@docusaurus/types": "3.9.2",
+    "docusaurus-plugin-typedoc": "^0.10.0",
+    "typedoc": "0.28.0",
+    "typescript": "~5.6.2"
+  },
+  "overrides": {
+    "@docusaurus/*": "3.9.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@faker-js/faker": "^9.2.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0"
+  }
+}

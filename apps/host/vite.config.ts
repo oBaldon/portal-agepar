@@ -13,6 +13,7 @@ export default defineConfig({
       // ---------- BFF ----------
       "/api":     { target: "http://bff:8000", changeOrigin: true },
       "/catalog": { target: "http://bff:8000", changeOrigin: true },
+      "/devdocs": { target: "http://docs:8000", changeOrigin: true },
     },
   },
 });
