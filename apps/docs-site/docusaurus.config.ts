@@ -43,17 +43,7 @@ const config: Config = {
           // Link "editar esta página"
           editUrl: 'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
         },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          editUrl: 'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-        },
+        blog: false, // desabilita o blog
         theme: {
           // idem: resolução via Node
           customCss: require.resolve('./src/css/custom.css'),
@@ -94,7 +84,7 @@ const config: Config = {
           position: 'left',
           label: 'Docs',
         },
-        { to: '/blog', label: 'Blog', position: 'left' },
+        //{ to: '/blog', label: 'Blog', position: 'left' },
         {
           href: 'https://github.com/oBaldon/portal-agepar',
           label: 'GitHub',
@@ -120,7 +110,7 @@ const config: Config = {
         {
           title: 'Mais',
           items: [
-            { label: 'Blog', to: '/blog' },
+            //{ label: 'Blog', to: '/blog' },
             { label: 'GitHub', href: 'https://github.com/oBaldon/portal-agepar' },
           ],
         },

@@ -1,23 +1,86 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
+/* apps/docs-site/src/pages/index.module.css */
+.hero {
+  padding: 4rem 0 2rem;
+  background: radial-gradient(1200px 500px at 10% -10%, rgba(0,152,255,0.15), transparent),
+              linear-gradient(180deg, rgba(0,0,0,0.02), transparent 60%);
+}
 
-.heroBanner {
-  padding: 4rem 0;
-  text-align: center;
-  position: relative;
+.heroInner {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.heroLeft { max-width: 720px; }
+.title { margin: 0 0 .25rem; font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; }
+.subtitle { margin: 0 0 1.25rem; font-size: 1.2rem; opacity: .9; }
+
+.ctaRow { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.cta { border-radius: 12px; padding: .65rem 1rem; }
+
+.meta { font-size: .9rem; opacity: .85; }
+.meta ul { margin: .35rem 0 0 1rem; }
+
+.heroRight { display: flex; justify-content: center; }
+.codeCard {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 14px;
+  background: var(--ifm-card-background-color);
+  box-shadow: var(--ifm-global-shadow-lw);
+  border: 1px solid var(--ifm-color-emphasis-200);
   overflow: hidden;
 }
-
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
+.codeHeader {
+  padding: .5rem .75rem;
+  font-size: .8rem;
+  background: var(--ifm-navbar-background-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+.codeBlock {
+  margin: 0;
+  padding: 1rem;
+  font-size: .8rem;
+  line-height: 1.4;
+  overflow: auto;
+}
+.codeFooter {
+  padding: .5rem .75rem;
+  background: var(--ifm-background-surface-color);
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  font-size: .8rem;
 }
 
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.card {
+  display: block;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-card-background-color);
+  box-shadow: var(--ifm-global-shadow-lw);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ifm-color-primary);
+  box-shadow: var(--ifm-global-shadow-md);
+}
+.card h3 { margin: .25rem 0 .25rem; font-size: 1.05rem; }
+.card p { margin: 0 0 .75rem; font-size: .9rem; opacity: .9; }
+.cardLink { font-size: .85rem; color: var(--ifm-color-primary); }
+
+@media (max-width: 996px) {
+  .heroInner { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
 }
