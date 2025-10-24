@@ -1,0 +1,102 @@
+---
+id: estilo-de-codigo
+title: Guia de Estilo — Exemplos de Código
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Este guia define **como** escrever exemplos de código de forma consistente.
+
+## Padrões
+- Sempre usar `title="..."` nos blocos que representam arquivos ou comandos importantes.
+- Preferir `showLineNumbers` quando o snippet tiver mais de ~10 linhas.
+- Destacar linhas críticas com `{...}` ou **magic comments**.
+- Comando ≠ Saída: separar em blocos distintos.
+- Preferir abas (`Tabs/TabItem`) para múltiplas linguagens.
+- Usar `diff` para mudanças, e `mermaid` para diagramas.
+
+---
+
+## 1) Título do bloco
+
+```bash title="Subindo com Docker Compose"
+docker compose up --build
+````
+
+## 2) Números de linha
+
+```ts title="vite.config.ts" showLineNumbers
+export default {
+  server: { proxy: { "/api": "http://bff:8000" } },
+};
+```
+
+## 3) Destaque de linhas (2 jeitos)
+
+**a) Por intervalo:**
+
+```python title="apps/bff/main.py" {3,5-7}
+from fastapi import FastAPI
+app = FastAPI()
+@app.get("/api/me")                  # linha 3 destacada
+def me():                            # linhas 5-7 destacadas
+    return {"ok": True}
+```
+
+**b) Por “magic comments”:**
+
+```ts title="fetch.ts"
+const r = await fetch("/api/me");
+// highlight-next-line
+if (!r.ok) throw new Error("Auth required");
+/* highlight-start */
+const data = await r.json();
+renderUser(data);
+/* highlight-end */
+```
+
+## 4) Blocos de diferença (diff)
+
+```diff title="apps/bff/app.py"
+- app = FastAPI()
++ app = FastAPI(title="Portal AGEPAR BFF")
+```
+
+## 5) Separar comando de saída
+
+```bash title="Requisição"
+curl -i http://localhost:8000/api/me
+```
+
+```text title="Resposta (HTTP 200)"
+HTTP/1.1 200 OK
+content-type: application/json
+{"ok":true}
+```
+
+## 6) Várias linguagens com abas
+
+<Tabs>
+  <TabItem value="curl" label="cURL">
+    ```bash
+    curl -X POST http://localhost:8000/api/auth/login -d 'user=dev&pass=dev'
+    ```
+  </TabItem>
+  <TabItem value="ts" label="TypeScript">
+    ```ts
+    await fetch("/api/auth/login", { method: "POST", body: formData });
+    ```
+  </TabItem>
+  <TabItem value="py" label="Python">
+    ```python
+    import requests; requests.post("http://localhost:8000/api/auth/login", data=payload)
+    ```
+  </TabItem>
+</Tabs>
+
+## 7) Admonitions (Dicas/Notas)
+
+:::tip Dica
+Use `title="..."`, `showLineNumbers` e **magic comments** para destacar passos críticos.
+:::

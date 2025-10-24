@@ -1,0 +1,122 @@
+---
+title: "Referências — BFF (FastAPI)"
+sidebar_position: 99
+---
+
+## Arquivos mapeados do repositório
+
+### Raiz do BFF
+- `portal-agepar-main/apps/bff/Dockerfile.dev`
+- `portal-agepar-main/apps/bff/app/auth/middleware.py`
+- `portal-agepar-main/apps/bff/app/auth/rbac.py`
+- `portal-agepar-main/apps/bff/app/auth/routes.py`
+- `portal-agepar-main/apps/bff/app/auth/sessions.py`
+- `portal-agepar-main/apps/bff/app/automations/accounts.py`
+- `portal-agepar-main/apps/bff/app/automations/controle.py`
+- `portal-agepar-main/apps/bff/app/automations/controle_ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/dfd.py`
+- `portal-agepar-main/apps/bff/app/automations/ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/fileshare.py`
+- `portal-agepar-main/apps/bff/app/automations/form2json.py`
+- `portal-agepar-main/apps/bff/app/automations/support.py`
+- `portal-agepar-main/apps/bff/app/automations/templates/accounts/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/controle/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/controle_ferias/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/dfd/history.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/dfd/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/ferias/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/fileshare/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/support/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/whoisonline/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/whoisonline.py`
+- `portal-agepar-main/apps/bff/app/db.py`
+- `portal-agepar-main/apps/bff/app/games/snake.py`
+- `portal-agepar-main/apps/bff/app/main.py`
+- `portal-agepar-main/apps/bff/app/utils/docx_tools.py`
+- `portal-agepar-main/apps/bff/requirements.txt`
+- `portal-agepar-main/apps/bff/run_dev.sh`
+- `portal-agepar-main/apps/bff/templates/dfd_models/ACS/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/ANA/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/ATII/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/CAT/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/CEL/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/CINV/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/COPPA/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/CPAD/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DAF-CA/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DAF-COF/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DAF-CRH/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DAF/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DFQS-CF/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DFQS/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DNR-CJ/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DNR-CNR/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DNR/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DP-AEP/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DP/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/DRE-CSB/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/FMSBA/model.docx`
+- `portal-agepar-main/apps/bff/templates/dfd_models/UCCO/model.docx`
+- `portal-agepar-main/apps/bff/templates/pdf/requerimento_de_ferias.pdf`
+- `portal-agepar-main/apps/bff/templates/pdf/substituicao_de_ferias.pdf`
+
+### Arquivos FastAPI
+- `portal-agepar-main/apps/bff/app/main.py`
+
+### Automations (pastas)
+- `portal-agepar-main/apps/bff/app/automations/accounts.py`
+- `portal-agepar-main/apps/bff/app/automations/controle.py`
+- `portal-agepar-main/apps/bff/app/automations/controle_ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/dfd.py`
+- `portal-agepar-main/apps/bff/app/automations/ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/fileshare.py`
+- `portal-agepar-main/apps/bff/app/automations/form2json.py`
+- `portal-agepar-main/apps/bff/app/automations/support.py`
+- `portal-agepar-main/apps/bff/app/automations/templates/accounts/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/controle/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/controle_ferias/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/dfd/history.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/dfd/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/ferias/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/fileshare/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/support/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/templates/whoisonline/ui.html`
+- `portal-agepar-main/apps/bff/app/automations/whoisonline.py`
+
+### Sessões mock (login)
+- `portal-agepar-main/apps/bff/app/auth/routes.py`
+- `portal-agepar-main/apps/bff/app/main.py`
+- `portal-agepar-main/apps/host/src/lib/api.ts`
+- `portal-agepar-main/apps/host/src/pages/Login.tsx`
+
+### Sessões mock (me)
+- `portal-agepar-main/apps/bff/app/auth/middleware.py`
+- `portal-agepar-main/apps/bff/app/main.py`
+
+### Rotas automations
+- `portal-agepar-main/apps/bff/app/automations/accounts.py`
+- `portal-agepar-main/apps/bff/app/automations/controle.py`
+- `portal-agepar-main/apps/bff/app/automations/controle_ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/dfd.py`
+- `portal-agepar-main/apps/bff/app/automations/ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/fileshare.py`
+- `portal-agepar-main/apps/bff/app/automations/form2json.py`
+- `portal-agepar-main/apps/bff/app/automations/support.py`
+- `portal-agepar-main/apps/bff/app/automations/whoisonline.py`
+- `portal-agepar-main/apps/bff/app/main.py`
+
+### Init DB
+- `portal-agepar-main/apps/bff/app/db.py`
+- `portal-agepar-main/apps/bff/app/main.py`
+
+### Pydantic v2 config
+- `portal-agepar-main/apps/bff/app/auth/routes.py`
+- `portal-agepar-main/apps/bff/app/automations/accounts.py`
+- `portal-agepar-main/apps/bff/app/automations/controle.py`
+- `portal-agepar-main/apps/bff/app/automations/controle_ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/dfd.py`
+- `portal-agepar-main/apps/bff/app/automations/ferias.py`
+- `portal-agepar-main/apps/bff/app/automations/fileshare.py`
+- `portal-agepar-main/apps/bff/app/automations/form2json.py`
+- `portal-agepar-main/apps/bff/app/automations/support.py`
+- `portal-agepar-main/apps/bff/app/automations/whoisonline.py`

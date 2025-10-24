@@ -1,0 +1,37 @@
+---
+id: playground-react
+title: Playground ao vivo (React/TSX)
+---
+
+Abaixo um exemplo simples de playground em TSX usando o tema **@docusaurus/theme-live-codeblock**.
+
+```tsx live title="ButtonDemo.tsx"
+function ButtonDemo() {
+  const handleClick = () => alert('Funcionou!');
+  return <button onClick={handleClick}>Clique</button>;
+}
+````
+
+Também é possível criar exemplos **inline** com `noInline` e um `render(...)` explícito:
+
+```tsx live noInline title="Contador"
+function Counter() {
+  const [n, setN] = React.useState(0);
+  return (
+    <div>
+      <p>Valor: {n}</p>
+      <button onClick={() => setN((v) => v + 1)}>+1</button>
+      <button onClick={() => setN((v) => v - 1)}>-1</button>
+      <button onClick={() => setN(0)}>Zerar</button>
+    </div>
+  );
+}
+
+render(<Counter />);
+```
+
+Dicas:
+
+* Use `.mdx` (não `.md`) para páginas com playground.
+* Para componentes com `export default`, **não** use `noInline`.
+* Para exemplos inline, **use `noInline`** e finalize com `render(<SeuComponente />)`.

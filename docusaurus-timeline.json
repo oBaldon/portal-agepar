@@ -1,0 +1,164 @@
+{
+    "plan": [
+        {
+            "order": 1,
+            "section": "Visão Geral e Arquitetura",
+            "topics": [
+                "Objetivo do Portal AGEPAR, escopo e público",
+                "Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite)",
+                "Monorepo: estrutura de pastas",
+                "Fluxo dev local vs. produção"
+            ]
+        },
+        {
+            "order": 2,
+            "section": "Ambiente & Dev Setup",
+            "topics": [
+                "Pré-requisitos (Docker, Node, Python)",
+                "docker-compose: serviços e portas (5173/8000/8000)",
+                "Variáveis de ambiente e CORS/cookies",
+                "Scripts de bootstrap e init do DB"
+            ]
+        },
+        {
+            "order": 3,
+            "section": "Build, Run & Deploy",
+            "topics": [
+                "Subir com Docker Compose",
+                "Execução direta (Vite + Uvicorn)",
+                "Proxies do Vite (/api, /catalog, /docs)",
+                "Estratégia de build (prod) e artefatos",
+                "CI/CD (se aplicável)"
+            ]
+        },
+        {
+            "order": 4,
+            "section": "Frontend (Host – React/Vite/TS)",
+            "topics": [
+                "Estrutura src/, pages/, components/",
+                "Navbar por categorias e leitura do catálogo",
+                "Renderização de blocos (iframe ui.url)",
+                "RBAC simples (requiredRoles ANY-of)",
+                "Ordem de categorias/blocos",
+                "Vite config e plugins"
+            ]
+        },
+        {
+            "order": 5,
+            "section": "Catálogo (/catalog/dev)",
+            "topics": [
+                "Estrutura JSON (categories[], blocks)",
+                "Esquema de bloco {categoryId, ui, navigation, routes, ...}",
+                "Convenções (icon, order, hidden)",
+                "Exemplos e práticas de extensão"
+            ]
+        },
+        {
+            "order": 6,
+            "section": "BFF (FastAPI)",
+            "topics": [
+                "Estrutura do app (apps/bff/app/...)",
+                "Sessões mock: POST /api/auth/login, GET /api/me",
+                "Rotas gerais /api e /api/automations/{kind}/...",
+                "Pydantic v2 (ConfigDict populate_by_name, extra=ignore)",
+                "Normalização/validação (evitar 422)",
+                "Mapeamento de erros (400–422)",
+                "Logging (INFO/ERROR)"
+            ]
+        },
+        {
+            "order": 7,
+            "section": "Automations – Padrão de Módulos",
+            "topics": [
+                "Local: apps/bff/app/automations/{slug}.py",
+                "GET /schema (opcional), GET /ui",
+                "POST /submit (BackgroundTasks)",
+                "GET /submissions, GET /submissions/{id}",
+                "POST /submissions/{id}/download",
+                "Checklist para criar nova automação",
+                "UI via iframe e integração com catálogo"
+            ]
+        },
+        {
+            "order": 8,
+            "section": "Banco de Dados & Persistência",
+            "topics": [
+                "SQLite no startup (init_db)",
+                "Tabelas submissions e audits",
+                "Campos: payload, status, result, error",
+                "Auditoria de eventos",
+                "Backup/migração (se houver) e limites"
+            ]
+        },
+        {
+            "order": 9,
+            "section": "Segurança",
+            "topics": [
+                "CORS restrito",
+                "Cookies de sessão",
+                "Sem segredos no repo",
+                "RBAC no Host (ANY-of)",
+                "Validações e saneamento (Pydantic)",
+                "Superfícies públicas (/api, /catalog, /docs) e mitigação"
+            ]
+        },
+        {
+            "order": 10,
+            "section": "Observabilidade",
+            "topics": [
+                "Padrões de log (trilha feliz vs erros)",
+                "Contexto em exceptions/audits",
+                "Métricas/healthchecks (se houver)"
+            ]
+        },
+        {
+            "order": 11,
+            "section": "Padrões de Erro & DX",
+            "topics": [
+                "Contratos de erro (códigos e mensagens)",
+                "Exemplos de 4xx/5xx por cenário",
+                "Regras de normalização para evitar 422",
+                "Boas práticas para novos endpoints"
+            ]
+        },
+        {
+            "order": 12,
+            "section": "Testes",
+            "topics": [
+                "Testes de API (cURL/pytest) e exemplos",
+                "Testes do Host (Vitest, se houver)",
+                "Testes manuais (RBAC, navegação, proxy de docs)"
+            ]
+        },
+        {
+            "order": 13,
+            "section": "Documentação (Docusaurus)",
+            "topics": [
+                "Estrutura docs/ (MDX), sidebars e docusaurus.config",
+                "Organização por seções (1–12)",
+                "Snippets (cURL, TS/TSX, Python)",
+                "Diagramas (Mermaid) e assets",
+                "Build & deploy da doc (/docs via proxy ou site dedicado)"
+            ]
+        },
+        {
+            "order": 14,
+            "section": "Guias de Produto (Fluxo Compras Público)",
+            "topics": [
+                "DFD → PCA → ETP → TR → Cotação/Dispensa/Licitação → Contrato → Execução/Empenho/Pagamento",
+                "Mapeamento de etapas para blocos/automations",
+                "Automação paralela: cruzador de orçamento"
+            ]
+        },
+        {
+            "order": 15,
+            "section": "Apêndices",
+            "topics": [
+                "Tipos TS e modelos Pydantic",
+                "Esquema formal do Catálogo (JSON Schema)",
+                "Convenções de commit/branch/versionamento",
+                "Roadmap e backlog técnico"
+            ]
+        }
+    ]
+}

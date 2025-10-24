@@ -1,0 +1,333 @@
+{
+  "Visão Geral e Arquitetura": {
+    "Top-level": [
+      "portal-agepar-main"
+    ],
+    "Arquivos de README": [
+      "portal-agepar-main/README.md",
+      "portal-agepar-main/apps/docs-site/README.md"
+    ]
+  },
+  "Ambiente & Dev Setup": {
+    "docker-compose": [
+      "portal-agepar-main/infra/docker-compose.dev.yml",
+      "portal-agepar-main/infra/docker-compose.pg.yml"
+    ],
+    "Env files": [],
+    "Node/Package": [
+      "portal-agepar-main/apps/docs-site/package-lock.json",
+      "portal-agepar-main/apps/docs-site/package.json",
+      "portal-agepar-main/apps/docs-site/pnpm-lock.yaml",
+      "portal-agepar-main/apps/host/package-lock.json",
+      "portal-agepar-main/apps/host/package.json"
+    ],
+    "Python Deps": [
+      "portal-agepar-main/apps/bff/requirements.txt",
+      "portal-agepar-main/requirements.txt"
+    ],
+    "Scripts": [
+      "portal-agepar-main/infra/scripts/db_smoke.sh",
+      "portal-agepar-main/infra/scripts/dev_down.sh",
+      "portal-agepar-main/infra/scripts/dev_fresh.sh",
+      "portal-agepar-main/infra/scripts/dev_logs.sh",
+      "portal-agepar-main/infra/scripts/dev_logs_purge.sh",
+      "portal-agepar-main/infra/scripts/dev_up.sh"
+    ]
+  },
+  "Build, Run & Deploy": {
+    "Vite config": [
+      "portal-agepar-main/apps/host/vite.config.ts"
+    ],
+    "TS/JS config": [
+      "portal-agepar-main/apps/docs-site/tsconfig.json",
+      "portal-agepar-main/apps/host/tsconfig.json"
+    ],
+    "CI/CD": []
+  },
+  "Frontend (Host – React/Vite/TS)": {
+    "Host/src": [
+      "portal-agepar-main/apps/docs-site/src/components/HomepageFeatures/index.tsx",
+      "portal-agepar-main/apps/docs-site/src/components/HomepageFeatures/styles.module.css",
+      "portal-agepar-main/apps/docs-site/src/css/custom.css",
+      "portal-agepar-main/apps/docs-site/src/pages/index.module.css",
+      "portal-agepar-main/apps/docs-site/src/pages/index.tsx",
+      "portal-agepar-main/apps/docs-site/src/pages/markdown-page.md",
+      "portal-agepar-main/apps/host/src/App.tsx",
+      "portal-agepar-main/apps/host/src/auth/AuthProvider.tsx",
+      "portal-agepar-main/apps/host/src/index.css",
+      "portal-agepar-main/apps/host/src/lib/api.ts",
+      "portal-agepar-main/apps/host/src/lib/catalog.ts",
+      "portal-agepar-main/apps/host/src/main.tsx",
+      "portal-agepar-main/apps/host/src/pages/AccountSessions.tsx",
+      "portal-agepar-main/apps/host/src/pages/CategoryView.tsx",
+      "portal-agepar-main/apps/host/src/pages/Forbidden.tsx",
+      "portal-agepar-main/apps/host/src/pages/HomeDashboard.tsx",
+      "portal-agepar-main/apps/host/src/pages/Login.tsx",
+      "portal-agepar-main/apps/host/src/pages/NotFound.tsx",
+      "portal-agepar-main/apps/host/src/pages/Register.tsx",
+      "portal-agepar-main/apps/host/src/pages/RegisterDisabled.tsx",
+      "portal-agepar-main/apps/host/src/types.ts"
+    ],
+    "Componentes/Pages TS/TSX": [
+      "portal-agepar-main/apps/docs-site/src/components/HomepageFeatures/index.tsx",
+      "portal-agepar-main/apps/docs-site/src/pages/index.tsx",
+      "portal-agepar-main/apps/host/src/App.tsx",
+      "portal-agepar-main/apps/host/src/auth/AuthProvider.tsx",
+      "portal-agepar-main/apps/host/src/lib/api.ts",
+      "portal-agepar-main/apps/host/src/lib/catalog.ts",
+      "portal-agepar-main/apps/host/src/main.tsx",
+      "portal-agepar-main/apps/host/src/pages/AccountSessions.tsx",
+      "portal-agepar-main/apps/host/src/pages/CategoryView.tsx",
+      "portal-agepar-main/apps/host/src/pages/Forbidden.tsx",
+      "portal-agepar-main/apps/host/src/pages/HomeDashboard.tsx",
+      "portal-agepar-main/apps/host/src/pages/Login.tsx",
+      "portal-agepar-main/apps/host/src/pages/NotFound.tsx",
+      "portal-agepar-main/apps/host/src/pages/Register.tsx",
+      "portal-agepar-main/apps/host/src/pages/RegisterDisabled.tsx",
+      "portal-agepar-main/apps/host/src/types.ts"
+    ],
+    "Tipos (TS)": [
+      "portal-agepar-main/apps/host/src/lib/api.ts",
+      "portal-agepar-main/apps/host/src/lib/catalog.ts",
+      "portal-agepar-main/apps/host/src/types.ts"
+    ],
+    "Integração Catálogo/BFF (indícios)": [
+      "portal-agepar-main/apps/host/src/App.tsx",
+      "portal-agepar-main/apps/host/vite.config.ts"
+    ]
+  },
+  "Catálogo (/catalog/dev)": {
+    "Arquivos do catálogo": [
+      "portal-agepar-main/catalog/catalog.dev.json"
+    ]
+  },
+  "BFF (FastAPI)": {
+    "Raiz do BFF": [
+      "portal-agepar-main/apps/bff/Dockerfile.dev",
+      "portal-agepar-main/apps/bff/app/auth/middleware.py",
+      "portal-agepar-main/apps/bff/app/auth/rbac.py",
+      "portal-agepar-main/apps/bff/app/auth/routes.py",
+      "portal-agepar-main/apps/bff/app/auth/sessions.py",
+      "portal-agepar-main/apps/bff/app/automations/accounts.py",
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/controle_ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/fileshare.py",
+      "portal-agepar-main/apps/bff/app/automations/form2json.py",
+      "portal-agepar-main/apps/bff/app/automations/support.py",
+      "portal-agepar-main/apps/bff/app/automations/templates/accounts/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle_ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/history.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/fileshare/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/support/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/whoisonline/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/whoisonline.py",
+      "portal-agepar-main/apps/bff/app/db.py",
+      "portal-agepar-main/apps/bff/app/games/snake.py",
+      "portal-agepar-main/apps/bff/app/main.py",
+      "portal-agepar-main/apps/bff/app/utils/docx_tools.py",
+      "portal-agepar-main/apps/bff/requirements.txt",
+      "portal-agepar-main/apps/bff/run_dev.sh",
+      "portal-agepar-main/apps/bff/templates/dfd_models/ACS/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/ANA/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/ATII/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/CAT/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/CEL/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/CINV/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/COPPA/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/CPAD/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DAF-CA/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DAF-COF/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DAF-CRH/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DAF/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DFQS-CF/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DFQS/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DNR-CJ/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DNR-CNR/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DNR/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DP-AEP/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DP/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/DRE-CSB/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/FMSBA/model.docx",
+      "portal-agepar-main/apps/bff/templates/dfd_models/UCCO/model.docx",
+      "portal-agepar-main/apps/bff/templates/pdf/requerimento_de_ferias.pdf",
+      "portal-agepar-main/apps/bff/templates/pdf/substituicao_de_ferias.pdf"
+    ],
+    "Arquivos FastAPI": [
+      "portal-agepar-main/apps/bff/app/main.py"
+    ],
+    "Automations (pastas)": [
+      "portal-agepar-main/apps/bff/app/automations/accounts.py",
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/controle_ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/fileshare.py",
+      "portal-agepar-main/apps/bff/app/automations/form2json.py",
+      "portal-agepar-main/apps/bff/app/automations/support.py",
+      "portal-agepar-main/apps/bff/app/automations/templates/accounts/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle_ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/history.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/fileshare/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/support/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/whoisonline/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/whoisonline.py"
+    ],
+    "Sessões mock (login)": [
+      "portal-agepar-main/apps/bff/app/auth/routes.py",
+      "portal-agepar-main/apps/bff/app/main.py",
+      "portal-agepar-main/apps/host/src/lib/api.ts",
+      "portal-agepar-main/apps/host/src/pages/Login.tsx"
+    ],
+    "Sessões mock (me)": [
+      "portal-agepar-main/apps/bff/app/auth/middleware.py",
+      "portal-agepar-main/apps/bff/app/main.py"
+    ],
+    "Rotas automations": [
+      "portal-agepar-main/apps/bff/app/automations/accounts.py",
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/controle_ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/fileshare.py",
+      "portal-agepar-main/apps/bff/app/automations/form2json.py",
+      "portal-agepar-main/apps/bff/app/automations/support.py",
+      "portal-agepar-main/apps/bff/app/automations/whoisonline.py",
+      "portal-agepar-main/apps/bff/app/main.py"
+    ],
+    "Init DB": [
+      "portal-agepar-main/apps/bff/app/db.py",
+      "portal-agepar-main/apps/bff/app/main.py"
+    ],
+    "Pydantic v2 config": [
+      "portal-agepar-main/apps/bff/app/auth/routes.py",
+      "portal-agepar-main/apps/bff/app/automations/accounts.py",
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/controle_ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/fileshare.py",
+      "portal-agepar-main/apps/bff/app/automations/form2json.py",
+      "portal-agepar-main/apps/bff/app/automations/support.py",
+      "portal-agepar-main/apps/bff/app/automations/whoisonline.py"
+    ]
+  },
+  "Automations – Padrão de Módulos": {
+    "Arquivos em automations": [
+      "portal-agepar-main/apps/bff/app/automations/accounts.py",
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/controle_ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/fileshare.py",
+      "portal-agepar-main/apps/bff/app/automations/form2json.py",
+      "portal-agepar-main/apps/bff/app/automations/support.py",
+      "portal-agepar-main/apps/bff/app/automations/templates/accounts/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle_ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/history.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/fileshare/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/support/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/whoisonline/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/whoisonline.py"
+    ],
+    "UI de automations (HTML/JS/CSS)": [
+      "portal-agepar-main/apps/bff/app/automations/templates/accounts/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/controle_ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/history.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/dfd/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/ferias/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/fileshare/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/support/ui.html",
+      "portal-agepar-main/apps/bff/app/automations/templates/whoisonline/ui.html"
+    ]
+  },
+  "Banco de Dados & Persistência": {
+    "DB/ORM/Migrações": [],
+    "Referências a submissions": [
+      "portal-agepar-main/README.md",
+      "portal-agepar-main/apps/bff/app/automations/accounts.py",
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/controle_ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/automations/form2json.py",
+      "portal-agepar-main/apps/bff/app/automations/support.py",
+      "portal-agepar-main/apps/bff/app/db.py",
+      "portal-agepar-main/apps/bff/app/main.py"
+    ],
+    "Referências a audits": [
+      "portal-agepar-main/apps/bff/app/automations/controle.py",
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py",
+      "portal-agepar-main/apps/bff/app/db.py",
+      "portal-agepar-main/apps/bff/app/main.py",
+      "portal-agepar-main/infra/sql/001_init_auth_logs.sql",
+      "portal-agepar-main/infra/sql/099_test_auth_logs.sql"
+    ]
+  },
+  "Segurança": {
+    "CORS": [
+      "portal-agepar-main/README.md",
+      "portal-agepar-main/apps/bff/app/main.py",
+      "portal-agepar-main/infra/docker-compose.dev.yml"
+    ],
+    "Sessões/Cookies": []
+  },
+  "Observabilidade": {
+    "Logs": [],
+    "Health/Métricas": []
+  },
+  "Padrões de Erro & DX": {
+    "Tratamento de Erros": [
+      "portal-agepar-main/apps/bff/app/automations/dfd.py",
+      "portal-agepar-main/apps/bff/app/automations/ferias.py"
+    ]
+  },
+  "Testes": {
+    "Pastas de teste": [],
+    "cURL snippets": [
+      "portal-agepar-main/README.md"
+    ],
+    "Config pytest": []
+  },
+  "Documentação": {
+    "Docusaurus (se houver)": [
+      "portal-agepar-main/apps/docs-site/docusaurus.config.ts",
+      "portal-agepar-main/apps/docs-site/sidebars.ts"
+    ],
+    "MkDocs (se houver)": [],
+    "Pasta docs/": [
+      "portal-agepar-main/apps/docs-site/docs/intro.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/_category_.json",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/congratulations.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/create-a-blog-post.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/create-a-document.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/create-a-page.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/deploy-your-site.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-basics/markdown-features.mdx",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-extras/_category_.json",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-extras/img/docsVersionDropdown.png",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-extras/img/localeDropdown.png",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-extras/manage-docs-versions.md",
+      "portal-agepar-main/apps/docs-site/docs/tutorial-extras/translate-your-site.md"
+    ]
+  },
+  "Guias de Produto (Fluxo Compras Público)": {
+    "Referências no repo": []
+  },
+  "Apêndices": {
+    "Esquemas/Schema": [],
+    "Versionamento/Commits": []
+  }
+}

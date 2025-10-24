@@ -1,3 +1,4 @@
+// @ts-check
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
@@ -23,6 +24,7 @@ const config: Config = {
   organizationName: 'oBaldon',
   projectName: 'portal-agepar',
 
+  // Continua válido no v3 (apenas o onBrokenMarkdownLinks mudou)
   onBrokenLinks: 'throw',
 
   // Internacionalização
@@ -36,10 +38,10 @@ const config: Config = {
       'classic',
       {
         docs: {
-          sidebarPath: './sidebars.ts',
+          // use require.resolve para garantir resolução do caminho no Node
+          sidebarPath: require.resolve('./sidebars.ts'),
           // Link "editar esta página"
-          editUrl:
-            'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
+          editUrl: 'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
         },
         blog: {
           showReadingTime: true,
@@ -47,21 +49,21 @@ const config: Config = {
             type: ['rss', 'atom'],
             xslt: true,
           },
-          editUrl:
-            'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
+          editUrl: 'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
         },
         theme: {
-          customCss: './src/css/custom.css',
+          // idem: resolução via Node
+          customCss: require.resolve('./src/css/custom.css'),
         },
       } satisfies Preset.Options,
     ],
   ],
 
   // Temas e configurações visuais
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: ['@docusaurus/theme-mermaid', '@docusaurus/theme-live-codeblock'],
   markdown: {
     mermaid: true,
     hooks: {
@@ -71,6 +73,10 @@ const config: Config = {
   },
 
   themeConfig: {
+    // Playground: onde o preview aparece em relação ao código
+    liveCodeBlock: {
+      playgroundPosition: 'bottom' // 'top' | 'bottom'
+    },
     image: 'img/docusaurus-social-card.jpg',
     colorMode: {
       respectPrefersColorScheme: true,
@@ -84,9 +90,9 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'techSidebar',
           position: 'left',
-          label: 'Documentação',
+          label: 'Docs',
         },
         { to: '/blog', label: 'Blog', position: 'left' },
         {
@@ -125,6 +131,8 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      // (opcional) garanta TSX e outros idiomas no highlight
+      additionalLanguages: ['tsx', 'typescript', 'jsx', 'bash', 'json', 'diff'],
     },
   } satisfies Preset.ThemeConfig,
 };
