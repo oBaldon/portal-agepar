@@ -6,8 +6,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 // Este arquivo roda em Node.js — não use APIs de browser aqui.
 
 const config: Config = {
-  title: 'Portal AGEPAR — Dev Docs',
-  tagline: 'Documentação para desenvolvedores do Portal AGEPAR',
+  title: 'Plataforma AGEPAR — Dev Docs',
+  tagline: 'Documentação para desenvolvedores da Plataforma AGEPAR',
   favicon: 'img/favicon.ico',
 
   // Flags de futuro — ver https://docusaurus.io/docs/api/docusaurus-config#future
@@ -72,9 +72,9 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Portal AGEPAR',
+      title: 'Plataforma AGEPAR',
       logo: {
-        alt: 'Logo do Portal AGEPAR',
+        alt: 'Logo da Plataforma AGEPAR',
         src: 'img/logo.svg',
       },
       items: [
@@ -115,7 +115,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Portal AGEPAR.
+      copyright: `Copyright © ${new Date().getFullYear()} Plataforma AGEPAR.
       Construído com Docusaurus.`,
     },
     prism: {

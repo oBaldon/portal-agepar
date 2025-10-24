@@ -11,7 +11,7 @@ function Hero() {
     <header className={styles.hero}>
       <div className={`container ${styles.heroInner}`}>
         <div className={styles.heroLeft}>
-          <h1 className={styles.title}>Portal AGEPAR — Dev Docs</h1>
+          <h1 className={styles.title}>Plataforma AGEPAR — Dev Docs</h1>
           <p className={styles.subtitle}>
             BFF (FastAPI), Host (React/Vite/TS), Catálogo modular, Automações e Docs.
           </p>
@@ -118,7 +118,7 @@ function FeatureGrid() {
 
 export default function Home(): ReactNode {
   return (
-    <Layout title="Portal AGEPAR — Dev Docs" description="Documentação técnica do Portal AGEPAR">
+    <Layout title="Plataforma AGEPAR — Dev Docs" description="Documentação técnica da Plataforma AGEPAR">
       <Hero />
       <FeatureGrid />
     </Layout>

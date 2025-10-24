@@ -1,4 +1,4 @@
-# Portal AGEPAR — Docusaurus Skeleton
+# Plataforma AGEPAR — Docusaurus Skeleton
 
 Este esqueleto foi gerado automaticamente a partir de:
 - `docusaurus-timeline.json`

@@ -7,7 +7,7 @@ sidebar_position: 0
 > Esta seção foi gerada a partir do plano (ordem 1).
 
 ## Objetivos
-- Descrever: Objetivo do Portal AGEPAR, escopo e público, Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite), Monorepo: estrutura de pastas, Fluxo dev local vs. produção
+- Descrever: Objetivo da Plataforma AGEPAR, escopo e público, Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite), Monorepo: estrutura de pastas, Fluxo dev local vs. produção
 
 ## Sumário Rápido
 - Estrutura e conceitos
