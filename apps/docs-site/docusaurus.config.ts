@@ -45,11 +45,13 @@ const config: Config = {
         },
         blog: {
           showReadingTime: true,
-          routeBasePath: '/blog',   // mantém separado das docs
+          routeBasePath: '/blog',
+          include: ['**/*.{md,mdx}'],
+          exclude: ['**/_*.{md,mdx}', '**/README.{md,mdx}'], // ⬅️ ignora README
+          editUrl: 'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
-          editUrl: 'https://github.com/oBaldon/portal-agepar/tree/main/apps/docs-site/',
         },
         theme: {
           // idem: resolução via Node
