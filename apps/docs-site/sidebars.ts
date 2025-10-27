@@ -1,6 +1,7 @@
 export default {
   techSidebar: [
     'intro',
+    'dev-guide',
     {
       type: 'category',
       label: '01 — Visão Geral e Arquitetura',
