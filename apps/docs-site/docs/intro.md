@@ -125,7 +125,7 @@ http://localhost:5173/docs
 
 ## Próximos passos neste site
 
-A documentação técnica do Portal AGEPAR está organizada por **seções numeradas** dentro de `docs/`, cada uma com seu próprio `index.md`:
+A documentação técnica da Plataforma AGEPAR está organizada por **seções numeradas** dentro de `docs/`, cada uma com seu próprio `index.md`:
 
 1. **Visão Geral & Arquitetura** — `01-visão-geral-e-arquitetura/`  
 2. **Ambiente Dev (Setup)** — `02-ambiente-dev-setup/`  
