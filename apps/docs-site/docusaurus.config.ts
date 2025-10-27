@@ -84,7 +84,7 @@ const config: Config = {
       title: 'Plataforma AGEPAR',
       logo: {
         alt: 'Logo da Plataforma AGEPAR',
-        src: 'img/logo.svg',
+        src: 'img/logo.png',
       },
       items: [
         {

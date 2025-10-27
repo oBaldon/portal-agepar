@@ -1,1 +1,94 @@
-/* custom styles */
+/* ===========================
+   AGEPAR — Tema global (Docusaurus)
+   Tokens + overrides do Infima
+   =========================== */
+
+:root {
+  /* Tokens AGEPAR (cores da identidade) */
+  --agepar-navy: #001836;
+  --agepar-blue: #00689E;
+  --agepar-green: #519032;
+  --agepar-lime: #BFD730;
+  --agepar-gray-600: #58595B;
+  --agepar-gray-200: #DCDDDE;
+
+  /* Tokens de texto para compor com light/dark */
+  --agepar-text-primary: var(--agepar-navy);
+  --agepar-text-secondary: var(--agepar-gray-600);
+
+  /* Mapeamento p/ Docusaurus (Infima) */
+  --ifm-color-primary: var(--agepar-blue);
+  --ifm-color-primary-dark: #005e8f;
+  --ifm-color-primary-darker: #005580;
+  --ifm-color-primary-darkest: #003f5e;
+  --ifm-color-primary-light: #0a7cb6;
+  --ifm-color-primary-lighter: #2f93c8;
+  --ifm-color-primary-lightest: #9ed4ee;
+
+  --ifm-font-family-base: "Montserrat", "Inter", system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --ifm-heading-font-weight: 800;
+  --ifm-code-font-size: 85%;
+
+  /* Navegação e superfícies */
+  --ifm-navbar-background-color: var(--agepar-navy);
+  --ifm-navbar-link-color: #ffffff;
+  --ifm-navbar-link-hover-color: #ffffff;
+  --ifm-footer-background-color: var(--agepar-navy);
+  --ifm-footer-link-color: #ffffff;
+  --ifm-footer-title-color: #ffffff;
+}
+
+/* Dark mode: mantemos a marca e garantimos contraste */
+[data-theme='dark'] {
+  --ifm-color-primary: var(--agepar-blue);
+  --ifm-navbar-background-color: var(--agepar-navy);
+  --ifm-footer-background-color: var(--agepar-navy);
+
+  /* Texto em seções customizadas */
+  --agepar-text-primary: #ffffff;
+  --agepar-text-secondary: var(--ifm-color-emphasis-700);
+}
+
+/* ===== Navbar actions & toggles visíveis no navy ===== */
+
+/* Links já são brancos via --ifm-navbar-link-color, mas forçamos ações: */
+.navbar .navbar__toggle,
+.navbar button[class*="toggleButton"],
+.navbar :is(.clean-btn).navbar__item {
+  color: var(--ifm-navbar-link-color) !important;
+  opacity: 0.95;
+}
+
+/* Ícones do modo claro/escuro/hamburger herdam currentColor */
+.navbar button[class*="toggleButton"] svg,
+.navbar .navbar__toggle svg {
+  stroke: currentColor;
+  fill: currentColor;
+}
+
+/* Hover/focus com leve feedback sem perder contraste */
+.navbar .navbar__toggle:hover,
+.navbar button[class*="toggleButton"]:hover,
+.navbar .navbar__toggle:focus,
+.navbar button[class*="toggleButton"]:focus {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  opacity: 1;
+}
+
+/* ===== Botão de acento (lima + navy) com contraste AAA ===== */
+.button--accent {
+  --ifm-button-background-color: var(--agepar-lime);
+  --ifm-button-border-color: var(--agepar-lime);
+  --ifm-button-color: var(--agepar-navy);
+}
+.button--accent:hover,
+.button--accent:focus {
+  filter: brightness(0.95);
+}
+
+/* Pequenas melhorias de legibilidade globais */
+p { line-height: 1.7; }
+code, pre { border-radius: 8px; }

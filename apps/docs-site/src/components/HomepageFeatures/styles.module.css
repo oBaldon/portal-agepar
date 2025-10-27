@@ -1,11 +1,61 @@
 .features {
+  padding: 3rem 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  background:
+    radial-gradient(900px 320px at 88% 0%, rgba(191,215,48,0.12), transparent 60%),
+    linear-gradient(180deg, rgba(0,24,54,0.03), transparent 60%);
+}
+
+.rowGap { row-gap: 1.5rem; }
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.iconWrap {
   display: flex;
   align-items: center;
-  padding: 2rem 0;
-  width: 100%;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  /* halo com a cor de acento e leve borda */
+  box-shadow:
+    inset 0 0 0 8px rgba(191, 215, 48, 0.22),
+    0 6px 18px rgba(0, 0, 0, 0.06);
+  background: var(--ifm-background-surface-color);
+  color: var(--agepar-navy); /* ícone usa currentColor */
 }
 
 .featureSvg {
-  height: 200px;
-  width: 200px;
+  width: 56px;
+  height: 56px;
+  display: block;
 }
+
+.textWrap { padding-right: .5rem; }
+.title {
+  margin: .25rem 0;
+  color: var(--agepar-text-primary);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.desc {
+  margin: 0;
+  color: var(--agepar-text-secondary);
+  line-height: 1.7;
+  font-size: .95rem;
+}
+
+/* Dark mode: mantém contraste e ícones legíveis */
+:global([data-theme='dark']) .iconWrap {
+  background: var(--ifm-background-surface-color);
+  box-shadow:
+    inset 0 0 0 8px rgba(191, 215, 48, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #ffffff; /* ícone branco no dark */
+}
+:global([data-theme='dark']) .title { color: #ffffff; }
+:global([data-theme='dark']) .desc { color: var(--ifm-color-emphasis-700); }

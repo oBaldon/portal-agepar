@@ -1,9 +1,9 @@
-// apps/docs-site/src/pages/index.tsx
 import type { ReactNode } from 'react';
 import Link from '@docusaurus/Link';
 import Layout from '@theme/Layout';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import styles from './index.module.css';
+import HomepageFeatures from '../components/HomepageFeatures';
 
 function Hero() {
   const { siteConfig } = useDocusaurusContext();
@@ -20,7 +20,7 @@ function Hero() {
             <Link className={`button button--primary ${styles.cta}`} to="/docs/intro">
               🚀 Começar pela Introdução
             </Link>
-            <Link className={`button button--secondary ${styles.cta}`} to="/docs/visão-geral-e-arquitetura">
+            <Link className={`button button--accent ${styles.cta}`} to="/docs/visão-geral-e-arquitetura">
               🧭 Visão Geral & Arquitetura
             </Link>
           </div>
@@ -120,6 +120,7 @@ export default function Home(): ReactNode {
   return (
     <Layout title="Plataforma AGEPAR — Dev Docs" description="Documentação técnica da Plataforma AGEPAR">
       <Hero />
+      <HomepageFeatures />
       <FeatureGrid />
     </Layout>
   );

@@ -1,8 +1,9 @@
-/* apps/docs-site/src/pages/index.module.css */
 .hero {
-  padding: 4rem 0 2rem;
-  background: radial-gradient(1200px 500px at 10% -10%, rgba(0,152,255,0.15), transparent),
-              linear-gradient(180deg, rgba(0,0,0,0.02), transparent 60%);
+  padding: 4rem 0 2.5rem;
+  /* Fundo com identidade: acento lima translúcido + leve sombra vertical */
+  background:
+    radial-gradient(1100px 480px at 12% -10%, rgba(191,215,48,0.20), transparent 60%),
+    linear-gradient(180deg, rgba(0,24,54,0.05), transparent 60%);
 }
 
 .heroInner {
@@ -13,16 +14,29 @@
 }
 
 .heroLeft { max-width: 720px; }
-.title { margin: 0 0 .25rem; font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; }
-.subtitle { margin: 0 0 1.25rem; font-size: 1.2rem; opacity: .9; }
+
+.title {
+  margin: 0 0 .4rem;
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--agepar-text-primary);
+}
+
+.subtitle {
+  margin: 0 0 1.25rem;
+  font-size: 1.15rem;
+  color: var(--agepar-text-secondary);
+}
 
 .ctaRow { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .cta { border-radius: 12px; padding: .65rem 1rem; }
 
-.meta { font-size: .9rem; opacity: .85; }
+.meta { font-size: .95rem; opacity: .95; color: var(--agepar-text-secondary); }
 .meta ul { margin: .35rem 0 0 1rem; }
 
 .heroRight { display: flex; justify-content: center; }
+
 .codeCard {
   width: 100%;
   max-width: 460px;
@@ -37,6 +51,7 @@
   font-size: .8rem;
   background: var(--ifm-navbar-background-color);
   border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  color: #fff;
 }
 .codeBlock {
   margin: 0;
@@ -73,8 +88,16 @@
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-global-shadow-md);
 }
-.card h3 { margin: .25rem 0 .25rem; font-size: 1.05rem; }
-.card p { margin: 0 0 .75rem; font-size: .9rem; opacity: .9; }
+.card h3 {
+  margin: .25rem 0 .25rem;
+  font-size: 1.05rem;
+  color: var(--agepar-text-primary);
+}
+.card p {
+  margin: 0 0 .75rem;
+  font-size: .9rem;
+  color: var(--agepar-text-secondary);
+}
 .cardLink { font-size: .85rem; color: var(--ifm-color-primary); }
 
 @media (max-width: 996px) {
