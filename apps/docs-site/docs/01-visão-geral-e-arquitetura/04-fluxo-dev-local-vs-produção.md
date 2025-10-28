@@ -4,8 +4,6 @@ title: "Fluxo dev local vs. produção"
 sidebar_position: 4
 ---
 
-_Criado em 2025-10-27 12:51:23_
-
 Esta página compara o **fluxo de desenvolvimento local** com o **fluxo de produção** para o Portal AGEPAR.
 
 ## Visão geral do fluxo
@@ -89,6 +87,4 @@ curl -i -X POST http://localhost:8000/api/auth/login   -H "Content-Type: applica
 
 ---
 
-_Esta página descreve o fluxo de execução e promoção. Consulte as seções 03 (Monorepo) e 10 (Observabilidade) para detalhes._
-
-_Criado em 2025-10-27 12:51:23_
+> _Criado em 2025-10-27 12:51:23_

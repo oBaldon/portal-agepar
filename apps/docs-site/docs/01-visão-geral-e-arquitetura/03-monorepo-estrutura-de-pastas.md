@@ -4,8 +4,6 @@ title: "Monorepo: estrutura de pastas"
 sidebar_position: 3
 ---
 
-_Criado em 2025-10-27 12:39:04_
-
 Esta página descreve a **estrutura do monorepo** do Portal AGEPAR, destacando as pastas principais e arquivos‑chave que suportam Host, BFF, Docs e Catálogo.
 
 ## Árvore (2 níveis)
@@ -96,6 +94,4 @@ curl -s http://localhost:8000/catalog/dev | jq .
 
 ---
 
-_Esta página resume a organização física do repositório; detalhes profundos estão nas seções 05 (Catálogo), 06 (BFF) e 07 (Automations)._
-
-_Criado em 2025-10-27 12:39:04_
+> _Criado em 2025-10-27 12:39:04_

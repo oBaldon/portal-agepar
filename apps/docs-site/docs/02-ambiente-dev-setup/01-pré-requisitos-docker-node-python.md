@@ -4,8 +4,6 @@ title: "Pré-requisitos (Docker, Node, Python)"
 sidebar_position: 1
 ---
 
-_Criado em 2025-10-27 13:48:02_
-
 Esta página lista os **pré‑requisitos** para rodar o ambiente de desenvolvimento da Plataforma AGEPAR com estabilidade e performance.
 
 > Requisitos mínimos recomendados: **Docker 24+**, **Docker Compose v2+**, **Node.js 18+** (com **pnpm**), **Python 3.11+**.
@@ -147,4 +145,4 @@ docker compose up --build
 
 ---
 
-_Criado em 2025-10-27 13:48:02_
+> _Criado em 2025-10-27 13:48:02_

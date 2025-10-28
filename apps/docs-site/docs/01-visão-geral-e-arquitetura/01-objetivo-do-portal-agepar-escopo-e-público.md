@@ -4,8 +4,6 @@ title: "Objetivo da Plataforma AGEPAR, escopo e público"
 sidebar_position: 1
 ---
 
-> _Criado em 2025-10-27 12:20:15_
-
 A **Plataforma AGEPAR** centraliza **fluxos de compras públicas** fim‑a‑fim (DFD → PCA → ETP → TR → Cotação/Dispensa/Licitação → Contrato → Execução/Empenho/Pagamento), oferecendo **automations modulares** orquestradas por um **BFF (FastAPI)** e apresentadas em um **Host (React/Vite/TS)**. A documentação para não‑devs é servida via **MkDocs/Material** (proxy em `/docs`).
 
 ## Objetivos do produto
@@ -71,6 +69,4 @@ curl -s http://localhost:8000/api/automations/dfd/ui
 
 ---
 
-> _Esta página será refinada conforme novos módulos e integrações são adicionados._
-
-_Criado em 2025-10-27 12:24:32_
+> _Criado em 2025-10-27 12:24:32_

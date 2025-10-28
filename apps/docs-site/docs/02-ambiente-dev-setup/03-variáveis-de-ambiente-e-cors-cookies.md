@@ -4,8 +4,6 @@ title: "Variáveis de ambiente e CORS/cookies"
 sidebar_position: 3
 ---
 
-_Criado em 2025-10-27 12:47:50_
-
 Esta página reúne **variáveis de ambiente** usadas no Host/BFF e as **configurações de CORS e cookies** típicas para desenvolvimento.
 
 > Regra geral: em dev, **origem** do Host `http://localhost:5173` deve estar liberada no BFF; sessões são mantidas por **cookies**.
@@ -159,6 +157,4 @@ curl -i http://localhost:8000/api/me -b cookies.txt
 
 ---
 
-> _Esta página descreve variáveis e segurança de transporte. Consulte também “Proxies do Vite” e “Troubleshooting”._
-
-_Criado em 2025-10-27 12:47:50_
+> _Criado em 2025-10-27 12:47:50_

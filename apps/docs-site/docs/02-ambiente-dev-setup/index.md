@@ -4,8 +4,6 @@ title: "Ambiente Dev — Setup"
 sidebar_position: 0
 ---
 
-_Criado em 2025-10-27 13:37:46_
-
 Esta seção cobre **pré-requisitos**, **subida com Docker Compose**, **proxies do Vite**, variáveis de ambiente (incl. `DATABASE_URL` do Postgres) e **troubleshooting** para o ambiente de desenvolvimento.
 
 ## Pré-requisitos
@@ -63,6 +61,4 @@ curl -s http://localhost:8000/api/eprotocolo/ping
 
 ---
 
-*Esta seção será detalhada com base nos artefatos do repositório principal.*
-
-_Criado em 2025-10-27 13:37:46_
+> _Criado em 2025-10-27 13:37:46_

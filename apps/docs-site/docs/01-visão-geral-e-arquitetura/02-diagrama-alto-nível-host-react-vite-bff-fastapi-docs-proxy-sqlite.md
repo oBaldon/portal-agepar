@@ -4,8 +4,6 @@ title: "Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite)"
 sidebar_position: 2
 ---
 
-_Criado em 2025-10-27 12:36:31_
-
 Esta página apresenta o **diagrama alto nível** da Plataforma AGEPAR e como os componentes se conectam em **dev** e **produção**.
 
 ## Diagrama (alto nível)
@@ -75,6 +73,4 @@ curl -s http://localhost:8000/api/automations/dfd/ui
 
 ---
 
-_Esta página é um resumo visual da arquitetura. Consulte a seção 06 (BFF FastAPI) e 05 (Catálogo) para detalhes de endpoints e schema._
-
-_Criado em 2025-10-27 12:36:31_
+> _Criado em 2025-10-27 12:36:31_

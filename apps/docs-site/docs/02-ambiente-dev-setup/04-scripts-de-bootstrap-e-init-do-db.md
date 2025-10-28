@@ -4,8 +4,6 @@ title: "Scripts de bootstrap e init do DB"
 sidebar_position: 4
 ---
 
-_Criado em 2025-10-27 13:10:00_
-
 O BFF usa **Postgres** (driver **psycopg**) definido em `apps/bff/app/db.py` para persistir:
 - **submissions** — `kind`, `payload` (JSONB), `status`, `result` (JSONB), `error`, timestamps
 - **audits** — `event`, `details` (JSONB), `submission_id`, timestamps
@@ -151,4 +149,4 @@ O `db.py` expõe utilitários para:
 
 ---
 
-_Criado em 2025-10-27 13:10:00_
+> _Criado em 2025-10-27 13:10:00_

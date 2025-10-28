@@ -4,8 +4,6 @@ title: "docker-compose: serviços e portas (5173/8000/8000)"
 sidebar_position: 2
 ---
 
-_Criado em 2025-10-27 13:54:16_
-
 Esta página detalha a **orquestração local** com Docker Compose para a Plataforma AGEPAR — serviços, portas e _healthchecks_, além de exemplos de verificação.
 
 > **Resumo das portas (dev):**
@@ -126,4 +124,4 @@ curl -i -X POST http://localhost:8000/api/auth/login \\
 
 ---
 
-_Criado em 2025-10-27 13:54:16_
+> _Criado em 2025-10-27 13:54:16_

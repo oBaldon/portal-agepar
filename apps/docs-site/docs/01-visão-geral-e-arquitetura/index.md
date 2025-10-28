@@ -4,11 +4,6 @@ title: "Visão Geral e Arquitetura"
 sidebar_position: 0
 ---
 
-_Criado em 2025-10-27 12:49:10_
-
-
-> Esta seção foi gerada a partir do plano (ordem 1).
-
 ## Objetivos
 - Descrever: Objetivo da Plataforma AGEPAR, escopo e público, Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite), Monorepo: estrutura de pastas, Fluxo dev local vs. produção
 
@@ -61,4 +56,4 @@ flowchart LR
 - **Docs / MkDocs**: servidas via `/docs` pelo host; conteúdo para não-devs; tema Material com Mermaid/Glightbox.
 - **Catálogo**: servido em `/catalog/dev` com `categories[]` e `blocks[]`; blocos com `ui.type="iframe"`.
 
-_Criado em 2025-10-27 12:49:10_
+> _Criado em 2025-10-27 12:49:10_
