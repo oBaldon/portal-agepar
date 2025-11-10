@@ -6,26 +6,64 @@
 <title>Fileshare — Uploader temporário</title>
 <style>
   :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; }
-  * { box-sizing:border-box } html,body { margin:0; background:var(--bg); color:var(--fg); font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
+  * { box-sizing:border-box }
+  html,body { margin:0; background:var(--bg); color:var(--fg); font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
+
+  /* Bloco de cima: largura padrão (antes) */
   .wrap { max-width: 960px; margin: 20px auto; padding: 0 16px; }
+
+  /* Bloco de baixo: largura dinâmica, centralizado */
+  .wide {
+    max-width: min(1280px, calc(100vw - 32px));
+    margin: 14px auto 20px;
+    padding: 0 16px;
+  }
+
   .card { background:var(--card); border:1px solid #e2e8f0; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
   h1 { font-size:18px; margin:0 0 10px }
   label { display:block; font-size:12px; color:var(--muted); margin:8px 0 6px; }
   input, select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; background:#fff; }
+
   .row { display:flex; gap:12px; }
   .row > * { flex:1; }
-  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 14px; cursor:pointer; }
+
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 14px; cursor:pointer; flex:0 0 auto; }
   .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
   .btn[disabled] { opacity:.55; cursor:not-allowed; }
+
+  .btn-row {
+    display:flex;
+    gap:8px;
+    align-items:center;
+    justify-content:center;  /* centraliza os botões */
+    flex-wrap:nowrap;        /* mantém lado a lado em desktop */
+  }
+
   table { width:100%; border-collapse:collapse; margin-top:12px; background:#fff; }
   th, td { padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left; }
   th { font-size:12px; color:#64748b; background:#f8fafc; }
   .nowrap { white-space:nowrap }
   .muted { color:#64748b; font-size:12px; }
-  .btn-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  /* Centraliza e reserva espaço para a coluna AÇÕES */
+  th:nth-child(5), td:nth-child(5) { text-align:center; width:280px; }
+
+  /* Evita “vazar” em telas estreitas; permite scroll horizontal da tabela */
+  .table-wrap { overflow-x:auto; }
+
+  /* Responsividade */
+  @media (max-width: 800px){
+    .row { flex-direction:column; }
+  }
+  @media (max-width: 600px){
+    .btn-row { flex-wrap:wrap; }             /* pode quebrar em telas pequenas */
+    th:nth-child(5), td:nth-child(5) { width:auto; }
+  }
 </style>
 </head>
 <body>
+
+<!-- BLOCO DE CIMA (padrão) -->
 <div class="wrap">
   <h1>Uploader temporário (Fileshare)</h1>
 
@@ -55,8 +93,11 @@
       </div>
     </form>
   </div>
+</div>
 
-  <div class="card" style="margin-top:14px">
+<!-- BLOCO DE BAIXO (largo dinâmico) -->
+<div class="wide">
+  <div class="card">
     <div class="row">
       <div>
         <label>Mostrar</label>
@@ -140,11 +181,15 @@
         <td class="nowrap">${it.owner_name || it.owner_id || "—"}</td>
         <td class="nowrap"></td>
       `;
-      const actions = document.createElement("div"); actions.className = "btn-row";
+
+      const actions = document.createElement("div");
+      actions.className = "btn-row";
 
       // Baixar (sempre visível; superuser baixa sem senha)
       const btnDown = document.createElement("button");
-      btnDown.className="btn"; btnDown.type="button"; btnDown.textContent="Baixar";
+      btnDown.className="btn";
+      btnDown.type="button";
+      btnDown.textContent="Baixar";
       btnDown.onclick = async ()=>{
         const fd = new FormData();
         if(it.has_secret && !isSuperuser){
@@ -167,7 +212,9 @@
       // Link (apenas dono ou superuser)
       if (canOwnerActions) {
         const btnShare = document.createElement("button");
-        btnShare.className="btn secondary"; btnShare.type="button"; btnShare.textContent="Link";
+        btnShare.className="btn secondary";
+        btnShare.type="button";
+        btnShare.textContent="Link";
         btnShare.onclick = async ()=>{
           const fd = new FormData();
           const expires = prompt("Validade do link: 1d, 7d ou 30d", "7d") || "7d";
@@ -193,7 +240,9 @@
       // Excluir (apenas dono ou superuser)
       if (canOwnerActions) {
         const btnDel = document.createElement("button");
-        btnDel.className="btn secondary"; btnDel.type="button"; btnDel.textContent="Excluir";
+        btnDel.className="btn secondary";
+        btnDel.type="button";
+        btnDel.textContent="Excluir";
         btnDel.onclick = async ()=>{
           if(!confirm("Excluir este arquivo?")) return;
           const r = await fetch(`/api/automations/fileshare/items/${it.id}/delete`, { method:"POST", credentials:"include" });
