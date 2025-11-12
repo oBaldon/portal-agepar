@@ -3,7 +3,18 @@ services:
     build:
       context: ../apps/bff
       dockerfile: Dockerfile.dev
+      labels:
+        org.agepar.project: portal-agepar        # <-- rótulos na IMAGEM (aplicados no build)
+        org.agepar.service: bff
+        org.opencontainers.image.title: "Portal AGEPAR BFF"
+        org.opencontainers.image.description: "FastAPI BFF (dev)"
+        org.opencontainers.image.source: "https://github.com/oBaldon/portal-agepar"
+        org.opencontainers.image.licenses: "MIT"
     container_name: portal-agepar-bff
+    labels:
+      org.agepar.project: portal-agepar          # <-- rótulos no CONTAINER (úteis para docker ps / filtros)
+      org.agepar.service: bff
+      org.agepar.env: dev
     environment:
       ENV: dev
       AUTH_MODE: mock
@@ -36,6 +47,10 @@ services:
   host:
     image: node:20-alpine
     container_name: portal-agepar-host
+    labels:
+      org.agepar.project: portal-agepar
+      org.agepar.service: host
+      org.agepar.env: dev
     working_dir: /workspace
     environment:
       VITE_CATALOG_URL: /catalog/dev
@@ -63,6 +78,10 @@ services:
   docs:
     image: node:20-alpine
     container_name: portal-agepar-docs
+    labels:
+      org.agepar.project: portal-agepar
+      org.agepar.service: docs
+      org.agepar.env: dev
     working_dir: /work/apps/docs-site
     environment:
       NODE_ENV: development

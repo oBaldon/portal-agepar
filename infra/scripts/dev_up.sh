@@ -14,16 +14,26 @@ echo "ℹ️  Validando serviços presentes na composição..."
 docker compose -f "$DEV_YML" -f "$PG_YML" config --services
 echo
 
-if ! docker compose -f "$DEV_YML" -f "$PG_YML" config --services | grep -q '^postgres$'; then
+# Confere se 'postgres' entrou na composição (nega o pipeline inteiro)
+if ! (
+  docker compose -f "$DEV_YML" -f "$PG_YML" config --services \
+  | tr -d '\r' \
+  | grep -Fxq 'postgres'
+); then
   echo "❌ O serviço 'postgres' não entrou na composição."
   echo "   Verifique o arquivo ${PG_YML}."
   exit 1
 fi
 
-docker compose -f "$DEV_YML" -f "$PG_YML" up -d --build
+# 👍 Ponto principal: garantir bases atualizadas e rebuildar o bff com base nova
+docker compose -f "$DEV_YML" -f "$PG_YML" up -d --build --pull always --remove-orphans
 
 echo
 echo "✅ Stack dev+pg no ar."
 echo " • Host    : http://localhost:5173"
 echo " • BFF     : http://localhost:8000"
 echo " • Postgres: localhost:${PGPORT_MAP:-5432}  (db=${PGDATABASE:-portal}, user=${PGUSER:-portal})"
+
+echo
+echo "ℹ️  Imagens em uso (com tamanhos):"
+docker compose -f "$DEV_YML" -f "$PG_YML" images

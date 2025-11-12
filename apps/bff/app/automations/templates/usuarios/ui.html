@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Usuários (RH) · v0.1.0</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; --ok:#059669; --err:#b91c1c; --bd:#e2e8f0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+
+  label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  input:not([type="checkbox"]):not([type="radio"]), textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
+  textarea { min-height: 100px; resize: vertical; }
+  .row { display:flex; gap: 12px; flex-wrap: wrap; }
+  .col { flex:1; min-width: 220px; }
+
+  .actions { display:flex; gap: 12px; align-items:center; justify-content: flex-end; flex-wrap: wrap; }
+  .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
+  .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.secondary:hover { background:#f8fafc; }
+  .btn.small { padding: 8px 12px; font-size: 12px; }
+  .btn.danger { background:#b91c1c; }
+  .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
+  .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+  .pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid #e2e8f0; background:#f8fafc; }
+  .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+  .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+  .note { font-size:12px; color:var(--muted); }
+  .group-hidden { display:none; }
+  .list { border:1px dashed var(--bd); padding:10px; border-radius:10px; background:#fff; }
+  .item { border:1px solid var(--bd); border-radius:10px; padding:10px; margin:10px 0; background:#fff; }
+  .item .row .col { min-width: 200px; }
+
+  .toast { position:fixed; right:16px; bottom:16px; padding:10px 12px; border-radius:10px; color:#fff; background:var(--pri); box-shadow:0 8px 20px rgba(2,6,23,.25); z-index:50 }
+  .toast.ok{ background:var(--ok) } .toast.err{ background:var(--err) }
+
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
+  th,td { padding:10px 12px; border-bottom:1px solid var(--bd); vertical-align:top; }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.02em; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Usuários (RH) <span class="muted">· v0.1.0</span></h1>
+    <span class="note">Criação e consulta de usuários corporativos pelo RH.</span>
+  </div>
+
+  <!-- CRIAR -->
+  <div class="card" aria-labelledby="titulo-criar">
+    <h2 id="titulo-criar" style="font-size:16px; margin:0 0 8px">Cadastrar novo usuário</h2>
+
+    <!-- Núcleo comum -->
+    <h3 style="font-size:14px; margin:6px 0">Núcleo comum</h3>
+    <div class="row">
+      <div class="col"><label for="nome_completo">Nome completo *</label><input id="nome_completo" required placeholder="Ex.: Maria da Silva"/></div>
+      <div class="col"><label for="rg">RG</label><input id="rg" placeholder="RG"/></div>
+      <div class="col"><label for="cpf">CPF *</label><input id="cpf" placeholder="Somente números" inputmode="numeric" minlength="11" maxlength="14" required/></div>
+    </div>
+    <div class="row">
+      <div class="col"><label for="id_funcional">ID funcional</label><input id="id_funcional" inputmode="numeric" placeholder="Ex.: 12345"/></div>
+      <div class="col"><label for="data_nascimento">Data de nascimento</label><input id="data_nascimento" type="date"/></div>
+      <div class="col"><label for="email_institucional">E-mail institucional</label><input id="email_institucional" placeholder="nome@org.gov.br"/></div>
+    </div>
+
+    <!-- Contato & endereço -->
+    <h3 style="font-size:14px; margin:6px 0">Contato & endereço</h3>
+    <div class="row">
+      <div class="col"><label for="telefone_principal">Telefone principal</label><input id="telefone_principal" placeholder="(xx) xxxxx-xxxx"/></div>
+      <div class="col"><label for="ramal">Ramal</label><input id="ramal" placeholder="Ex.: 1234"/></div>
+      <div class="col"><label for="email_principal">E-mail principal</label><input id="email_principal" placeholder="pessoal@exemplo.com"/></div>
+    </div>
+    <div class="row">
+      <div class="col" style="flex:2"><label for="endereco">Endereço</label><input id="endereco" placeholder="Rua, número, bairro, cidade/UF"/></div>
+      <div class="col" style="max-width:200px"><label for="dependentes_qtde">Dependentes (qtde)</label><input id="dependentes_qtde" type="number" min="0" step="1" inputmode="numeric"/></div>
+    </div>
+
+    <!-- Formação -->
+    <h3 style="font-size:14px; margin:6px 0">Formação</h3>
+    <div class="row">
+      <div class="col" style="max-width:220px">
+        <label><input type="checkbox" id="form_nivel_medio" /> Concluiu nível médio</label>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <div class="row" style="align-items:center; justify-content:space-between">
+          <h4 style="font-size:13px; margin:4px 0">Graduações</h4>
+          <button class="btn small secondary" type="button" id="btn_add_grad">Adicionar</button>
+        </div>
+        <div id="grad_list" class="list" aria-live="polite"></div>
+      </div>
+      <div class="col">
+        <div class="row" style="align-items:center; justify-content:space-between">
+          <h4 style="font-size:13px; margin:4px 0">Pós-graduações</h4>
+          <button class="btn small secondary" type="button" id="btn_add_pos">Adicionar</button>
+        </div>
+        <div id="pos_list" class="list" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- Situação funcional -->
+    <h3 style="font-size:14px; margin:6px 0">Situação funcional</h3>
+    <div class="row">
+      <div class="col">
+        <label for="tipo_vinculo">Tipo de vínculo *</label>
+        <select id="tipo_vinculo">
+          <option value="efetivo">Efetivo</option>
+          <option value="comissionado">Comissionado</option>
+          <option value="estagiario">Estagiário</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="status">Status do vínculo *</label>
+        <select id="status">
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="col" id="motivo_wrap" style="display:none">
+        <label for="motivo_inatividade">Motivo da inatividade</label>
+        <select id="motivo_inatividade">
+          <option value="">-- Selecionar --</option>
+          <option value="exoneracao">Exoneração</option>
+          <option value="aposentadoria">Aposentadoria</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="org_unit_code">Unidade organizacional *</label>
+        <select id="org_unit_code">
+          <option value="" disabled selected>Carregando...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- Especificidades por vínculo -->
+    <!-- EFETIVO -->
+    <div id="grupo-efetivo" class="group-hidden">
+      <h3 style="font-size:14px; margin:6px 0">Efetivo — Atos e marcos</h3>
+      <div class="row">
+        <div class="col"><label for="ef_decreto_num">Decreto nomeação (nº)</label><input id="ef_decreto_num"/></div>
+        <div class="col"><label for="ef_decreto_data">Decreto nomeação (data)</label><input id="ef_decreto_data" type="date"/></div>
+        <div class="col"><label for="ef_posse_data">Posse (data)</label><input id="ef_posse_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="ef_exercicio_data">Exercício (data)</label><input id="ef_exercicio_data" type="date"/></div>
+        <div class="col"><label for="ef_lotacao_portaria">Lotação (portaria)</label><input id="ef_lotacao_portaria"/></div>
+        <div class="col"><label for="ef_cedido_de">Cedido de</label><input id="ef_cedido_de"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="ef_cedido_para">Cedido para</label><input id="ef_cedido_para"/></div>
+        <div class="col"><label for="ef_classe">Classe (romanos)</label><input id="ef_classe" placeholder="Ex.: III"/></div>
+        <div class="col"><label for="ef_classe_nivel">Nível (inteiro)</label><input id="ef_classe_nivel" type="number" min="0" step="1"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="ef_estab_data">Estabilidade (data)</label><input id="ef_estab_data" type="date"/></div>
+        <div class="col"><label for="ef_estab_protocolo">Estabilidade (protocolo)</label><input id="ef_estab_protocolo"/></div>
+        <div class="col"><label for="ef_estab_resolucao">Estabilidade (resolução conjunta)</label><input id="ef_estab_resolucao"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="ef_estab_pub_data">Estabilidade (publicação data)</label><input id="ef_estab_pub_data" type="date"/></div>
+      </div>
+
+      <h4 style="font-size:13px; margin:10px 0 4px">Capacitações</h4>
+      <div class="row" style="align-items:center; justify-content:flex-end">
+        <button class="btn small secondary" type="button" id="btn_add_cap">Adicionar</button>
+      </div>
+      <div id="ef_cap_list" class="list" aria-live="polite"></div>
+
+      <h4 style="font-size:13px; margin:10px 0 4px">GITI</h4>
+      <div class="row" style="align-items:center; justify-content:flex-end">
+        <button class="btn small secondary" type="button" id="btn_add_giti">Adicionar</button>
+      </div>
+      <div id="ef_giti_list" class="list" aria-live="polite"></div>
+
+      <div class="hr"></div>
+      <h3 style="font-size:14px; margin:6px 0">Efetivo — Outro cargo (opcional)</h3>
+      <div class="row">
+        <div class="col" style="max-width:260px">
+          <label><input type="checkbox" id="ef_outro_enable"/> Possui outro cargo</label>
+        </div>
+      </div>
+      <div id="ef_outro_wrap" class="group-hidden">
+        <div class="row">
+          <div class="col"><label for="ef_out_funcao">Função/CC</label><input id="ef_out_funcao"/></div>
+          <div class="col"><label for="ef_out_decreto_num">Decreto nomeação (nº)</label><input id="ef_out_decreto_num"/></div>
+          <div class="col"><label for="ef_out_decreto_data">Decreto nomeação (data)</label><input id="ef_out_decreto_data" type="date"/></div>
+        </div>
+        <div class="row">
+          <div class="col"><label for="ef_out_posse_data">Posse (data)</label><input id="ef_out_posse_data" type="date"/></div>
+          <div class="col"><label for="ef_out_exercicio_data">Exercício (data)</label><input id="ef_out_exercicio_data" type="date"/></div>
+          <div class="col"><label for="ef_out_simbolo">Símbolo</label><input id="ef_out_simbolo" placeholder="Ex.: CCE-8, FCE-14"/></div>
+        </div>
+        <div class="row">
+          <div class="col"><label for="ef_out_exon_num">Decreto exoneração (nº)</label><input id="ef_out_exon_num"/></div>
+          <div class="col"><label for="ef_out_exon_data">Decreto exoneração (data)</label><input id="ef_out_exon_data" type="date"/></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMISSIONADO -->
+    <div id="grupo-comissionado" class="group-hidden">
+      <h3 style="font-size:14px; margin:6px 0">Comissionado</h3>
+      <div class="row">
+        <div class="col"><label for="co_decreto_num">Decreto nomeação (nº)</label><input id="co_decreto_num"/></div>
+        <div class="col"><label for="co_decreto_data">Decreto nomeação (data)</label><input id="co_decreto_data" type="date"/></div>
+        <div class="col"><label for="co_posse_data">Posse (data)</label><input id="co_posse_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="co_exercicio_data">Exercício (data)</label><input id="co_exercicio_data" type="date"/></div>
+        <div class="col"><label for="co_simbolo">Símbolo</label><input id="co_simbolo" placeholder="Ex.: CCE-8, FCE-14"/></div>
+        <div class="col"><label for="co_funcao">Função exercida</label><input id="co_funcao"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="co_exon_num">Decreto exoneração (nº)</label><input id="co_exon_num"/></div>
+        <div class="col"><label for="co_exon_data">Decreto exoneração (data)</label><input id="co_exon_data" type="date"/></div>
+        <div class="col">
+          <label for="co_com_vinculo">Com vínculo?</label>
+          <select id="co_com_vinculo">
+            <option value="">--</option>
+            <option value="true">Sim</option>
+            <option value="false">Não</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTAGIÁRIO -->
+    <div id="grupo-estagiario" class="group-hidden">
+      <h3 style="font-size:14px; margin:6px 0">Estagiário — TCE & prazos</h3>
+      <div class="row">
+        <div class="col"><label for="es_tce_num">TCE (nº)</label><input id="es_tce_num"/></div>
+        <div class="col"><label for="es_tce_ano">TCE (ano)</label><input id="es_tce_ano" type="number" min="1900" max="2100" inputmode="numeric"/></div>
+        <div class="col"><label for="es_inicio_data">Início</label><input id="es_inicio_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="es_fim_data">Fim</label><input id="es_fim_data" type="date"/></div>
+        <div class="col"><label for="es_limite_alerta_data">Limite alerta (auto: +2 anos)</label><input id="es_limite_alerta_data" type="date" disabled/></div>
+        <div class="col"><label for="es_aditivo_novo_fim">Aditivo (novo fim)</label><input id="es_aditivo_novo_fim" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="es_rescisao_data">Rescisão (data)</label><input id="es_rescisao_data" type="date"/></div>
+      </div>
+
+      <h4 style="font-size:13px; margin:10px 0 4px">Controles operacionais</h4>
+      <div class="row">
+        <div class="col"><label for="es_fluxogramas">Fluxogramas</label><textarea id="es_fluxogramas" placeholder="Observações"></textarea></div>
+        <div class="col"><label for="es_frequencia">Frequência</label><textarea id="es_frequencia" placeholder="Observações"></textarea></div>
+      </div>
+      <div class="row">
+        <div class="col"><label for="es_pagamento">Pagamento</label><textarea id="es_pagamento" placeholder="Observações"></textarea></div>
+        <div class="col" style="max-width:260px; align-self:flex-end; padding-bottom:8px">
+          <label><input type="checkbox" id="es_vale_transporte"/> Recebe vale-transporte</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:12px">
+      <span class="note">A senha inicial é um PIN aleatório de 4 dígitos; o usuário deverá trocá-la no primeiro acesso.</span>
+      <button class="btn" id="btn_criar" type="button">Criar usuário</button>
+    </div>
+    <div id="criar_result" class="note" style="margin-top:8px"></div>
+  </div>
+
+  <!-- BUSCAR -->
+  <div id="card-buscar" class="card" style="margin-top:16px" aria-labelledby="titulo-buscar">
+    <h2 id="titulo-buscar" style="font-size:16px; margin:0 0 8px">Buscar usuários</h2>
+    <div class="row">
+      <div class="col"><label for="f_q">Busca</label><input id="f_q" placeholder="nome, e-mail ou CPF" /></div>
+      <div class="col">
+        <label for="f_tipo">Vínculo</label>
+        <select id="f_tipo">
+          <option value="">Todos</option>
+          <option value="efetivo">Efetivo</option>
+          <option value="comissionado">Comissionado</option>
+          <option value="estagiario">Estagiário</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="f_status">Status do vínculo</label>
+        <select id="f_status">
+          <option value="">Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="col">
+        <label for="f_org">Unidade</label>
+        <select id="f_org"><option value="">Todas</option></select>
+      </div>
+      <div class="col" style="max-width:140px">
+        <label for="f_limit">Limite</label>
+        <select id="f_limit"><option>20</option><option selected>50</option><option>100</option><option>200</option></select>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:8px">
+      <div></div>
+      <div class="btn-row">
+        <button class="btn" id="btn_buscar" type="button">Buscar</button>
+        <button class="btn secondary" id="btn_limpar" type="button">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div id="lista_wrap" class="note">Sem resultados.</div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+  const API = "/api/automations/usuarios";
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
+  const byId = id => document.getElementById(id);
+
+  function toast(msg, kind="ok", ms=3500){
+    const el = byId("toast"); el.textContent = msg; el.className = "toast " + kind; el.hidden = false;
+    clearTimeout(el._t); el._t = setTimeout(()=> el.hidden = true, ms);
+  }
+  function errToMessage(e){
+    if (!e) return "Erro inesperado.";
+    if (typeof e === "string") return e;
+    if (e.error || e.message) return e.message || e.error;
+    return JSON.stringify(e);
+  }
+  async function jfetch(url, opts={}){
+    const o = Object.assign({ headers: { "Content-Type": "application/json" }, credentials: "same-origin" }, opts);
+    const res = await fetch(url, o);
+    const ct = res.headers.get("content-type") || "";
+    let body = null;
+    if (ct.includes("application/json")) { body = await res.json().catch(()=>null); }
+    else { body = await res.text().catch(()=>null); }
+    if (!res.ok){ throw (body || { error:"http_error", message:`HTTP ${res.status}` }); }
+    return body;
+  }
+  function onlyDigits(s){ return (s||"").replace(/\D+/g,""); }
+  function asIntOrNull(v){ const n = Number(v); return Number.isFinite(n) ? n : null; }
+  function escapeHtml(s){
+    return String(s==null?"":s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,'&quot;').replace(/'/g,"&#039;");
+  }
+
+  // ===== Formação: listas dinâmicas
+  function makeGradItem(){
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso"/></div>
+        <div class="col"><label>Instituição</label><input data-k="instituicao"/></div>
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button type="button" class="btn small secondary" data-act="remove">Remover</button>
+      </div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function makePosItem(){
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso"/></div>
+        <div class="col"><label>Tipo</label>
+          <select data-k="tipo">
+            <option value="">--</option>
+            <option value="especializacao">Especialização</option>
+            <option value="mestrado">Mestrado</option>
+            <option value="doutorado">Doutorado</option>
+          </select>
+        </div>
+        <div class="col"><label>Instituição</label><input data-k="instituicao"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button type="button" class="btn small secondary" data-act="remove">Remover</button>
+      </div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function makeCapacitacaoItem(){
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso"/></div>
+        <div class="col"><label>Protocolo</label><input data-k="protocolo"/></div>
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Decreto (nº)</label><input data-k="decreto_numero"/></div>
+        <div class="col"><label>Resolução conjunta</label><input data-k="resolucao_conjunta"/></div>
+        <div class="col"><label>Classe (texto)</label><input data-k="classe"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button type="button" class="btn small secondary" data-act="remove">Remover</button>
+      </div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function makeGitiItem(){
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso"/></div>
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date"/></div>
+        <div class="col"><label>Tipo</label>
+          <select data-k="tipo">
+            <option value="">--</option>
+            <option value="graduacao">Graduação</option>
+            <option value="mestrado">Mestrado</option>
+            <option value="doutorado">Doutorado</option>
+            <option value="pos">Pós-graduação</option>
+          </select>
+        </div>
+        <div class="col"><label>Percentual</label>
+          <select data-k="percentual">
+            <option value="">--</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button type="button" class="btn small secondary" data-act="remove">Remover</button>
+      </div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+
+  // ===== Schema (org_units)
+  async function loadSchema(){
+    try {
+      const s = await jfetch(`${API}/schema`, { method:"GET" });
+      const orgs = s.org_units || [];
+      const sel1 = byId("org_unit_code");
+      const sel2 = byId("f_org");
+      if (sel1){ sel1.innerHTML = ""; orgs.forEach(o => { const opt = document.createElement("option"); opt.value=o.code; opt.textContent=`${o.code} — ${o.name}`; sel1.appendChild(opt); }); }
+      if (sel2){ sel2.innerHTML = `<option value="">Todas</option>`; orgs.forEach(o => { const opt = document.createElement("option"); opt.value=o.code; opt.textContent=`${o.code} — ${o.name}`; sel2.appendChild(opt); }); }
+    } catch(e){ toast("Falha ao carregar schema: " + errToMessage(e), "err"); }
+  }
+
+  // ===== Governanças
+  function showTipoGroup(){
+    const t = byId("tipo_vinculo")?.value || "efetivo";
+    byId("grupo-efetivo")?.classList.toggle("group-hidden", t!=="efetivo");
+    byId("grupo-comissionado")?.classList.toggle("group-hidden", t!=="comissionado");
+    byId("grupo-estagiario")?.classList.toggle("group-hidden", t!=="estagiario");
+  }
+  function onStatusChange(){
+    const st = byId("status")?.value || "ativo";
+    const wrap = byId("motivo_wrap");
+    if (wrap){ wrap.style.display = (st === "inativo") ? "" : "none"; }
+    if (st !== "inativo"){ const m = byId("motivo_inatividade"); if (m) m.value = ""; }
+  }
+  function onEfOutroToggle(){
+    const checked = byId("ef_outro_enable")?.checked;
+    byId("ef_outro_wrap")?.classList.toggle("group-hidden", !checked);
+  }
+  function calcLimiteEstagio(){
+    const ini = byId("es_inicio_data")?.value;
+    const out = byId("es_limite_alerta_data");
+    if(!out){ return; }
+    if(!ini){ out.value = ""; return; }
+    const d = new Date(ini+"T00:00:00");
+    if(isNaN(d.getTime())){ out.value = ""; return; }
+    d.setFullYear(d.getFullYear()+2);
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+    out.value = `${y}-${m}-${day}`;
+  }
+
+  // ===== Helpers
+  function collectList(container, mapFn){
+    return Array.from(container.children).map(div => mapFn(div)).filter(x => x && Object.values(x).some(v => v !== null && v !== "" && v !== false));
+  }
+  function getVal(div, k){ const el = div.querySelector(`[data-k="${k}"]`); return el ? (el.value || "") : ""; }
+
+  // ===== Criar
+  async function onCriar(){
+    const btn = byId("btn_criar"); if (btn) btn.disabled = true;
+    byId("criar_result").textContent = "";
+    try{
+      const status = byId("status").value;
+      const motivo = byId("motivo_inatividade")?.value || null;
+      const payload = {
+        nome_completo: byId("nome_completo").value.trim(),
+        rg: byId("rg").value.trim() || null,
+        cpf: onlyDigits(byId("cpf").value),
+        id_funcional: asIntOrNull(byId("id_funcional").value),
+        data_nascimento: byId("data_nascimento").value || null,
+        email_institucional: byId("email_institucional").value.trim() || null,
+        telefone_principal: byId("telefone_principal").value.trim() || null,
+        ramal: byId("ramal").value.trim() || null,
+        endereco: byId("endereco").value.trim() || null,
+        dependentes_qtde: asIntOrNull(byId("dependentes_qtde").value),
+        email_principal: byId("email_principal").value.trim() || null,
+        formacao: {
+          nivel_medio: byId("form_nivel_medio").checked,
+          graduacoes: collectList(byId("grad_list"), d => ({
+            curso: getVal(d, "curso"),
+            instituicao: getVal(d, "instituicao") || null,
+            conclusao_data: getVal(d, "conclusao_data") || null
+          })),
+          pos_graduacoes: collectList(byId("pos_list"), d => ({
+            curso: getVal(d, "curso"),
+            tipo: getVal(d, "tipo") || null,
+            instituicao: getVal(d, "instituicao") || null,
+            conclusao_data: getVal(d, "conclusao_data") || null
+          })),
+        },
+        tipo_vinculo: byId("tipo_vinculo").value,
+        status: status,
+        motivo_inatividade: (status === "inativo") ? motivo : null,
+        org_unit_code: byId("org_unit_code").value
+      };
+      if (payload.nome_completo.length < 3) throw "Nome muito curto.";
+      if ((payload.cpf||"").length !== 11) throw "CPF deve conter 11 dígitos.";
+      if (payload.status === "inativo" && !payload.motivo_inatividade) throw "Selecione o motivo da inatividade.";
+
+      if (payload.tipo_vinculo === "efetivo"){
+        payload.efetivo = {
+          decreto_nomeacao_numero: byId("ef_decreto_num").value || null,
+          decreto_nomeacao_data: byId("ef_decreto_data").value || null,
+          posse_data: byId("ef_posse_data").value || null,
+          exercicio_data: byId("ef_exercicio_data").value || null,
+          lotacao_portaria: byId("ef_lotacao_portaria").value || null,
+          cedido_de: byId("ef_cedido_de").value || null,
+          cedido_para: byId("ef_cedido_para").value || null,
+          classe: (byId("ef_classe").value || "").trim() || null,
+          classe_nivel: asIntOrNull(byId("ef_classe_nivel").value),
+          estabilidade_data: byId("ef_estab_data").value || null,
+          estabilidade_protocolo: byId("ef_estab_protocolo").value || null,
+          estabilidade_resolucao_conjunta: byId("ef_estab_resolucao").value || null,
+          estabilidade_publicacao_data: byId("ef_estab_pub_data").value || null,
+          capacitacoes: collectList(byId("ef_cap_list"), d => ({
+            protocolo: getVal(d, "protocolo") || null,
+            curso: getVal(d, "curso"),
+            conclusao_data: getVal(d, "conclusao_data") || null,
+            decreto_numero: getVal(d, "decreto_numero") || null,
+            resolucao_conjunta: getVal(d, "resolucao_conjunta") || null,
+            classe: getVal(d, "classe") || null
+          })),
+          giti: collectList(byId("ef_giti_list"), d => ({
+            curso: getVal(d, "curso"),
+            conclusao_data: getVal(d, "conclusao_data") || null,
+            tipo: getVal(d, "tipo") || null,
+            percentual: getVal(d, "percentual") || null
+          }))
+        };
+        if (byId("ef_outro_enable")?.checked){
+          // ✅ CORRIGIDO: envia dentro de efetivo.outro_cargo
+          payload.efetivo.outro_cargo = {
+            funcao_ou_cc: byId("ef_out_funcao").value || null,
+            decreto_nomeacao_numero: byId("ef_out_decreto_num").value || null,
+            decreto_nomeacao_data: byId("ef_out_decreto_data").value || null,
+            posse_data: byId("ef_out_posse_data").value || null,
+            exercicio_data: byId("ef_out_exercicio_data").value || null,
+            simbolo: byId("ef_out_simbolo").value || null,
+            decreto_exoneracao_numero: byId("ef_out_exon_num").value || null,
+            decreto_exoneracao_data: byId("ef_out_exon_data").value || null
+          };
+        }
+      }
+      if (payload.tipo_vinculo === "comissionado"){
+        payload.comissionado = {
+          decreto_nomeacao_numero: byId("co_decreto_num").value || null,
+          decreto_nomeacao_data: byId("co_decreto_data").value || null,
+          posse_data: byId("co_posse_data").value || null,
+          exercicio_data: byId("co_exercicio_data").value || null,
+          simbolo: byId("co_simbolo").value || null,
+          decreto_exoneracao_numero: byId("co_exon_num").value || null,
+          decreto_exoneracao_data: byId("co_exon_data").value || null,
+          com_vinculo: (function(){ const v = byId("co_com_vinculo").value; return v === "" ? null : (v === "true"); })(),
+          funcao_exercida: byId("co_funcao").value || null
+        };
+      }
+      if (payload.tipo_vinculo === "estagiario"){
+        payload.estagiario = {
+          tce_numero: byId("es_tce_num").value || null,
+          tce_ano: asIntOrNull(byId("es_tce_ano").value),
+          inicio_data: byId("es_inicio_data").value || null,
+          fim_data: byId("es_fim_data").value || null,
+          limite_alerta_data: byId("es_limite_alerta_data").value || null, // ignorado pelo backend (campo derivado)
+          aditivo_novo_fim_data: byId("es_aditivo_novo_fim").value || null,
+          rescisao_data: byId("es_rescisao_data").value || null,
+          fluxogramas: byId("es_fluxogramas").value || null,
+          frequencia: byId("es_frequencia").value || null,
+          pagamento: byId("es_pagamento").value || null,
+          vale_transporte: !!byId("es_vale_transporte").checked
+        };
+      }
+
+      const res = await jfetch(`${API}/users`, { method:"POST", body: JSON.stringify(payload) });
+      byId("criar_result").innerHTML = `
+        <span class="badge">OK</span>
+        Usuário criado: <span class="mono">${res.id}</span>
+        — PIN temporário: <span class="mono">${res.temporary_pin}</span>
+      `;
+      toast("Usuário criado com sucesso.", "ok");
+    } catch(e){
+      toast("Falha ao criar: " + errToMessage(e), "err");
+    } finally { if (byId("btn_criar")) byId("btn_criar").disabled = false; }
+  }
+
+  // ===== Buscar/listar
+  async function onBuscar(){
+    const btn = byId("btn_buscar"); if (btn) btn.disabled = true;
+    const q = byId("f_q").value.trim();
+    const tipo = byId("f_tipo").value || "";
+    const status = byId("f_status").value || "";
+    const org = byId("f_org").value || "";
+    const limit = Number(byId("f_limit").value || "50");
+    const url = new URL(location.origin + `${API}/users`);
+    if (q) url.searchParams.set("q", q);
+    if (tipo) url.searchParams.set("tipo_vinculo", tipo);
+    if (status) url.searchParams.set("status_vinculo", status);
+    if (org) url.searchParams.set("org_unit", org);
+    url.searchParams.set("limit", String(limit));
+    url.searchParams.set("offset", "0");
+    try{
+      const data = await jfetch(url.toString(), { method:"GET" });
+      renderLista(data);
+    } catch(e){
+      byId("lista_wrap").textContent = "Erro: " + errToMessage(e);
+    } finally { if (btn) btn.disabled = false; }
+  }
+  function onLimpar(){
+    byId("f_q").value = ""; byId("f_tipo").value = ""; byId("f_status").value = ""; byId("f_org").value = ""; onBuscar();
+  }
+  function copy(text){ navigator.clipboard?.writeText(text).then(()=> toast("Copiado!"), ()=> toast("Não foi possível copiar", "err")); }
+
+  function renderLista(data){
+    const items = data.items || [];
+    if (!items.length){ byId("lista_wrap").textContent = "Sem resultados."; return; }
+    const rows = items.map(it => {
+      const org = it.org_unit ? `${it.org_unit.code} — ${it.org_unit.name}` : "-";
+      const motivo = (it.status_vinculo === "inativo" && it.motivo_inatividade) ? ` <span class="note">(${escapeHtml(it.motivo_inatividade)})</span>` : "";
+      return `
+        <tr>
+          <td>
+            <div><strong>${escapeHtml(it.nome_completo||"-")}</strong></div>
+            <div class="muted mono">${it.id} <button class="btn small secondary" data-copy="${it.id}" type="button" style="margin-left:6px">Copiar ID</button></div>
+          </td>
+          <td class="mono">${it.cpf || "-"}</td>
+          <td>${escapeHtml(it.email_principal || "-")}</td>
+          <td><span class="pill">${it.tipo_vinculo || "-"}</span></td>
+          <td><span class="pill">${it.status_vinculo || "-"}</span>${motivo}</td>
+          <td>${escapeHtml(org)}</td>
+        </tr>`;
+    }).join("");
+    byId("lista_wrap").innerHTML = `
+      <div class="muted" style="margin-bottom:8px">${data.total||items.length} resultados</div>
+      <div style="overflow:auto"><table>
+        <thead><tr>
+          <th>Usuário</th><th>CPF</th><th>E-mail</th><th>Vínculo</th><th>Status</th><th>Unidade</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    byId("lista_wrap").querySelectorAll('button[data-copy]').forEach(btn => {
+      btn.addEventListener('click', () => copy(btn.dataset.copy||''));
+    });
+  }
+
+  // ===== Bindings (seguros)
+  on("#btn_criar", "click", onCriar);
+  on("#btn_buscar", "click", onBuscar);
+  on("#btn_limpar", "click", onLimpar);
+  on("#tipo_vinculo", "change", showTipoGroup);
+  on("#status", "change", onStatusChange);
+  on("#ef_outro_enable", "change", onEfOutroToggle);
+  on("#es_inicio_data", "input", calcLimiteEstagio);
+
+  on("#btn_add_grad", "click", ()=> byId("grad_list")?.appendChild(makeGradItem()));
+  on("#btn_add_pos", "click", ()=> byId("pos_list")?.appendChild(makePosItem()));
+  on("#btn_add_cap", "click", ()=> byId("ef_cap_list")?.appendChild(makeCapacitacaoItem()));
+  on("#btn_add_giti", "click", ()=> byId("ef_giti_list")?.appendChild(makeGitiItem()));
+
+  // ===== Boot
+  (async function boot(){
+    const buscarCard = byId("card-buscar"); if (buscarCard) buscarCard.style.display = ""; // garante visibilidade
+    await loadSchema();
+    showTipoGroup();
+    onStatusChange();
+    // slots iniciais (UX)
+    byId("grad_list")?.appendChild(makeGradItem());
+    byId("pos_list")?.appendChild(makePosItem());
+    // opcional: carregar lista inicial
+    // onBuscar();
+  })();
+</script>
+</body>
+</html>

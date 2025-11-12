@@ -2,6 +2,10 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: portal-agepar-postgres
+    labels:
+      org.agepar.project: portal-agepar
+      org.agepar.service: postgres
+      org.agepar.env: dev
     environment:
       POSTGRES_DB: ${PGDATABASE:-portal}
       POSTGRES_USER: ${PGUSER:-portal}
@@ -27,6 +31,10 @@ services:
 
   # Override no BFF apenas para injetar DATABASE_URL enquanto mantemos AUTH_MODE=mock
   bff:
+    labels:
+      org.agepar.project: portal-agepar
+      org.agepar.service: bff
+      org.agepar.env: dev
     environment:
       DATABASE_URL: "postgresql://${PGUSER:-portal}:${PGPASSWORD:-portaldev}@postgres:5432/${PGDATABASE:-portal}"
     depends_on:
@@ -40,3 +48,6 @@ services:
 
 volumes:
   pg_data:
+    labels:
+      org.agepar.project: portal-agepar
+      org.agepar.volume: pg_data

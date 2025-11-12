@@ -24,6 +24,7 @@ from app.automations.accounts import router as accounts_router
 from app.automations.fileshare import router as fileshare_router
 from app.automations.whoisonline import router as whoisonline_router
 from app.automations.support import router as support_router
+from app.automations.usuarios import router as usuarios_router
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
@@ -258,6 +259,7 @@ def automations_index() -> Dict[str, Any]:
             {"kind": "support", "version": "1.0.0", "title": "Suporte & Feedback"},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
             {"kind": "whoisonline", "version": "0.1.0", "title": "Quem está online (Superuser)"},
+            {"kind": "usuarios", "version": "1.0.0", "title": "Admin — Gestão de Usuários"},    
         ]
     }
 
@@ -272,6 +274,7 @@ APP.include_router(controle_ferias_router)  # calendário de férias (aba dentro
 APP.include_router(support_router)
 APP.include_router(accounts_router)
 APP.include_router(whoisonline_router)
+APP.include_router(usuarios_router)
 # (removido) APP.include_router(snake_router)  # já incluído acima
 
 # ------------------------------------------------------------------------------

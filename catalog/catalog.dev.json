@@ -161,6 +161,25 @@
       "superuserOnly": true
     },
     {
+      "name": "usuarios",
+      "displayName": "Usuários (RH)",
+      "version": "0.1.0",
+      "categoryId": "governanca",
+      "ui": { "type": "iframe", "url": "/api/automations/usuarios/ui" },
+      "navigation": [
+        { "label": "Usuários (RH)", "path": "/usuarios", "icon": "Users" },
+        { "label": "Criar", "path": "/usuarios?tab=criar", "icon": "UserPlus" },
+        { "label": "Buscar/Editar", "path": "/usuarios?tab=buscar", "icon": "Search" },
+        { "label": "Roles", "path": "/usuarios?tab=roles", "icon": "Shield" },
+        { "label": "Sessões", "path": "/usuarios?tab=sessoes", "icon": "Activity" }
+      ],
+      "routes": [
+        { "path": "/usuarios", "kind": "iframe" }
+      ],
+      "requiredRoles": ["rh", "admin", "teste"],
+      "description": "Cadastro e gestão de usuários corporativos pelo RH."
+    },
+    {
       "name": "ferias",
       "displayName": "Férias - Requerimento e Substituição",
       "version": "0.1.0",
