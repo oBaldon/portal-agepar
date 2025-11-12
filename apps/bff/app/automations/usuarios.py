@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 REQUIRED_ROLES = ("rh", "admin")
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "usuarios"
 
+# UO padrão enquanto a modelagem estiver "desabilitada"
+DEFAULT_ORG_UNIT_CODE = "AGEPAR"
+
 router = APIRouter(
     prefix="/api/automations/usuarios",
     tags=["automations:usuarios"],
@@ -264,7 +267,12 @@ class UserCreateIn(BaseModel):
     tipo_vinculo: TipoVinculo
     status: StatusVinculo = "ativo"
     motivo_inatividade: Optional[MotivoInatividade] = None
-    org_unit_code: str = Field(..., description="code da org unit (ex.: GOV-RH)")
+
+    # Unidade Organizacional (opcional; se omitir, usa DEFAULT_ORG_UNIT_CODE)
+    org_unit_code: Optional[str] = Field(
+        default=None,
+        description='code da org unit (ex.: GOV-RH); se omitido, usa default'
+    )
 
     # Específicos
     efetivo: Optional[EfetivoIn] = None
@@ -300,6 +308,7 @@ def schema() -> Dict[str, Any]:
             "giti_percentual": [10, 15, 20],
         },
         "org_units": orgs,
+        "default_org_unit_code": DEFAULT_ORG_UNIT_CODE,
         "notes": "Cadastro e gestão de usuários corporativos pelo RH (modelo relacional).",
     }
 
@@ -414,11 +423,13 @@ def create_user(payload: UserCreateIn, request: Request):
             if cur.fetchone():
                 return err_json(409, code="conflict", message="E-mail já cadastrado.")
 
-        # org unit
-        cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (payload.org_unit_code,))
+        # org unit (opcional) — usa default "AGEPAR" se não vier no payload
+        desired_code = payload.org_unit_code or DEFAULT_ORG_UNIT_CODE
+        cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (desired_code,))
         row = cur.fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Org Unit não encontrada.")
+            # isso só ocorre se a seed da raiz não existir
+            raise HTTPException(status_code=500, detail=f'Org Unit padrão "{desired_code}" não encontrada. Verifique as seeds.')
         org_unit_id = row["id"]
 
         # cria usuário (novas colunas normalizadas)
@@ -612,9 +623,9 @@ def create_user(payload: UserCreateIn, request: Request):
                 ),
             )
 
-        # auditoria + submission
+        # auditoria + submission (guardar o code efetivamente usado)
         actor = request.session.get("user") or {}
-        add_audit("usuarios", "user.create", actor, {"user_id": user_id, "org_unit": payload.org_unit_code})
+        add_audit("usuarios", "user.create", actor, {"user_id": user_id, "org_unit": desired_code})
         insert_submission(
             {
                 "kind": "usuarios",
@@ -630,7 +641,7 @@ def create_user(payload: UserCreateIn, request: Request):
                     "tipo_vinculo": payload.tipo_vinculo,
                     "status_vinculo": payload.status,
                     "motivo_inatividade": payload.motivo_inatividade,
-                    "org_unit": payload.org_unit_code,
+                    "org_unit": desired_code,
                 },
                 "status": "done",
                 "result": {"user_id": user_id},

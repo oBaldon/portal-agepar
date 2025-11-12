@@ -135,9 +135,10 @@
         </select>
       </div>
       <div class="col">
-        <label for="org_unit_code">Unidade organizacional *</label>
+        <!-- 🔄 virou opcional -->
+        <label for="org_unit_code">Unidade organizacional (opcional)</label>
         <select id="org_unit_code">
-          <option value="" disabled selected>Carregando...</option>
+          <option value="">(usar padrão)</option>
         </select>
       </div>
     </div>
@@ -449,10 +450,40 @@
     try {
       const s = await jfetch(`${API}/schema`, { method:"GET" });
       const orgs = s.org_units || [];
+      const defaultOrg = s.default_org_unit_code || "AGEPAR";
+
+      // cadastro
       const sel1 = byId("org_unit_code");
+      if (sel1){
+        sel1.innerHTML = "";
+        // placeholder para deixar claro que é opcional
+        const ph = document.createElement("option");
+        ph.value = "";
+        ph.textContent = `(usar padrão: ${defaultOrg})`;
+        sel1.appendChild(ph);
+
+        orgs.forEach(o => {
+          const opt = document.createElement("option");
+          opt.value = o.code;
+          opt.textContent = (o.code && o.code !== o.name) ? `${o.code} — ${o.name}` : o.name;
+          sel1.appendChild(opt);
+        });
+
+        // deixe value vazio para o backend aplicar o default automaticamente
+        sel1.value = "";
+      }
+
+      // filtro de busca
       const sel2 = byId("f_org");
-      if (sel1){ sel1.innerHTML = ""; orgs.forEach(o => { const opt = document.createElement("option"); opt.value=o.code; opt.textContent=`${o.code} — ${o.name}`; sel1.appendChild(opt); }); }
-      if (sel2){ sel2.innerHTML = `<option value="">Todas</option>`; orgs.forEach(o => { const opt = document.createElement("option"); opt.value=o.code; opt.textContent=`${o.code} — ${o.name}`; sel2.appendChild(opt); }); }
+      if (sel2){
+        sel2.innerHTML = `<option value="">Todas</option>`;
+        orgs.forEach(o => {
+          const opt = document.createElement("option");
+          opt.value = o.code;
+          opt.textContent = (o.code && o.code !== o.name) ? `${o.code} — ${o.name}` : o.name;
+          sel2.appendChild(opt);
+        });
+      }
     } catch(e){ toast("Falha ao carregar schema: " + errToMessage(e), "err"); }
   }
 
@@ -527,6 +558,7 @@
         tipo_vinculo: byId("tipo_vinculo").value,
         status: status,
         motivo_inatividade: (status === "inativo") ? motivo : null,
+        // se vier "", o backend usa a default via DEFAULT_ORG_UNIT_CODE
         org_unit_code: byId("org_unit_code").value
       };
       if (payload.nome_completo.length < 3) throw "Nome muito curto.";
@@ -564,7 +596,6 @@
           }))
         };
         if (byId("ef_outro_enable")?.checked){
-          // ✅ CORRIGIDO: envia dentro de efetivo.outro_cargo
           payload.efetivo.outro_cargo = {
             funcao_ou_cc: byId("ef_out_funcao").value || null,
             decreto_nomeacao_numero: byId("ef_out_decreto_num").value || null,
@@ -596,7 +627,7 @@
           tce_ano: asIntOrNull(byId("es_tce_ano").value),
           inicio_data: byId("es_inicio_data").value || null,
           fim_data: byId("es_fim_data").value || null,
-          limite_alerta_data: byId("es_limite_alerta_data").value || null, // ignorado pelo backend (campo derivado)
+          limite_alerta_data: byId("es_limite_alerta_data").value || null, // ignorado pelo backend
           aditivo_novo_fim_data: byId("es_aditivo_novo_fim").value || null,
           rescisao_data: byId("es_rescisao_data").value || null,
           fluxogramas: byId("es_fluxogramas").value || null,
