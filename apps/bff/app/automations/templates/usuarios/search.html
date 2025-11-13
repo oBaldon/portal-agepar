@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Usuários cadastrados · v0.1.0</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --bd:#e2e8f0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Apple Color Emoji","Segoe UI Emoji",sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  .muted { color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); padding:16px; }
+  .toolbar { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:10px; }
+  .search { display:flex; gap:8px; flex:1; }
+  input[type="search"] { width:100%; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; cursor:pointer; transition:.16s ease; text-decoration:none; display:inline-block; }
+  .btn:hover { transform: translateY(-1px); }
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; table-layout:fixed; }
+  th,td { padding:10px 12px; border-bottom:1px solid var(--bd); vertical-align:top; text-align:left; }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; }
+  .empty { padding:12px; color:var(--muted); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Usuários cadastrados <span class="muted">· v0.1.0</span></h1>
+    <a href="/api/automations/usuarios/ui" class="btn" aria-label="Voltar">Voltar</a>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="search">
+        <input id="q" type="search" placeholder="Buscar por nome, e-mail ou CPF (q)" />
+        <a id="buscar" href="#" class="btn">Buscar</a>
+      </div>
+      <div><span id="meta" class="muted"></span></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>CPF</th>
+            <th>ID Funcional</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="rows"><tr><td class="empty" colspan="5">Nenhum resultado.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const rows = document.getElementById("rows");
+  const q = document.getElementById("q");
+  const btn = document.getElementById("buscar");
+  const meta = document.getElementById("meta");
+
+  async function fetchUsers(query) {
+    const url = new URL("/api/automations/usuarios/users", window.location.origin);
+    if (query && query.trim()) url.searchParams.set("q", query.trim());
+    url.searchParams.set("limit", "50");
+    url.searchParams.set("offset", "0");
+    const res = await fetch(url.toString(), { credentials: "include" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  }
+
+  function render(data) {
+    rows.innerHTML = "";
+    const items = data?.items || data || [];
+    if (!items.length) {
+      rows.innerHTML = '<tr><td class="empty" colspan="5">Nenhum resultado.</td></tr>';
+      meta.textContent = "";
+      return;
+    }
+    for (const u of items) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${(u.nome_completo ?? u.name ?? "")}</td>
+        <td>${(u.email_principal ?? u.email ?? "")}</td>
+        <td class="mono">${(u.cpf ?? "")}</td>
+        <td class="mono">${(u.id_funcional ?? u.idFuncional ?? "-")}</td>
+        <td>${(u.status_vinculo ?? u.status ?? "")}</td>`;
+      rows.appendChild(tr);
+    }
+    const total = (typeof data?.total === "number") ? data.total : items.length;
+    meta.textContent = `${total} resultado(s)`;
+  }
+
+  btn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try { render(await fetchUsers(q.value)); }
+    catch { rows.innerHTML = '<tr><td class="empty" colspan="5">Erro ao buscar.</td></tr>'; meta.textContent = ""; }
+  });
+
+  // Inicial
+  fetchUsers("").then(render).catch(()=>{});
+</script>
+</body>
+</html>

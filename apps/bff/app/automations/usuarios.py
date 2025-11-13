@@ -288,6 +288,17 @@ def ui() -> HTMLResponse:
     html = _read_html("ui.html")
     return HTMLResponse(content=html)
 
+@router.get("/ui/search")
+@router.get("/ui/search/")
+def ui_search(request: Request) -> HTMLResponse:
+    """
+    UI separada para busca de usuários cadastrados (padrão semelhante ao DFD: /ui/history).
+    """
+    # Guard RBAC (consistente com os endpoints sensíveis)
+    checker = require_roles_any(*REQUIRED_ROLES)
+    checker(request)
+    html = _read_html("search.html")
+    return HTMLResponse(content=html)
 
 # ---------------------------------------------------------------------
 # JSON endpoints
@@ -353,6 +364,7 @@ def list_users(
         u.name            AS nome_completo,
         u.cpf,
         u.email           AS email_principal,
+        u.id_funcional    AS id_funcional,
         u.email_institucional,
         u.telefone_principal,
         u.ramal,

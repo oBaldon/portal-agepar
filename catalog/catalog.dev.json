@@ -169,7 +169,7 @@
       "navigation": [
         { "label": "Usuários (RH)", "path": "/usuarios", "icon": "Users" },
         { "label": "Criar", "path": "/usuarios?tab=criar", "icon": "UserPlus" },
-        { "label": "Buscar/Editar", "path": "/usuarios?tab=buscar", "icon": "Search" },
+        { "label": "Buscar/Editar", "path": "/usuarios/cadastrados", "icon": "Search" },
         { "label": "Roles", "path": "/usuarios?tab=roles", "icon": "Shield" },
         { "label": "Sessões", "path": "/usuarios?tab=sessoes", "icon": "Activity" }
       ],

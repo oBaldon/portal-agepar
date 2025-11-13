@@ -42,17 +42,16 @@
 
   .toast { position:fixed; right:16px; bottom:16px; padding:10px 12px; border-radius:10px; color:#fff; background:var(--pri); box-shadow:0 8px 20px rgba(2,6,23,.25); z-index:50 }
   .toast.ok{ background:var(--ok) } .toast.err{ background:var(--err) }
-
-  table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
-  th,td { padding:10px 12px; border-bottom:1px solid var(--bd); vertical-align:top; }
-  th { font-size:12px; text-transform:uppercase; letter-spacing:.02em; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <h1>Usuários (RH) <span class="muted">· v0.1.0</span></h1>
-    <span class="note">Criação e consulta de usuários corporativos pelo RH.</span>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span class="note">Criação e consulta de usuários corporativos pelo RH.</span>
+      <a class="btn secondary small" href="/api/automations/usuarios/ui/search">Usuários cadastrados</a>
+    </div>
   </div>
 
   <!-- CRIAR -->
@@ -135,7 +134,7 @@
         </select>
       </div>
       <div class="col">
-        <!-- 🔄 virou opcional -->
+        <!-- opcional -->
         <label for="org_unit_code">Unidade organizacional (opcional)</label>
         <select id="org_unit_code">
           <option value="">(usar padrão)</option>
@@ -273,50 +272,6 @@
     </div>
     <div id="criar_result" class="note" style="margin-top:8px"></div>
   </div>
-
-  <!-- BUSCAR -->
-  <div id="card-buscar" class="card" style="margin-top:16px" aria-labelledby="titulo-buscar">
-    <h2 id="titulo-buscar" style="font-size:16px; margin:0 0 8px">Buscar usuários</h2>
-    <div class="row">
-      <div class="col"><label for="f_q">Busca</label><input id="f_q" placeholder="nome, e-mail ou CPF" /></div>
-      <div class="col">
-        <label for="f_tipo">Vínculo</label>
-        <select id="f_tipo">
-          <option value="">Todos</option>
-          <option value="efetivo">Efetivo</option>
-          <option value="comissionado">Comissionado</option>
-          <option value="estagiario">Estagiário</option>
-        </select>
-      </div>
-      <div class="col">
-        <label for="f_status">Status do vínculo</label>
-        <select id="f_status">
-          <option value="">Todos</option>
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
-        </select>
-      </div>
-      <div class="col">
-        <label for="f_org">Unidade</label>
-        <select id="f_org"><option value="">Todas</option></select>
-      </div>
-      <div class="col" style="max-width:140px">
-        <label for="f_limit">Limite</label>
-        <select id="f_limit"><option>20</option><option selected>50</option><option>100</option><option>200</option></select>
-      </div>
-    </div>
-    <div class="actions" style="margin-top:8px">
-      <div></div>
-      <div class="btn-row">
-        <button class="btn" id="btn_buscar" type="button">Buscar</button>
-        <button class="btn secondary" id="btn_limpar" type="button">Limpar</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-top:12px">
-    <div id="lista_wrap" class="note">Sem resultados.</div>
-  </div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
@@ -324,7 +279,6 @@
 <script>
   const API = "/api/automations/usuarios";
   const $ = sel => document.querySelector(sel);
-  const $$ = sel => Array.from(document.querySelectorAll(sel));
   const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
   const byId = id => document.getElementById(id);
 
@@ -350,13 +304,59 @@
   }
   function onlyDigits(s){ return (s||"").replace(/\D+/g,""); }
   function asIntOrNull(v){ const n = Number(v); return Number.isFinite(n) ? n : null; }
-  function escapeHtml(s){
-    return String(s==null?"":s)
-      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-      .replace(/"/g,'&quot;').replace(/'/g,"&#039;");
+
+  // ===== Schema (org_units)
+  async function loadSchema(){
+    try {
+      const s = await jfetch(`${API}/schema`, { method:"GET" });
+      const orgs = s.org_units || [];
+      const defaultOrg = s.default_org_unit_code || "AGEPAR";
+
+      // cadastro
+      const sel1 = byId("org_unit_code");
+      if (sel1){
+        sel1.innerHTML = "";
+        const ph = document.createElement("option");
+        ph.value = "";
+        ph.textContent = `(usar padrão: ${defaultOrg})`;
+        sel1.appendChild(ph);
+
+        orgs.forEach(o => {
+          const opt = document.createElement("option");
+          opt.value = o.code;
+          opt.textContent = (o.code && o.code !== o.name) ? `${o.code} — ${o.name}` : o.name;
+          sel1.appendChild(opt);
+        });
+
+        // deixar value vazio para o backend aplicar o default automaticamente
+        sel1.value = "";
+      }
+    } catch(e){ toast("Falha ao carregar schema: " + errToMessage(e), "err"); }
   }
 
-  // ===== Formação: listas dinâmicas
+  // ===== Governanças
+  function showTipoGroup(){
+    const t = byId("tipo_vinculo")?.value || "efetivo";
+    byId("grupo-efetivo")?.classList.toggle("group-hidden", t!=="efetivo");
+    byId("grupo-comissionado")?.classList.toggle("group-hidden", t!=="comissionado");
+    byId("grupo-estagiario")?.classList.toggle("group-hidden", t!=="estagiario");
+  }
+  function onStatusChange(){
+    const st = byId("status")?.value || "ativo";
+    const wrap = byId("motivo_wrap");
+    if (wrap){ wrap.style.display = (st === "inativo") ? "" : "none"; }
+    if (st !== "inativo"){ const m = byId("motivo_inatividade"); if (m) m.value = ""; }
+  }
+  function onEfOutroToggle(){
+    const checked = byId("ef_outro_enable")?.checked;
+    byId("ef_outro_wrap")?.classList.toggle("group-hidden", !checked);
+  }
+
+  // ===== Helpers listas
+  function collectList(container, mapFn){
+    return Array.from(container.children).map(div => mapFn(div)).filter(x => x && Object.values(x).some(v => v !== null && v !== "" && v !== false));
+  }
+  function getVal(div, k){ const el = div.querySelector(`[data-k="${k}"]`); return el ? (el.value || "") : ""; }
   function makeGradItem(){
     const div = document.createElement("div"); div.className="item";
     div.innerHTML = `
@@ -445,83 +445,6 @@
     return div;
   }
 
-  // ===== Schema (org_units)
-  async function loadSchema(){
-    try {
-      const s = await jfetch(`${API}/schema`, { method:"GET" });
-      const orgs = s.org_units || [];
-      const defaultOrg = s.default_org_unit_code || "AGEPAR";
-
-      // cadastro
-      const sel1 = byId("org_unit_code");
-      if (sel1){
-        sel1.innerHTML = "";
-        // placeholder para deixar claro que é opcional
-        const ph = document.createElement("option");
-        ph.value = "";
-        ph.textContent = `(usar padrão: ${defaultOrg})`;
-        sel1.appendChild(ph);
-
-        orgs.forEach(o => {
-          const opt = document.createElement("option");
-          opt.value = o.code;
-          opt.textContent = (o.code && o.code !== o.name) ? `${o.code} — ${o.name}` : o.name;
-          sel1.appendChild(opt);
-        });
-
-        // deixe value vazio para o backend aplicar o default automaticamente
-        sel1.value = "";
-      }
-
-      // filtro de busca
-      const sel2 = byId("f_org");
-      if (sel2){
-        sel2.innerHTML = `<option value="">Todas</option>`;
-        orgs.forEach(o => {
-          const opt = document.createElement("option");
-          opt.value = o.code;
-          opt.textContent = (o.code && o.code !== o.name) ? `${o.code} — ${o.name}` : o.name;
-          sel2.appendChild(opt);
-        });
-      }
-    } catch(e){ toast("Falha ao carregar schema: " + errToMessage(e), "err"); }
-  }
-
-  // ===== Governanças
-  function showTipoGroup(){
-    const t = byId("tipo_vinculo")?.value || "efetivo";
-    byId("grupo-efetivo")?.classList.toggle("group-hidden", t!=="efetivo");
-    byId("grupo-comissionado")?.classList.toggle("group-hidden", t!=="comissionado");
-    byId("grupo-estagiario")?.classList.toggle("group-hidden", t!=="estagiario");
-  }
-  function onStatusChange(){
-    const st = byId("status")?.value || "ativo";
-    const wrap = byId("motivo_wrap");
-    if (wrap){ wrap.style.display = (st === "inativo") ? "" : "none"; }
-    if (st !== "inativo"){ const m = byId("motivo_inatividade"); if (m) m.value = ""; }
-  }
-  function onEfOutroToggle(){
-    const checked = byId("ef_outro_enable")?.checked;
-    byId("ef_outro_wrap")?.classList.toggle("group-hidden", !checked);
-  }
-  function calcLimiteEstagio(){
-    const ini = byId("es_inicio_data")?.value;
-    const out = byId("es_limite_alerta_data");
-    if(!out){ return; }
-    if(!ini){ out.value = ""; return; }
-    const d = new Date(ini+"T00:00:00");
-    if(isNaN(d.getTime())){ out.value = ""; return; }
-    d.setFullYear(d.getFullYear()+2);
-    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
-    out.value = `${y}-${m}-${day}`;
-  }
-
-  // ===== Helpers
-  function collectList(container, mapFn){
-    return Array.from(container.children).map(div => mapFn(div)).filter(x => x && Object.values(x).some(v => v !== null && v !== "" && v !== false));
-  }
-  function getVal(div, k){ const el = div.querySelector(`[data-k="${k}"]`); return el ? (el.value || "") : ""; }
-
   // ===== Criar
   async function onCriar(){
     const btn = byId("btn_criar"); if (btn) btn.disabled = true;
@@ -558,7 +481,6 @@
         tipo_vinculo: byId("tipo_vinculo").value,
         status: status,
         motivo_inatividade: (status === "inativo") ? motivo : null,
-        // se vier "", o backend usa a default via DEFAULT_ORG_UNIT_CODE
         org_unit_code: byId("org_unit_code").value
       };
       if (payload.nome_completo.length < 3) throw "Nome muito curto.";
@@ -627,7 +549,7 @@
           tce_ano: asIntOrNull(byId("es_tce_ano").value),
           inicio_data: byId("es_inicio_data").value || null,
           fim_data: byId("es_fim_data").value || null,
-          limite_alerta_data: byId("es_limite_alerta_data").value || null, // ignorado pelo backend
+          limite_alerta_data: byId("es_limite_alerta_data").value || null,
           aditivo_novo_fim_data: byId("es_aditivo_novo_fim").value || null,
           rescisao_data: byId("es_rescisao_data").value || null,
           fluxogramas: byId("es_fluxogramas").value || null,
@@ -649,90 +571,31 @@
     } finally { if (byId("btn_criar")) byId("btn_criar").disabled = false; }
   }
 
-  // ===== Buscar/listar
-  async function onBuscar(){
-    const btn = byId("btn_buscar"); if (btn) btn.disabled = true;
-    const q = byId("f_q").value.trim();
-    const tipo = byId("f_tipo").value || "";
-    const status = byId("f_status").value || "";
-    const org = byId("f_org").value || "";
-    const limit = Number(byId("f_limit").value || "50");
-    const url = new URL(location.origin + `${API}/users`);
-    if (q) url.searchParams.set("q", q);
-    if (tipo) url.searchParams.set("tipo_vinculo", tipo);
-    if (status) url.searchParams.set("status_vinculo", status);
-    if (org) url.searchParams.set("org_unit", org);
-    url.searchParams.set("limit", String(limit));
-    url.searchParams.set("offset", "0");
-    try{
-      const data = await jfetch(url.toString(), { method:"GET" });
-      renderLista(data);
-    } catch(e){
-      byId("lista_wrap").textContent = "Erro: " + errToMessage(e);
-    } finally { if (btn) btn.disabled = false; }
-  }
-  function onLimpar(){
-    byId("f_q").value = ""; byId("f_tipo").value = ""; byId("f_status").value = ""; byId("f_org").value = ""; onBuscar();
-  }
-  function copy(text){ navigator.clipboard?.writeText(text).then(()=> toast("Copiado!"), ()=> toast("Não foi possível copiar", "err")); }
-
-  function renderLista(data){
-    const items = data.items || [];
-    if (!items.length){ byId("lista_wrap").textContent = "Sem resultados."; return; }
-    const rows = items.map(it => {
-      const org = it.org_unit ? `${it.org_unit.code} — ${it.org_unit.name}` : "-";
-      const motivo = (it.status_vinculo === "inativo" && it.motivo_inatividade) ? ` <span class="note">(${escapeHtml(it.motivo_inatividade)})</span>` : "";
-      return `
-        <tr>
-          <td>
-            <div><strong>${escapeHtml(it.nome_completo||"-")}</strong></div>
-            <div class="muted mono">${it.id} <button class="btn small secondary" data-copy="${it.id}" type="button" style="margin-left:6px">Copiar ID</button></div>
-          </td>
-          <td class="mono">${it.cpf || "-"}</td>
-          <td>${escapeHtml(it.email_principal || "-")}</td>
-          <td><span class="pill">${it.tipo_vinculo || "-"}</span></td>
-          <td><span class="pill">${it.status_vinculo || "-"}</span>${motivo}</td>
-          <td>${escapeHtml(org)}</td>
-        </tr>`;
-    }).join("");
-    byId("lista_wrap").innerHTML = `
-      <div class="muted" style="margin-bottom:8px">${data.total||items.length} resultados</div>
-      <div style="overflow:auto"><table>
-        <thead><tr>
-          <th>Usuário</th><th>CPF</th><th>E-mail</th><th>Vínculo</th><th>Status</th><th>Unidade</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div>`;
-    byId("lista_wrap").querySelectorAll('button[data-copy]').forEach(btn => {
-      btn.addEventListener('click', () => copy(btn.dataset.copy||''));
-    });
-  }
-
-  // ===== Bindings (seguros)
+  // ===== Bindings
   on("#btn_criar", "click", onCriar);
-  on("#btn_buscar", "click", onBuscar);
-  on("#btn_limpar", "click", onLimpar);
   on("#tipo_vinculo", "change", showTipoGroup);
   on("#status", "change", onStatusChange);
   on("#ef_outro_enable", "change", onEfOutroToggle);
-  on("#es_inicio_data", "input", calcLimiteEstagio);
-
-  on("#btn_add_grad", "click", ()=> byId("grad_list")?.appendChild(makeGradItem()));
-  on("#btn_add_pos", "click", ()=> byId("pos_list")?.appendChild(makePosItem()));
-  on("#btn_add_cap", "click", ()=> byId("ef_cap_list")?.appendChild(makeCapacitacaoItem()));
-  on("#btn_add_giti", "click", ()=> byId("ef_giti_list")?.appendChild(makeGitiItem()));
+  on("#es_inicio_data", "input", ()=> {
+    const out = byId("es_limite_alerta_data");
+    const ini = byId("es_inicio_data")?.value;
+    if(!out) return;
+    if(!ini){ out.value = ""; return; }
+    const d = new Date(ini+"T00:00:00");
+    if(isNaN(d.getTime())){ out.value = ""; return; }
+    d.setFullYear(d.getFullYear()+2);
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+    out.value = `${y}-${m}-${day}`;
+  });
 
   // ===== Boot
   (async function boot(){
-    const buscarCard = byId("card-buscar"); if (buscarCard) buscarCard.style.display = ""; // garante visibilidade
     await loadSchema();
     showTipoGroup();
     onStatusChange();
     // slots iniciais (UX)
     byId("grad_list")?.appendChild(makeGradItem());
     byId("pos_list")?.appendChild(makePosItem());
-    // opcional: carregar lista inicial
-    // onBuscar();
   })();
 </script>
 </body>
