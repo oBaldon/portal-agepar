@@ -327,8 +327,10 @@ def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
     Opcionalmente filtra por kind.
     """
     try:
+        kind_norm = _normalize_kind(kind)
         try:
-            rows = db.list_audits(kind=kind, limit=2000, offset=0) if kind else db.list_audits(limit=2000, offset=0)
+            # Busca ampla (limit maior para cobrir variedade); filtro por kind será aplicado abaixo com normalização.
+            rows = db.list_audits(limit=2000, offset=0)
         except TypeError:
             # assinatura antiga (sem params) — faz fallback
             rows = db.list_audits()
@@ -338,9 +340,12 @@ def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
             a = (r.get("action") or "").strip()
             if not a:
                 continue
-            if kind:
-                rk = r.get("kind") or r.get("target_kind")
-                if rk != kind:
+            if kind_norm:
+                # normaliza origem do kind do registro: r.kind, r.target_kind, meta.kind
+                meta = r.get("meta") or r.get("extra") or {}
+                rk_raw = r.get("kind") or r.get("target_kind") or (meta.get("kind") if isinstance(meta, dict) else None)
+                rk = _normalize_kind(rk_raw)
+                if rk != kind_norm:
                     continue
             seen.add(a)
         items = sorted(seen)
@@ -348,6 +353,29 @@ def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
     except Exception as e:
         logger.exception("erro ao listar actions")
         raise HTTPException(status_code=500, detail=f"erro ao listar actions: {e}")
+
+
+@router.get("/kinds")
+def list_kinds() -> Dict[str, Any]:
+    """
+    Retorna a lista de kinds/alvos distintos (normalizados) presentes nos audits.
+    """
+    try:
+        try:
+            rows = db.list_audits(limit=3000, offset=0)
+        except TypeError:
+            rows = db.list_audits()
+        seen = set()
+        for r in rows:
+            meta = r.get("meta") or r.get("extra") or {}
+            rk_raw = r.get("kind") or r.get("target_kind") or (meta.get("kind") if isinstance(meta, dict) else None)
+            rk = _normalize_kind(rk_raw)
+            if rk:
+                seen.add(rk)
+        return {"items": sorted(seen)}
+    except Exception as e:
+        logger.exception("erro ao listar kinds")
+        raise HTTPException(status_code=500, detail=f"erro ao listar kinds: {e}")
 
 
 # --------------------------
@@ -419,10 +447,11 @@ def list_audits_api(
                 if action.lower() not in str(a).lower():
                     return False
             if kind:
-                tk = it.get("target_kind")
-                ek = (it.get("extra") or {}).get("kind") if isinstance(it.get("extra"), dict) else None
-                # aceita "automations/{kind}" e normalizado
-                if tk not in (kind, f"automations/{kind}") and _normalize_kind(ek) != _normalize_kind(kind):
+                kind_norm = _normalize_kind(kind)
+                tk_norm = _normalize_kind(it.get("target_kind"))
+                ek = (it.get("extra") or {})
+                ek_norm = _normalize_kind(ek.get("kind") if isinstance(ek, dict) else None)
+                if tk_norm != kind_norm and ek_norm != kind_norm:
                     return False
             return True
 

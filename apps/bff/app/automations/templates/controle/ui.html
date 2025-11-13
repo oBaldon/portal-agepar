@@ -87,9 +87,7 @@
         <label for="kind">Tipo (alvo)</label>
         <select id="kind">
           <option value="" selected>(Todos)</option>
-          <option value="dfd">DFD</option>
-          <option value="ferias">Férias</option>
-          <option value="support">Suporte</option>
+        </select>
         </select>
       </div>
       <div class="col">
@@ -179,8 +177,10 @@
   async function loadActions(){
     const sel = qs("#action");
     const keep = sel.value;
+    const kind = qs("#kind").value.trim();
     try{
-      const r = await fetch(`/api/automations/controle/actions`, { credentials: "include" });
+      const url = kind ? `/api/automations/controle/actions?kind=${encodeURIComponent(kind)}` : `/api/automations/controle/actions`;
+      const r = await fetch(url, { credentials: "include" });
       if(!r.ok) throw new Error();
       const data = await r.json();
       const items = Array.isArray(data.items) ? data.items : [];
@@ -210,6 +210,38 @@
         sel.appendChild(o);
       });
       sel.value = "completed";
+    }
+  }
+
+  async function loadKinds(){
+    const sel = qs("#kind");
+    const keep = sel.value;
+    try{
+      const r = await fetch(`/api/automations/controle/kinds`, { credentials: "include" });
+      if(!r.ok) throw new Error();
+      const data = await r.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      // preserva a primeira opção "(Todos)"
+      sel.innerHTML = "";
+      const optAll = document.createElement("option");
+      optAll.value = ""; optAll.textContent = "(Todos)";
+      sel.appendChild(optAll);
+      for(const k of items){
+        const o = document.createElement("option");
+        o.value = k; o.textContent = k.toUpperCase(); // exibe legível, mantém value normalizado
+        sel.appendChild(o);
+      }
+      if(keep){
+        sel.value = keep;
+      }
+    }catch(_){
+      // fallback mínimo caso endpoint falhe
+      if(!sel.querySelector("option[value='dfd']")){
+        const o1=document.createElement("option"); o1.value="dfd"; o1.textContent="DFD"; sel.appendChild(o1);
+      }
+      if(!sel.querySelector("option[value='ferias']")){
+        const o2=document.createElement("option"); o2.value="ferias"; o2.textContent="FÉRIAS"; sel.appendChild(o2);
+      }
     }
   }
 
@@ -345,19 +377,39 @@
   }
 
   function initDefaults(){
-    const now = new Date();
+    // Define padrões locais:
+    // - since: 7 dias atrás às 00:00 (local)
+    // - until: hoje às 23:59 (local)
     const pad = (n)=>String(n).padStart(2,"0");
-    const yyyy = now.getFullYear();
-    const mm = pad(now.getMonth()+1);
-    const dd = pad(now.getDate());
-    qs("#since").value = `${yyyy}-${mm}-${dd}T00:00`;
+    const today = new Date();
+    const startOfToday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    );
+    const sevenDaysAgoStart = new Date(startOfToday);
+    sevenDaysAgoStart.setDate(sevenDaysAgoStart.getDate() - 7);
+    const endOfToday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      23, 59, 0, 0
+    );
+    qs("#since").value = `${sevenDaysAgoStart.getFullYear()}-${pad(sevenDaysAgoStart.getMonth()+1)}-${pad(sevenDaysAgoStart.getDate())}T00:00`;
+    qs("#until").value = `${endOfToday.getFullYear()}-${pad(endOfToday.getMonth()+1)}-${pad(endOfToday.getDate())}T${pad(endOfToday.getHours())}:${pad(endOfToday.getMinutes())}`;
+
     qs("#username").focus();
   }
 
   qs("#btnApply").addEventListener("click", load);
   qs("#btnCsv").addEventListener("click", exportCsv);
+  qs("#kind").addEventListener("change", async ()=>{
+    await loadActions();
+  });
 
   async function bootstrap(){
+    await loadKinds();
     await loadActions();
     initDefaults();
     await load();
