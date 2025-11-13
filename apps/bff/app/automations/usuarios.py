@@ -300,6 +300,16 @@ def ui_search(request: Request) -> HTMLResponse:
     html = _read_html("search.html")
     return HTMLResponse(content=html)
 
+@router.get("/ui/user/{user_id}")
+def ui_user_detail(user_id: str, request: Request) -> HTMLResponse:
+    """
+    UI de detalhe do usuário (renderiza tabela 'completíssima').
+    """
+    checker = require_roles_any(*REQUIRED_ROLES)
+    checker(request)
+    html = _read_html("detail.html")
+    return HTMLResponse(content=html)
+
 # ---------------------------------------------------------------------
 # JSON endpoints
 # ---------------------------------------------------------------------
@@ -408,6 +418,182 @@ def list_users(
         total = (cur.fetchone() or {}).get("c", 0) or 0
 
     return {"items": items, "count": len(items), "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/users/{user_id}")
+def get_user_detail(user_id: str) -> Dict[str, Any]:
+    """
+    Detalhe 'completíssimo' do usuário.
+    - Núcleo (users)
+    - Emprego atual (employment + org_units)
+      - Especializações (efetivo/comissionado/estagiario) e listas
+    - Formação (graduações/pos)
+    """
+    with _pg() as conn, conn.cursor() as cur:
+        # Núcleo
+        cur.execute(
+            """
+            SELECT
+              u.id::text        AS id,
+              u.name            AS nome_completo,
+              u.cpf,
+              u.rg,
+              u.id_funcional,
+              u.data_nascimento,
+              u.email           AS email_principal,
+              u.email_institucional,
+              u.telefone_principal,
+              u.ramal,
+              u.endereco,
+              u.dependentes_qtde,
+              u.formacao_nivel_medio,
+              u.status          AS status_usuario
+            FROM users u
+            WHERE u.id::text = %s
+            """,
+            (user_id,),
+        )
+        urow = cur.fetchone()
+        if not urow:
+            raise HTTPException(status_code=404, detail="user not found")
+        user = dict(urow)
+
+        # Emprego atual
+        cur.execute(
+            """
+            SELECT
+              e.id::text AS employment_id,
+              e.type     AS tipo_vinculo,
+              e.status   AS status_vinculo,
+              e.inactivity_reason AS motivo_inatividade,
+              e.start_date,
+              e.end_date,
+              ou.code AS org_code,
+              ou.name AS org_name
+            FROM employment e
+            LEFT JOIN org_units ou ON ou.id = e.org_unit_id
+            WHERE e.user_id = %s AND e.end_date IS NULL
+            ORDER BY e.start_date DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        erow = cur.fetchone()
+        employment: Dict[str, Any] | None = None
+        if erow:
+            e = dict(erow)
+            e["org_unit"] = {"code": e.pop("org_code", None), "name": e.pop("org_name", None)} if e.get("org_code") else None
+            employment = e
+
+            # Especializações
+            if e["tipo_vinculo"] == "efetivo":
+                cur.execute(
+                    """
+                    SELECT
+                      decreto_nomeacao_numero, decreto_nomeacao_data,
+                      posse_data, exercicio_data,
+                      lotacao_portaria, cedido_de, cedido_para,
+                      classe, classe_nivel,
+                      estabilidade_data, estabilidade_protocolo,
+                      estabilidade_resolucao_conjunta, estabilidade_publicacao_data
+                    FROM employment_efetivo
+                    WHERE employment_id = %s
+                    """,
+                    (e["employment_id"],),
+                )
+                eff = cur.fetchone()
+                efetivo = dict(eff) if eff else {}
+
+                # Listas
+                cur.execute(
+                    """
+                    SELECT protocolo, curso, conclusao_data, decreto_numero, resolucao_conjunta, classe
+                    FROM efetivo_capacitacoes
+                    WHERE employment_id = %s
+                    ORDER BY id
+                    """,
+                    (e["employment_id"],),
+                )
+                efetivo["capacitacoes"] = [dict(r) for r in (cur.fetchall() or [])]
+
+                cur.execute(
+                    """
+                    SELECT curso, conclusao_data, tipo, percentual
+                    FROM efetivo_giti
+                    WHERE employment_id = %s
+                    ORDER BY id
+                    """,
+                    (e["employment_id"],),
+                )
+                efetivo["giti"] = [dict(r) for r in (cur.fetchall() or [])]
+
+                cur.execute(
+                    """
+                    SELECT funcao_ou_cc, decreto_nomeacao_numero, decreto_nomeacao_data,
+                           posse_data, exercicio_data, simbolo, decreto_exoneracao_numero, decreto_exoneracao_data
+                    FROM employment_efetivo_outro_cargo
+                    WHERE employment_id = %s
+                    LIMIT 1
+                    """,
+                    (e["employment_id"],),
+                )
+                oc = cur.fetchone()
+                efetivo["outro_cargo"] = dict(oc) if oc else None
+                employment["efetivo"] = efetivo
+
+            elif e["tipo_vinculo"] == "comissionado":
+                cur.execute(
+                    """
+                    SELECT
+                      decreto_nomeacao_numero, decreto_nomeacao_data,
+                      posse_data, exercicio_data,
+                      simbolo, decreto_exoneracao_numero, decreto_exoneracao_data,
+                      com_vinculo, funcao_exercida
+                    FROM employment_comissionado
+                    WHERE employment_id = %s
+                    LIMIT 1
+                    """,
+                    (e["employment_id"],),
+                )
+                c = cur.fetchone()
+                employment["comissionado"] = dict(c) if c else {}
+
+            elif e["tipo_vinculo"] == "estagiario":
+                cur.execute(
+                    """
+                    SELECT
+                      tce_numero, tce_ano, inicio_data, fim_data,
+                      aditivo_novo_fim_data, rescisao_data,
+                      fluxogramas, frequencia, pagamento, vale_transporte
+                    FROM employment_estagiario
+                    WHERE employment_id = %s
+                    LIMIT 1
+                    """,
+                    (e["employment_id"],),
+                )
+                s = cur.fetchone()
+                employment["estagiario"] = dict(s) if s else {}
+
+        # Formação
+        cur.execute(
+            "SELECT curso, instituicao, conclusao_data FROM user_education_graduacao WHERE user_id = %s ORDER BY id",
+            (user_id,),
+        )
+        graduacoes = [dict(r) for r in (cur.fetchall() or [])]
+        cur.execute(
+            "SELECT curso, tipo, instituicao, conclusao_data FROM user_education_posgrad WHERE user_id = %s ORDER BY id",
+            (user_id,),
+        )
+        pos_graduacoes = [dict(r) for r in (cur.fetchall() or [])]
+
+    return {
+        "user": user,
+        "employment": employment,
+        "educacao": {
+            "graduacoes": graduacoes,
+            "pos_graduacoes": pos_graduacoes,
+        },
+    }
 
 
 @router.post("/users")

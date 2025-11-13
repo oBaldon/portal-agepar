@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Detalhe do usuário · v0.1.0</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --bd:#e2e8f0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  .muted { color:var(--muted); }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; text-decoration:none; display:inline-block; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.small { padding:8px 12px; font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); padding:16px; }
+  table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; table-layout:fixed; }
+  th,td { padding:10px 12px; border-bottom:1px solid var(--bd); vertical-align:top; text-align:left; }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .section { background:#f1f5f9; font-weight:600; }
+  .kv th { width:240px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Detalhe do usuário <span class="muted">· v0.1.0</span></h1>
+    <a class="btn secondary" href="/api/automations/usuarios/ui/search">Voltar</a>
+  </div>
+
+  <div class="card">
+    <table class="kv">
+      <thead>
+        <tr><th>Campo</th><th>Valor</th></tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td class="muted">Carregando…</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const TB = document.getElementById("tbody");
+
+  function cell(v){
+    if (v == null) return "-";
+    if (Array.isArray(v)) return v.length ? `<ul>${v.map(x=>`<li>${cell(x)}</li>`).join("")}</ul>` : "-";
+    if (typeof v === "object") {
+      return `<pre class="mono" style="white-space:pre-wrap">${escapeHtml(JSON.stringify(v, null, 2))}</pre>`;
+    }
+    return String(v);
+  }
+  function row(k, v, mono=false){
+    const cls = mono ? ' class="mono"' : '';
+    return `<tr><th>${k}</th><td${cls}>${cell(v)}</td></tr>`;
+  }
+  function section(label){
+    return `<tr class="section"><td colspan="2">${label}</td></tr>`;
+  }
+  function escapeHtml(s){
+    return String(s==null?"":s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,'&quot;').replace(/'/g,"&#039;");
+  }
+  function qparam(name){
+    // user_id vem na URL: /ui/user/{id}. Não há querystring, então extrair do path para chamadas subsequentes.
+    const parts = location.pathname.split("/");
+    return parts[parts.length-1];
+  }
+
+  async function load(){
+    const userId = qparam("user_id");
+    const url = new URL(`/api/automations/usuarios/users/${encodeURIComponent(userId)}`, location.origin);
+    const res = await fetch(url.toString(), { credentials:"include" });
+    if (!res.ok){ TB.innerHTML = `<tr><td colspan="2">Erro HTTP ${res.status}</td></tr>`; return; }
+    const data = await res.json();
+
+    const u = data.user || {};
+    const e = data.employment || {};
+    const edu = data.educacao || {};
+
+    const rows = [];
+
+    rows.push(section("Núcleo (users)"));
+    rows.push(row("ID", u.id, true));
+    rows.push(row("Nome completo", u.nome_completo));
+    rows.push(row("CPF", u.cpf, true));
+    rows.push(row("RG", u.rg, true));
+    rows.push(row("ID funcional", u.id_funcional, true));
+    rows.push(row("Data de nascimento", u.data_nascimento));
+    rows.push(row("E-mail principal", u.email_principal));
+    rows.push(row("E-mail institucional", u.email_institucional));
+    rows.push(row("Telefone principal", u.telefone_principal));
+    rows.push(row("Ramal", u.ramal));
+    rows.push(row("Endereço", u.endereco));
+    rows.push(row("Dependentes (qtde)", u.dependentes_qtde));
+    rows.push(row("Formação: nível médio", u.formacao_nivel_medio ? "Sim" : "Não"));
+    rows.push(row("Status (users.status)", u.status_usuario));
+
+    rows.push(section("Emprego atual (employment)"));
+    if (Object.keys(e).length === 0){
+      rows.push(row("Emprego", "Sem vínculo atual"));
+    } else {
+      rows.push(row("Employment ID", e.employment_id, true));
+      rows.push(row("Tipo de vínculo", e.tipo_vinculo));
+      rows.push(row("Status do vínculo", e.status_vinculo));
+      rows.push(row("Motivo da inatividade", e.motivo_inatividade || "-"));
+      rows.push(row("Início", e.start_date || "-"));
+      rows.push(row("Fim", e.end_date || "-"));
+      const org = e.org_unit ? `${e.org_unit.code || "-"} — ${e.org_unit.name || "-"}` : "-";
+      rows.push(row("Unidade organizacional", org));
+
+      if (e.tipo_vinculo === "efetivo" && e.efetivo){
+        const ef = e.efetivo || {};
+        rows.push(section("Especialização: EFETIVO"));
+        rows.push(row("Decreto nomeação (nº)", ef.decreto_nomeacao_numero));
+        rows.push(row("Decreto nomeação (data)", ef.decreto_nomeacao_data));
+        rows.push(row("Posse (data)", ef.posse_data));
+        rows.push(row("Exercício (data)", ef.exercicio_data));
+        rows.push(row("Lotação (portaria)", ef.lotacao_portaria));
+        rows.push(row("Cedido de", ef.cedido_de));
+        rows.push(row("Cedido para", ef.cedido_para));
+        rows.push(row("Classe", ef.classe));
+        rows.push(row("Classe (nível)", ef.classe_nivel));
+        rows.push(row("Estabilidade (data)", ef.estabilidade_data));
+        rows.push(row("Estabilidade (protocolo)", ef.estabilidade_protocolo));
+        rows.push(row("Estabilidade (resolução conjunta)", ef.estabilidade_resolucao_conjunta));
+        rows.push(row("Estabilidade (publicação data)", ef.estabilidade_publicacao_data));
+
+        rows.push(row("Capacitações", (ef.capacitacoes||[]).map(c => {
+          return `Curso: ${escapeHtml(c.curso||"-")} | Conclusão: ${escapeHtml(c.conclusao_data||"-")} | Protocolo: ${escapeHtml(c.protocolo||"-")} | Decreto: ${escapeHtml(c.decreto_numero||"-")} | Resolução: ${escapeHtml(c.resolucao_conjunta||"-")} | Classe: ${escapeHtml(c.classe||"-")}`;
+        }).join("\n")));
+        rows.push(row("GITI", (ef.giti||[]).map(g => {
+          return `Curso: ${escapeHtml(g.curso||"-")} | Conclusão: ${escapeHtml(g.conclusao_data||"-")} | Tipo: ${escapeHtml(g.tipo||"-")} | Percentual: ${escapeHtml(g.percentual??"-")}`;
+        }).join("\n")));
+
+        const oc = ef.outro_cargo;
+        if (oc){
+          rows.push(section("Efetivo — Outro cargo"));
+          rows.push(row("Função/CC", oc.funcao_ou_cc));
+          rows.push(row("Decreto nomeação (nº)", oc.decreto_nomeacao_numero));
+          rows.push(row("Decreto nomeação (data)", oc.decreto_nomeacao_data));
+          rows.push(row("Posse (data)", oc.posse_data));
+          rows.push(row("Exercício (data)", oc.exercicio_data));
+          rows.push(row("Símbolo", oc.simbolo));
+          rows.push(row("Decreto exoneração (nº)", oc.decreto_exoneracao_numero));
+          rows.push(row("Decreto exoneração (data)", oc.decreto_exoneracao_data));
+        }
+      }
+      if (e.tipo_vinculo === "comissionado" && e.comissionado){
+        const c = e.comissionado || {};
+        rows.push(section("Especialização: COMISSIONADO"));
+        rows.push(row("Decreto nomeação (nº)", c.decreto_nomeacao_numero));
+        rows.push(row("Decreto nomeação (data)", c.decreto_nomeacao_data));
+        rows.push(row("Posse (data)", c.posse_data));
+        rows.push(row("Exercício (data)", c.exercicio_data));
+        rows.push(row("Símbolo", c.simbolo));
+        rows.push(row("Decreto exoneração (nº)", c.decreto_exoneracao_numero));
+        rows.push(row("Decreto exoneração (data)", c.decreto_exoneracao_data));
+        rows.push(row("Com vínculo?", c.com_vinculo===true ? "Sim" : (c.com_vinculo===false ? "Não" : "-")));
+        rows.push(row("Função exercida", c.funcao_exercida));
+      }
+      if (e.tipo_vinculo === "estagiario" && e.estagiario){
+        const s = e.estagiario || {};
+        rows.push(section("Especialização: ESTAGIÁRIO"));
+        rows.push(row("TCE (nº)", s.tce_numero));
+        rows.push(row("TCE (ano)", s.tce_ano));
+        rows.push(row("Início", s.inicio_data));
+        rows.push(row("Fim", s.fim_data));
+        rows.push(row("Aditivo (novo fim)", s.aditivo_novo_fim_data));
+        rows.push(row("Rescisão (data)", s.rescisao_data));
+        rows.push(row("Fluxogramas", s.fluxogramas));
+        rows.push(row("Frequência", s.frequencia));
+        rows.push(row("Pagamento", s.pagamento));
+        rows.push(row("Vale-transporte", s.vale_transporte===true ? "Sim" : (s.vale_transporte===false ? "Não" : "-")));
+      }
+    }
+
+    rows.push(section("Formação — Graduações"));
+    (edu.graduacoes||[]).forEach((g, i) => {
+      rows.push(row(`#${i+1}`, `Curso: ${escapeHtml(g.curso||"-")} | Instituição: ${escapeHtml(g.instituicao||"-")} | Conclusão: ${escapeHtml(g.conclusao_data||"-")}`));
+    });
+    if (!(edu.graduacoes||[]).length) rows.push(row("(nenhuma)", "-"));
+
+    rows.push(section("Formação — Pós-graduações"));
+    (edu.pos_graduacoes||[]).forEach((p, i) => {
+      rows.push(row(`#${i+1}`, `Curso: ${escapeHtml(p.curso||"-")} | Tipo: ${escapeHtml(p.tipo||"-")} | Instituição: ${escapeHtml(p.instituicao||"-")} | Conclusão: ${escapeHtml(p.conclusao_data||"-")}`));
+    });
+    if (!(edu.pos_graduacoes||[]).length) rows.push(row("(nenhuma)", "-"));
+
+    TB.innerHTML = rows.join("");
+  }
+
+  load().catch(() => { TB.innerHTML = '<tr><td colspan="2">Erro ao carregar.</td></tr>'; });
+</script>
+</body>
+</html>

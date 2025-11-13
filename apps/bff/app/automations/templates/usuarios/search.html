@@ -51,9 +51,10 @@
             <th>CPF</th>
             <th>ID Funcional</th>
             <th>Status</th>
+            <th>Ações</th>
           </tr>
         </thead>
-        <tbody id="rows"><tr><td class="empty" colspan="5">Nenhum resultado.</td></tr></tbody>
+        <tbody id="rows"><tr><td class="empty" colspan="6">Nenhum resultado.</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -90,7 +91,9 @@
         <td>${(u.email_principal ?? u.email ?? "")}</td>
         <td class="mono">${(u.cpf ?? "")}</td>
         <td class="mono">${(u.id_funcional ?? u.idFuncional ?? "-")}</td>
-        <td>${(u.status_vinculo ?? u.status ?? "")}</td>`;
+        <td>${(u.status_vinculo ?? u.status ?? "")}</td>
+        <td><a class="btn small secondary" href="/api/automations/usuarios/ui/user/${encodeURIComponent(u.id)}">Ver</a></td>
+      `;
       rows.appendChild(tr);
     }
     const total = (typeof data?.total === "number") ? data.total : items.length;
