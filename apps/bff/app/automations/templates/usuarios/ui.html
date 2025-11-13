@@ -340,6 +340,14 @@
     byId("grupo-efetivo")?.classList.toggle("group-hidden", t!=="efetivo");
     byId("grupo-comissionado")?.classList.toggle("group-hidden", t!=="comissionado");
     byId("grupo-estagiario")?.classList.toggle("group-hidden", t!=="estagiario");
+
+    // Semeia listas quando Efetivo estiver ativo
+    if (t === "efetivo") {
+      const capList = byId("ef_cap_list");
+      const gitiList = byId("ef_giti_list");
+      if (capList && capList.children.length === 0) capList.appendChild(makeCapacitacaoItem());
+      if (gitiList && gitiList.children.length === 0) gitiList.appendChild(makeGitiItem());
+    }
   }
   function onStatusChange(){
     const st = byId("status")?.value || "ativo";
@@ -576,6 +584,12 @@
   on("#tipo_vinculo", "change", showTipoGroup);
   on("#status", "change", onStatusChange);
   on("#ef_outro_enable", "change", onEfOutroToggle);
+  // Botões de adicionar itens nas listas
+  on("#btn_add_grad", "click", () => byId("grad_list")?.appendChild(makeGradItem()));
+  on("#btn_add_pos", "click", () => byId("pos_list")?.appendChild(makePosItem()));
+  on("#btn_add_cap", "click", () => byId("ef_cap_list")?.appendChild(makeCapacitacaoItem()));
+  on("#btn_add_giti", "click", () => byId("ef_giti_list")?.appendChild(makeGitiItem()));
+
   on("#es_inicio_data", "input", ()=> {
     const out = byId("es_limite_alerta_data");
     const ini = byId("es_inicio_data")?.value;
