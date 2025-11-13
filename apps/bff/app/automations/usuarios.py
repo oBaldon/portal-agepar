@@ -6,6 +6,9 @@ import pathlib
 import re
 from typing import Any, Dict, List, Optional, Literal
 from secrets import choice
+from datetime import date, datetime, time
+from decimal import Decimal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -76,6 +79,26 @@ def err_json(
     if received is not None:
         content["received"] = received
     return JSONResponse(status_code=status, content=content)
+
+
+def _json_safe(obj: Any) -> Any:
+    """Converte recursivamente para tipos serializáveis em JSON (psycopg json)."""
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, (date, datetime, time)):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_json_safe(v) for v in obj]
+    try:
+        return str(obj)
+    except Exception:
+        return None
 
 
 def _read_html(name: str) -> str:
@@ -478,7 +501,7 @@ def get_user_detail(user_id: str) -> Dict[str, Any]:
               u.cpf,
               u.rg,
               u.id_funcional,
-              u.data_nascimento,
+              u.data_nascimento::text AS data_nascimento,
               u.email           AS email_principal,
               u.email_institucional,
               u.telefone_principal,
@@ -864,7 +887,7 @@ def create_user(payload: UserCreateIn, request: Request):
         actor = request.session.get("user") or {}
         add_audit("usuarios", "user.create", actor, {"user_id": user_id, "org_unit": desired_code})
         insert_submission(
-            {
+            _json_safe({
                 "kind": "usuarios",
                 "version": "0.1.0",
                 "actor_cpf": actor.get("cpf"),
@@ -883,7 +906,7 @@ def create_user(payload: UserCreateIn, request: Request):
                 "status": "done",
                 "result": {"user_id": user_id},
                 "error": None,
-            }
+            })
         )
 
     # devolve PIN (RH comunica ao usuário)
@@ -896,6 +919,10 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
     Atualiza completamente os dados do usuário, emprego atual e especializações.
     Estratégia para listas: 'replace' (apaga e recria quando fornecidas).
     """
+    # snapshot "antes" para diff
+    before = _snapshot_minimo(user_id)
+    payload_dict = payload.model_dump(exclude_unset=True)
+
     with _pg() as conn, conn.cursor() as cur:
         # existência
         cur.execute("SELECT id::text FROM users WHERE id::text = %s", (user_id,))
@@ -904,13 +931,13 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
 
         # validações básicas
         cpf_digits = None
-        if payload.cpf is not None:
+        if "cpf" in payload_dict:
             cpf_digits = norm_cpf(payload.cpf)
         if cpf_digits:
             cur.execute("SELECT 1 FROM users WHERE cpf = %s AND id::text <> %s", (cpf_digits, user_id))
             if cur.fetchone():
                 return err_json(409, code="conflict", message="CPF já cadastrado para outro usuário.")
-        if payload.email_principal:
+        if "email_principal" in payload_dict and payload.email_principal:
             cur.execute("SELECT 1 FROM users WHERE email = %s AND id::text <> %s", (payload.email_principal, user_id))
             if cur.fetchone():
                 return err_json(409, code="conflict", message="E-mail já cadastrado para outro usuário.")
@@ -925,21 +952,21 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
             sets.append(f"{col} = %s")
             params.append(val)
 
-        if payload.nome_completo is not None: add_set("name", payload.nome_completo)
+        if "nome_completo" in payload_dict: add_set("name", payload.nome_completo)
         if cpf_digits is not None: add_set("cpf", cpf_digits)
-        if payload.rg is not None: add_set("rg", payload.rg)
-        if payload.id_funcional is not None: add_set("id_funcional", payload.id_funcional)
-        if payload.data_nascimento is not None: add_set("data_nascimento", payload.data_nascimento)
-        if payload.email_principal is not None: add_set("email", payload.email_principal)
-        if payload.email_institucional is not None: add_set("email_institucional", payload.email_institucional)
-        if payload.telefone_principal is not None: add_set("telefone_principal", payload.telefone_principal)
-        if payload.ramal is not None: add_set("ramal", payload.ramal)
-        if payload.endereco is not None: add_set("endereco", payload.endereco)
-        if payload.dependentes_qtde is not None: add_set("dependentes_qtde", payload.dependentes_qtde)
+        if "rg" in payload_dict: add_set("rg", payload.rg)
+        if "id_funcional" in payload_dict: add_set("id_funcional", payload.id_funcional)
+        if "data_nascimento" in payload_dict: add_set("data_nascimento", payload.data_nascimento)
+        if "email_principal" in payload_dict: add_set("email", payload.email_principal)
+        if "email_institucional" in payload_dict: add_set("email_institucional", payload.email_institucional)
+        if "telefone_principal" in payload_dict: add_set("telefone_principal", payload.telefone_principal)
+        if "ramal" in payload_dict: add_set("ramal", payload.ramal)
+        if "endereco" in payload_dict: add_set("endereco", payload.endereco)
+        if "dependentes_qtde" in payload_dict: add_set("dependentes_qtde", payload.dependentes_qtde)
         if payload.formacao is not None and payload.formacao.nivel_medio is not None:
             add_set("formacao_nivel_medio", bool(payload.formacao.nivel_medio))
         # refletir status do employment no users.status se vier
-        if payload.status is not None:
+        if "status" in payload_dict and payload.status is not None:
             add_set("status", map_user_status_from_employment(payload.status))
         if sets:
             cur.execute("UPDATE users SET " + ", ".join(sets) + " WHERE id::text = %s", (*params, user_id))
@@ -954,7 +981,7 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
         current_type = (erow or {}).get("type")
 
         # criar emprego se não existir e houver dados do emprego
-        if not employment_id and any([payload.tipo_vinculo, payload.status, payload.org_unit_code]):
+        if not employment_id and any(k in payload_dict for k in ("tipo_vinculo", "status", "org_unit_code", "motivo_inatividade")):
             desired_code = payload.org_unit_code or DEFAULT_ORG_UNIT_CODE
             cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (desired_code,))
             ou = cur.fetchone()
@@ -975,13 +1002,13 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
             # atualizar campos do emprego
             esets: List[str] = []
             eparams: List[Any] = []
-            if payload.tipo_vinculo is not None:
+            if "tipo_vinculo" in payload_dict:
                 esets.append("type = %s"); eparams.append(payload.tipo_vinculo); current_type = payload.tipo_vinculo
-            if payload.status is not None:
+            if "status" in payload_dict:
                 esets.append("status = %s"); eparams.append(payload.status)
-            if payload.motivo_inatividade is not None:
+            if "motivo_inatividade" in payload_dict:
                 esets.append("inactivity_reason = %s"); eparams.append(payload.motivo_inatividade)
-            if payload.org_unit_code is not None:
+            if "org_unit_code" in payload_dict:
                 cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (payload.org_unit_code,))
                 ou = cur.fetchone()
                 if not ou:
@@ -991,7 +1018,7 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                 cur.execute("UPDATE employment SET " + ", ".join(esets) + " WHERE id::text = %s", (*eparams, employment_id))
 
             # substituir especializações conforme tipo atual (apenas se payload da especialização foi enviado)
-            if current_type == "efetivo" and payload.efetivo is not None:
+            if current_type == "efetivo" and "efetivo" in payload_dict:
                 cur.execute("DELETE FROM employment_efetivo WHERE employment_id = %s", (employment_id,))
                 cur.execute("DELETE FROM efetivo_capacitacoes WHERE employment_id = %s", (employment_id,))
                 cur.execute("DELETE FROM efetivo_giti WHERE employment_id = %s", (employment_id,))
@@ -1051,7 +1078,7 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                             oc.posse_data, oc.exercicio_data, oc.simbolo, oc.decreto_exoneracao_numero, oc.decreto_exoneracao_data,
                         ),
                     )
-            elif current_type == "comissionado" and payload.comissionado is not None:
+            elif current_type == "comissionado" and "comissionado" in payload_dict:
                 cur.execute("DELETE FROM employment_comissionado WHERE employment_id = %s", (employment_id,))
                 c = payload.comissionado
                 cur.execute(
@@ -1067,7 +1094,7 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                         c.simbolo, c.decreto_exoneracao_numero, c.decreto_exoneracao_data, c.com_vinculo, c.funcao_exercida,
                     ),
                 )
-            elif current_type == "estagiario" and payload.estagiario is not None:
+            elif current_type == "estagiario" and "estagiario" in payload_dict:
                 cur.execute("DELETE FROM employment_estagiario WHERE employment_id = %s", (employment_id,))
                 s = payload.estagiario
                 cur.execute(
@@ -1085,7 +1112,7 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                 )
 
         # formação listas (replace quando fornecidas)
-        if payload.formacao is not None:
+        if "formacao" in payload_dict and payload.formacao is not None:
             cur.execute("DELETE FROM user_education_graduacao WHERE user_id = %s", (user_id,))
             cur.execute("DELETE FROM user_education_posgrad WHERE user_id = %s", (user_id,))
             for g in (payload.formacao.graduacoes or []):
@@ -1099,9 +1126,224 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                     (user_id, p.curso, p.tipo, p.instituicao, p.conclusao_data),
                 )
 
+        # auditoria + histórico
         actor = request.session.get("user") or {}
-        add_audit("usuarios", "user.update", actor, {"user_id": user_id})
-    return {"ok": True, "id": user_id}
+        changes = _compute_changes(before, payload_dict)
+        add_audit("usuarios", "user.update", actor, {"user_id": user_id, "changes_count": len(changes)})
+
+        insert_submission(_json_safe({
+            "kind": "usuarios",
+            "version": "0.1.0",
+            "actor_cpf": actor.get("cpf"),
+            "actor_nome": actor.get("name") or actor.get("nome"),
+            "actor_email": actor.get("email"),
+            "payload": {
+                "action": "update_user",
+                "user_id": user_id,
+                "changes": changes,
+            },
+            "status": "done",
+            "result": {"user_id": user_id, "changes": len(changes)},
+            "error": None,
+        }))
+
+    return {"ok": True, "id": user_id, "changes": len(changes)}
+
+# ===== Diff helpers e histórico =====================================
+
+def _normalize_bool(v):
+    if isinstance(v, bool):
+        return v
+    if v in (None, ""):
+        return None
+    s = str(v).strip().lower()
+    if s in ("true", "1", "sim"):
+        return True
+    if s in ("false", "0", "nao", "não"):
+        return False
+    return v
+
+def _norm_date(v):
+    if v in (None, ""):
+        return None
+    if isinstance(v, datetime):
+        return v.date().isoformat()
+    if isinstance(v, date):
+        return v.isoformat()
+    if isinstance(v, str):
+        s = v.strip()
+        return s[:10] if len(s) >= 10 else s
+    return v
+
+def _cmp_field(changes: List[Dict[str, Any]], path: str, before: Any, after: Any):
+    if before != after:
+        changes.append({"path": path, "before": before, "after": after})
+
+def _snapshot_minimo(user_id: str) -> Dict[str, Any]:
+    """Snapshot mínimo (núcleo + emprego + contadores de educação) para comparação rápida."""
+    with _pg() as conn, conn.cursor() as cur:
+        # Núcleo
+        cur.execute(
+            """
+            SELECT
+              u.name AS nome_completo,
+              u.cpf, u.rg, u.id_funcional, u.data_nascimento,
+              u.email AS email_principal, u.email_institucional,
+              u.telefone_principal, u.ramal, u.endereco,
+              u.dependentes_qtde, u.formacao_nivel_medio
+            FROM users u
+            WHERE u.id::text = %s
+            """,
+            (user_id,),
+        )
+        u = cur.fetchone()
+        if not u:
+            raise HTTPException(status_code=404, detail="user not found")
+        user = dict(u)
+
+        # Emprego atual
+        cur.execute(
+            """
+            SELECT
+              e.type AS tipo_vinculo,
+              e.status AS status_vinculo,
+              e.inactivity_reason AS motivo_inatividade,
+              ou.code AS org_code
+            FROM employment e
+            LEFT JOIN org_units ou ON ou.id = e.org_unit_id
+            WHERE e.user_id = %s AND e.end_date IS NULL
+            ORDER BY e.start_date DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        er = cur.fetchone()
+        emp = dict(er) if er else {
+            "tipo_vinculo": None, "status_vinculo": None,
+            "motivo_inatividade": None, "org_code": None
+        }
+
+        # Contadores de formação
+        cur.execute("SELECT COUNT(*) AS c FROM user_education_graduacao WHERE user_id = %s", (user_id,))
+        grad_c = (cur.fetchone() or {}).get("c", 0) or 0
+        cur.execute("SELECT COUNT(*) AS c FROM user_education_posgrad WHERE user_id = %s", (user_id,))
+        pos_c = (cur.fetchone() or {}).get("c", 0) or 0
+        edu_counts = {"graduacoes_count": int(grad_c), "pos_graduacoes_count": int(pos_c)}
+
+    return {"user": user, "employment": emp, "educacao": edu_counts}
+
+
+def _compute_changes(before: Dict[str, Any], payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Compara snapshot mínimo vs payload (campos núcleo + emprego + contadores de formação).
+    Retorna lista de {path, before, after}.
+    """
+    changes: List[Dict[str, Any]] = []
+    bu = before.get("user", {})
+    be = before.get("employment", {})
+    be_edu = before.get("educacao", {}) or {}
+
+    def _cmp_field_local(path: str, before_v: Any, after_v: Any):
+        if before_v != after_v:
+            changes.append({"path": path, "before": before_v, "after": after_v})
+
+    # Núcleo (só compara se veio no payload)
+    if "nome_completo" in payload:
+        _cmp_field_local("user.nome_completo", bu.get("nome_completo"), payload.get("nome_completo"))
+    if "cpf" in payload:
+        _cmp_field_local("user.cpf", bu.get("cpf"), (safe_digits(payload.get("cpf") or "") or None))
+    if "rg" in payload:
+        _cmp_field_local("user.rg", bu.get("rg"), payload.get("rg"))
+    if "id_funcional" in payload:
+        _cmp_field_local("user.id_funcional", bu.get("id_funcional"), payload.get("id_funcional"))
+    if "data_nascimento" in payload:
+        _cmp_field_local(
+            "user.data_nascimento",
+            _norm_date(bu.get("data_nascimento")),
+            _norm_date(payload.get("data_nascimento")),
+        )
+    if "email_principal" in payload:
+        _cmp_field_local("user.email_principal", bu.get("email_principal"), payload.get("email_principal"))
+    if "email_institucional" in payload:
+        _cmp_field_local("user.email_institucional", bu.get("email_institucional"), payload.get("email_institucional"))
+    if "telefone_principal" in payload:
+        _cmp_field_local("user.telefone_principal", bu.get("telefone_principal"), payload.get("telefone_principal"))
+    if "ramal" in payload:
+        _cmp_field_local("user.ramal", bu.get("ramal"), payload.get("ramal"))
+    if "endereco" in payload:
+        _cmp_field_local("user.endereco", bu.get("endereco"), payload.get("endereco"))
+    if "dependentes_qtde" in payload:
+        _cmp_field_local("user.dependentes_qtde", bu.get("dependentes_qtde"), payload.get("dependentes_qtde"))
+    if "formacao" in payload and isinstance(payload["formacao"], dict) and "nivel_medio" in payload["formacao"]:
+        _cmp_field_local("user.formacao_nivel_medio", bool(bu.get("formacao_nivel_medio")), bool(payload["formacao"].get("nivel_medio")))
+
+    # Emprego
+    if "tipo_vinculo" in payload:
+        _cmp_field_local("employment.tipo_vinculo", be.get("tipo_vinculo"), payload.get("tipo_vinculo"))
+    if "status" in payload:
+        _cmp_field_local("employment.status_vinculo", be.get("status_vinculo"), payload.get("status"))
+    if "motivo_inatividade" in payload:
+        _cmp_field_local("employment.motivo_inatividade", be.get("motivo_inatividade"), payload.get("motivo_inatividade"))
+    if "org_unit_code" in payload:
+        _cmp_field_local("employment.org_unit_code", be.get("org_code"), payload.get("org_unit_code") or be.get("org_code"))
+
+    # Formação: comparar por contagem de itens para evitar falso positivo
+    if "formacao" in payload and isinstance(payload["formacao"], dict):
+        if "graduacoes" in payload["formacao"] and isinstance(payload["formacao"]["graduacoes"], list):
+            before_n = int(be_edu.get("graduacoes_count") or 0)
+            after_n = len(payload["formacao"]["graduacoes"] or [])
+            if before_n != after_n:
+                changes.append({"path": "educacao.graduacoes_count", "before": before_n, "after": after_n})
+        if "pos_graduacoes" in payload["formacao"] and isinstance(payload["formacao"]["pos_graduacoes"], list):
+            before_n = int(be_edu.get("pos_graduacoes_count") or 0)
+            after_n = len(payload["formacao"]["pos_graduacoes"] or [])
+            if before_n != after_n:
+                changes.append({"path": "educacao.pos_graduacoes_count", "before": before_n, "after": after_n})
+
+    # Removido: sinais genéricos ("employment.efetivo/comissionado/estagiario") para não inflar o contador
+
+    return changes
+
+
+@router.get("/users/{user_id}/history")
+def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[str, Any]:
+    """
+    Retorna histórico de eventos (criação/atualizações) do usuário,
+    baseado em submissions com kind="usuarios".
+    """
+    limit = clamp(limit, 1, 500)
+    offset = max(0, offset)
+    # Pega um lote e filtra pelo user_id no payload
+    subs = list_submissions_admin(kind="usuarios", limit=1000, offset=0)  # lote largo para filtrar em memória
+    items = []
+    for s in subs:
+        p = (s or {}).get("payload") or {}
+        if p.get("user_id") != user_id:
+            continue
+        act = p.get("action")
+        if act not in ("create_user", "update_user"):
+            continue
+        items.append({
+            "id": s.get("id"),
+            "at": s.get("created_at") or s.get("created") or s.get("ts"),
+            "action": act,
+            "actor": {
+                "cpf": s.get("actor_cpf"),
+                "nome": s.get("actor_nome"),
+                "email": s.get("actor_email"),
+            },
+            "changes": p.get("changes") or [],  # lista [{path,before,after}] em updates
+        })
+    # Ordena por data asc (antigos primeiro)
+    items.sort(key=lambda x: (x.get("at") or ""))
+    # Pagina o resultado solicitado
+    return {
+        "items": items[offset: offset + limit],
+        "count": len(items[offset: offset + limit]),
+        "total": len(items),
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 # ---------------------------------------------------------------------

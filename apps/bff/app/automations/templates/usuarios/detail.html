@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Detalhe do usuário · v0.1.0</title>
 <style>
-  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --bd:#e2e8f0; }
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --bd:#e2e8f0; --ok:#059669; --warn:#b45309; }
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; }
   body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",sans-serif; background:var(--bg); color:var(--fg); }
@@ -13,40 +13,141 @@
   .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
   h1 { font-size:20px; margin:0 0 8px; }
   .muted { color:var(--muted); }
-  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; text-decoration:none; display:inline-block; }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; text-decoration:none; display:inline-block; cursor:pointer; }
   .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
   .btn.small { padding:8px 12px; font-size:12px; }
+  .btn.ghost { background:transparent; color:var(--pri); border-color:transparent; }
   .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); padding:16px; }
+  .stack { display: grid; gap:16px; }
   table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; table-layout:fixed; }
   th,td { padding:10px 12px; border-bottom:1px solid var(--bd); vertical-align:top; text-align:left; }
   th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
   .section { background:#f1f5f9; font-weight:600; }
   .kv th { width:240px; }
+  .toolbar { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; border:1px solid var(--bd); padding:4px 8px; border-radius:999px; }
+  .empty { color:var(--muted); padding:8px 0; }
+  .grid { display:grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 780px){ .grid { grid-template-columns: 1fr 1fr; } }
+
+  /* ===== Diff (grid) ===== */
+  .diff { border:1px solid var(--bd); border-radius:12px; overflow:hidden; background:#fff; }
+  .diff-group { border-top:1px solid var(--bd); }
+  .diff-group:first-child { border-top:none; }
+  .diff-group-header { background:#f8fafc; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:600; }
+  .diff-grid { display:grid; grid-template-columns: 1.2fr 1fr 1fr; }
+  .diff-cell { padding:8px 12px; border-top:1px solid var(--bd); white-space:pre-wrap; word-break:break-word; overflow:auto; max-height:180px; }
+  .diff-head .diff-cell { font-weight:600; background:#fff; position:sticky; top:0; z-index:0; }
+  .diff-after { background:#f0fdf4; }
+
+  /* ===== Modal ===== */
+  .hidden { display:none !important; }
+  .modal-open { overflow:hidden; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; padding:16px; z-index:9999; }
+  .modal { background:var(--card); border:1px solid var(--bd); border-radius:14px; box-shadow:0 10px 25px rgba(0,0,0,.2); max-width:980px; width:100%; max-height:85vh; display:flex; flex-direction:column; }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--bd); }
+  .modal-title { font-size:16px; font-weight:600; }
+  .modal-body { padding:12px 16px; overflow:auto; }
+  .modal-actions { display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--bd); justify-content:flex-end; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <h1>Detalhe do usuário <span class="muted">· v0.1.0</span></h1>
-    <a class="btn secondary" href="/api/automations/usuarios/ui/search">Voltar</a>
+    <div class="toolbar">
+      <a class="btn secondary small" id="btn_voltar" href="/api/automations/usuarios/ui/search">Voltar</a>
+      <a class="btn small" id="btn_editar" href="#">Editar</a>
+      <button class="btn ghost small" id="btn_recarregar" type="button">Recarregar</button>
+    </div>
   </div>
 
-  <div class="card">
-    <table class="kv">
-      <thead>
-        <tr><th>Campo</th><th>Valor</th></tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td class="muted">Carregando…</td><td></td></tr>
-      </tbody>
-    </table>
+  <div class="stack">
+    <!-- Bloco: dados completos -->
+    <div class="card">
+      <table class="kv">
+        <thead>
+          <tr><th>Campo</th><th>Valor</th></tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td class="muted">Carregando…</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bloco: histórico -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+        <h2 style="font-size:16px;margin:0">Histórico de alterações</h2>
+        <span id="hist_meta" class="pill">0 evento(s)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:180px">Data/hora</th>
+            <th style="width:120px">Ação</th>
+            <th>Autor</th>
+            <th style="width:160px">Alterações</th>
+          </tr>
+        </thead>
+        <tbody id="hist_tbody">
+          <tr><td class="empty" colspan="4">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para diffs -->
+<div id="diff_modal" class="modal-overlay hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="diff_modal_title">
+    <div class="modal-header">
+      <div id="diff_modal_title" class="modal-title">Alterações</div>
+      <button id="diff_modal_close_x" class="btn secondary small" type="button">Fechar</button>
+    </div>
+    <div id="diff_modal_body" class="modal-body"></div>
+    <div class="modal-actions">
+      <button id="diff_modal_close" class="btn secondary small" type="button">Fechar</button>
+    </div>
   </div>
 </div>
 
 <script>
   const TB = document.getElementById("tbody");
+  const HB = document.getElementById("hist_tbody");
+  const HM = document.getElementById("hist_meta");
+  const btnEditar = document.getElementById("btn_editar");
+  const btnRecarregar = document.getElementById("btn_recarregar");
 
+  // Modal helpers
+  const modal = document.getElementById("diff_modal");
+  const modalBody = document.getElementById("diff_modal_body");
+  const modalTitle = document.getElementById("diff_modal_title");
+  const closeBtns = [document.getElementById("diff_modal_close"), document.getElementById("diff_modal_close_x")];
+
+  function openModal(title, html){
+    modalTitle.textContent = title || "Alterações";
+    modalBody.innerHTML = html || "";
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    (closeBtns[0] || closeBtns[1]).focus();
+  }
+  function closeModal(){
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  }
+  closeBtns.forEach(b => b.addEventListener("click", closeModal));
+  modal.addEventListener("click", (ev) => {
+    if (ev.target === modal) closeModal();
+  });
+  window.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
+  });
+
+  // Render helpers
   function cell(v){
     if (v == null) return "-";
     if (Array.isArray(v)) return v.length ? `<ul>${v.map(x=>`<li>${cell(x)}</li>`).join("")}</ul>` : "-";
@@ -57,24 +158,73 @@
   }
   function row(k, v, mono=false){
     const cls = mono ? ' class="mono"' : '';
-    return `<tr><th>${k}</th><td${cls}>${cell(v)}</td></tr>`;
+    return `<tr><th>${escapeHtml(k)}</th><td${cls}>${cell(v)}</td></tr>`;
   }
   function section(label){
-    return `<tr class="section"><td colspan="2">${label}</td></tr>`;
+    return `<tr class="section"><td colspan="2">${escapeHtml(label)}</td></tr>`;
   }
   function escapeHtml(s){
     return String(s==null?"":s)
       .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
       .replace(/"/g,'&quot;').replace(/'/g,"&#039;");
   }
-  function qparam(name){
-    // user_id vem na URL: /ui/user/{id}. Não há querystring, então extrair do path para chamadas subsequentes.
+  function getUserIdFromPath(){
     const parts = location.pathname.split("/");
     return parts[parts.length-1];
   }
+  function fmtDateTime(s){
+    if (!s) return "-";
+    try {
+      const d = new Date(s);
+      if (Number.isNaN(d.getTime())) return String(s);
+      return d.toLocaleString();
+    } catch { return String(s); }
+  }
+  function prettyVal(v){
+    if (v === null || v === undefined || v === "") return "<span class='muted'>∅</span>";
+    if (typeof v === "object") return escapeHtml(JSON.stringify(v, null, 2));
+    return escapeHtml(String(v));
+  }
 
-  async function load(){
-    const userId = qparam("user_id");
+  function groupChanges(changes){
+    const groups = { "Núcleo (user)": [], "Emprego": [], "Educação": [], "Outros": [] };
+    for (const ch of (changes||[])){
+      const p = String(ch.path || "");
+      if (p.startsWith("user.")) groups["Núcleo (user)"].push(ch);
+      else if (p.startsWith("employment.")) groups["Emprego"].push(ch);
+      else if (p.startsWith("educacao.") || p.startsWith("educação.")) groups["Educação"].push(ch);
+      else groups["Outros"].push(ch);
+    }
+    return Object.entries(groups).filter(([,arr]) => arr.length > 0);
+  }
+
+  function renderChanges(changes){
+    const groups = groupChanges(changes);
+    if (groups.length === 0) return "<div class='empty'>Sem alterações.</div>";
+    const htmlGroups = groups.map(([title, arr]) => {
+      const bodyRows = arr.map(ch => `
+        <div class="diff-cell mono">${escapeHtml(ch.path||"-")}</div>
+        <div class="diff-cell mono">${prettyVal(ch.before)}</div>
+        <div class="diff-cell diff-after mono">${prettyVal(ch.after)}</div>
+      `).join("");
+      return `
+        <div class="diff-group">
+          <div class="diff-group-header">
+            <div>${escapeHtml(title)}</div>
+            <span class="pill">${arr.length}</span>
+          </div>
+          <div class="diff-grid diff-head">
+            <div class="diff-cell">Campo</div>
+            <div class="diff-cell">Antes</div>
+            <div class="diff-cell">Depois</div>
+          </div>
+          <div class="diff-grid">${bodyRows}</div>
+        </div>`;
+    }).join("");
+    return `<div class="diff">${htmlGroups}</div>`;
+  }
+
+  async function loadDetail(userId){
     const url = new URL(`/api/automations/usuarios/users/${encodeURIComponent(userId)}`, location.origin);
     const res = await fetch(url.toString(), { credentials:"include" });
     if (!res.ok){ TB.innerHTML = `<tr><td colspan="2">Erro HTTP ${res.status}</td></tr>`; return; }
@@ -85,7 +235,6 @@
     const edu = data.educacao || {};
 
     const rows = [];
-
     rows.push(section("Núcleo (users)"));
     rows.push(row("ID", u.id, true));
     rows.push(row("Nome completo", u.nome_completo));
@@ -103,7 +252,7 @@
     rows.push(row("Status (users.status)", u.status_usuario));
 
     rows.push(section("Emprego atual (employment)"));
-    if (Object.keys(e).length === 0){
+    if (!e || Object.keys(e).length === 0){
       rows.push(row("Emprego", "Sem vínculo atual"));
     } else {
       rows.push(row("Employment ID", e.employment_id, true));
@@ -196,7 +345,63 @@
     TB.innerHTML = rows.join("");
   }
 
-  load().catch(() => { TB.innerHTML = '<tr><td colspan="2">Erro ao carregar.</td></tr>'; });
+  function renderHistory(items){
+    if (!Array.isArray(items) || items.length === 0){
+      HB.innerHTML = '<tr><td class="empty" colspan="4">Sem eventos.</td></tr>';
+      HM.textContent = "0 evento(s)";
+      return;
+    }
+    items = items.slice().sort((a,b) => String(b.at||"").localeCompare(String(a.at||"")));
+    HM.textContent = `${items.length} evento(s)`;
+    HB.innerHTML = "";
+    for (const it of items){
+      const changes = Array.isArray(it.changes) ? it.changes : [];
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="mono">${escapeHtml(fmtDateTime(it.at))}</td>
+        <td>${escapeHtml(it.action === "create_user" ? "criação" : it.action)}</td>
+        <td>
+          <div>${escapeHtml(it.actor?.nome || "-")}</div>
+          <div class="mono muted">${escapeHtml(it.actor?.email || "-")}</div>
+          <div class="mono muted">${escapeHtml(it.actor?.cpf || "-")}</div>
+        </td>
+        <td class="changes-cell"></td>
+      `;
+      const cell = tr.querySelector(".changes-cell");
+      if (changes.length === 0){
+        cell.textContent = "-";
+      } else {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn secondary small";
+        btn.textContent = `${changes.length} alteração(ões)`;
+        btn.addEventListener("click", () => {
+          const title = `Alterações — ${fmtDateTime(it.at)} · ${it.action}`;
+          openModal(title, renderChanges(changes));
+        });
+        cell.appendChild(btn);
+      }
+      HB.appendChild(tr);
+    }
+  }
+
+  async function loadHistory(userId){
+    const url = new URL(`/api/automations/usuarios/users/${encodeURIComponent(userId)}/history`, location.origin);
+    const res = await fetch(url.toString(), { credentials: "include" });
+    if (!res.ok){ HB.innerHTML = `<tr><td colspan="4">Erro HTTP ${res.status}</td></tr>`; HM.textContent = ""; return; }
+    const data = await res.json();
+    renderHistory(data.items || []);
+  }
+
+  async function boot(){
+    const userId = getUserIdFromPath();
+    btnEditar.href = `/api/automations/usuarios/ui/user/${encodeURIComponent(userId)}/edit`;
+    document.getElementById("btn_voltar").href = "/api/automations/usuarios/ui/search";
+    await Promise.all([loadDetail(userId), loadHistory(userId)]);
+  }
+
+  document.addEventListener("DOMContentLoaded", boot);
+  btnRecarregar.addEventListener("click", () => boot());
 </script>
 </body>
 </html>
