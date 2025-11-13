@@ -19,6 +19,9 @@
   input[type="search"] { width:100%; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; }
   .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; cursor:pointer; transition:.16s ease; text-decoration:none; display:inline-block; }
   .btn:hover { transform: translateY(-1px); }
+  .btn.small { padding:8px 10px; font-size:12px; }
+  .btn.secondary { background:#fff; color:#334155; border-color:var(--bd); }
+  .btn.secondary:hover { background:#f8fafc; }
   table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; table-layout:fixed; }
   th,td { padding:10px 12px; border-bottom:1px solid var(--bd); vertical-align:top; text-align:left; }
   th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); background:#f8fafc; position:sticky; top:0; z-index:1; }
@@ -43,7 +46,7 @@
     </div>
 
     <div class="table-wrap">
-      <table>
+      <table aria-label="Tabela de usuários cadastrados">
         <thead>
           <tr>
             <th>Nome</th>
@@ -51,7 +54,7 @@
             <th>CPF</th>
             <th>ID Funcional</th>
             <th>Status</th>
-            <th>Ações</th>
+            <th style="width:160px">Ações</th>
           </tr>
         </thead>
         <tbody id="rows"><tr><td class="empty" colspan="6">Nenhum resultado.</td></tr></tbody>
@@ -80,11 +83,12 @@
     rows.innerHTML = "";
     const items = data?.items || data || [];
     if (!items.length) {
-      rows.innerHTML = '<tr><td class="empty" colspan="5">Nenhum resultado.</td></tr>';
+      rows.innerHTML = '<tr><td class="empty" colspan="6">Nenhum resultado.</td></tr>';
       meta.textContent = "";
       return;
     }
     for (const u of items) {
+      const id = u.id ?? u.user_id ?? "";
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${(u.nome_completo ?? u.name ?? "")}</td>
@@ -92,7 +96,10 @@
         <td class="mono">${(u.cpf ?? "")}</td>
         <td class="mono">${(u.id_funcional ?? u.idFuncional ?? "-")}</td>
         <td>${(u.status_vinculo ?? u.status ?? "")}</td>
-        <td><a class="btn small secondary" href="/api/automations/usuarios/ui/user/${encodeURIComponent(u.id)}">Ver</a></td>
+        <td style="white-space:nowrap">
+          <a class="btn small secondary" href="/api/automations/usuarios/ui/user/${encodeURIComponent(id)}">Ver</a>
+          <a class="btn small" href="/api/automations/usuarios/ui/user/${encodeURIComponent(id)}/edit">Editar</a>
+        </td>
       `;
       rows.appendChild(tr);
     }
@@ -103,7 +110,14 @@
   btn.addEventListener("click", async (e) => {
     e.preventDefault();
     try { render(await fetchUsers(q.value)); }
-    catch { rows.innerHTML = '<tr><td class="empty" colspan="5">Erro ao buscar.</td></tr>'; meta.textContent = ""; }
+    catch { rows.innerHTML = '<tr><td class="empty" colspan="6">Erro ao buscar.</td></tr>'; meta.textContent = ""; }
+  });
+
+  q.addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      btn.click();
+    }
   });
 
   // Inicial

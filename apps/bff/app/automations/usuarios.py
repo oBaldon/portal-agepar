@@ -280,6 +280,32 @@ class UserCreateIn(BaseModel):
     estagiario: Optional[EstagiarioIn] = None
 
 
+class UserUpdateIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    # Núcleo (opcionais)
+    nome_completo: Optional[str] = Field(default=None, min_length=3, max_length=200)
+    cpf: Optional[str] = Field(default=None, min_length=11, max_length=14)
+    rg: Optional[str] = None
+    id_funcional: Optional[int] = None
+    data_nascimento: Optional[str] = None
+    email_principal: Optional[str] = None
+    email_institucional: Optional[str] = None
+    telefone_principal: Optional[str] = None
+    ramal: Optional[str] = None
+    endereco: Optional[str] = None
+    dependentes_qtde: Optional[int] = Field(default=None, ge=0)
+    formacao: Optional[FormacaoIn] = None
+    # Emprego
+    tipo_vinculo: Optional[TipoVinculo] = None
+    status: Optional[StatusVinculo] = None
+    motivo_inatividade: Optional[MotivoInatividade] = None
+    org_unit_code: Optional[str] = None
+    # Especializações
+    efetivo: Optional[EfetivoIn] = None
+    comissionado: Optional[ComissionadoIn] = None
+    estagiario: Optional[EstagiarioIn] = None
+
+
 # ---------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------
@@ -288,17 +314,18 @@ def ui() -> HTMLResponse:
     html = _read_html("ui.html")
     return HTMLResponse(content=html)
 
+
 @router.get("/ui/search")
 @router.get("/ui/search/")
 def ui_search(request: Request) -> HTMLResponse:
     """
     UI separada para busca de usuários cadastrados (padrão semelhante ao DFD: /ui/history).
     """
-    # Guard RBAC (consistente com os endpoints sensíveis)
     checker = require_roles_any(*REQUIRED_ROLES)
     checker(request)
     html = _read_html("search.html")
     return HTMLResponse(content=html)
+
 
 @router.get("/ui/user/{user_id}")
 def ui_user_detail(user_id: str, request: Request) -> HTMLResponse:
@@ -309,6 +336,18 @@ def ui_user_detail(user_id: str, request: Request) -> HTMLResponse:
     checker(request)
     html = _read_html("detail.html")
     return HTMLResponse(content=html)
+
+
+@router.get("/ui/user/{user_id}/edit")
+def ui_user_edit(user_id: str, request: Request) -> HTMLResponse:
+    """
+    UI de edição do usuário.
+    """
+    checker = require_roles_any(*REQUIRED_ROLES)
+    checker(request)
+    html = _read_html("detail_edit.html")
+    return HTMLResponse(content=html)
+
 
 # ---------------------------------------------------------------------
 # JSON endpoints
@@ -849,6 +888,220 @@ def create_user(payload: UserCreateIn, request: Request):
 
     # devolve PIN (RH comunica ao usuário)
     return {"ok": True, "id": user_id, "temporary_pin": temp_pin}
+
+
+@router.put("/users/{user_id}")
+def update_user(user_id: str, payload: UserUpdateIn, request: Request):
+    """
+    Atualiza completamente os dados do usuário, emprego atual e especializações.
+    Estratégia para listas: 'replace' (apaga e recria quando fornecidas).
+    """
+    with _pg() as conn, conn.cursor() as cur:
+        # existência
+        cur.execute("SELECT id::text FROM users WHERE id::text = %s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="user not found")
+
+        # validações básicas
+        cpf_digits = None
+        if payload.cpf is not None:
+            cpf_digits = norm_cpf(payload.cpf)
+        if cpf_digits:
+            cur.execute("SELECT 1 FROM users WHERE cpf = %s AND id::text <> %s", (cpf_digits, user_id))
+            if cur.fetchone():
+                return err_json(409, code="conflict", message="CPF já cadastrado para outro usuário.")
+        if payload.email_principal:
+            cur.execute("SELECT 1 FROM users WHERE email = %s AND id::text <> %s", (payload.email_principal, user_id))
+            if cur.fetchone():
+                return err_json(409, code="conflict", message="E-mail já cadastrado para outro usuário.")
+        if payload.status == "inativo" and payload.motivo_inatividade is None:
+            raise HTTPException(status_code=422, detail="motivo_inatividade é obrigatório quando status = inativo")
+
+        # update users (parciais)
+        sets: List[str] = []
+        params: List[Any] = []
+
+        def add_set(col: str, val: Any):
+            sets.append(f"{col} = %s")
+            params.append(val)
+
+        if payload.nome_completo is not None: add_set("name", payload.nome_completo)
+        if cpf_digits is not None: add_set("cpf", cpf_digits)
+        if payload.rg is not None: add_set("rg", payload.rg)
+        if payload.id_funcional is not None: add_set("id_funcional", payload.id_funcional)
+        if payload.data_nascimento is not None: add_set("data_nascimento", payload.data_nascimento)
+        if payload.email_principal is not None: add_set("email", payload.email_principal)
+        if payload.email_institucional is not None: add_set("email_institucional", payload.email_institucional)
+        if payload.telefone_principal is not None: add_set("telefone_principal", payload.telefone_principal)
+        if payload.ramal is not None: add_set("ramal", payload.ramal)
+        if payload.endereco is not None: add_set("endereco", payload.endereco)
+        if payload.dependentes_qtde is not None: add_set("dependentes_qtde", payload.dependentes_qtde)
+        if payload.formacao is not None and payload.formacao.nivel_medio is not None:
+            add_set("formacao_nivel_medio", bool(payload.formacao.nivel_medio))
+        # refletir status do employment no users.status se vier
+        if payload.status is not None:
+            add_set("status", map_user_status_from_employment(payload.status))
+        if sets:
+            cur.execute("UPDATE users SET " + ", ".join(sets) + " WHERE id::text = %s", (*params, user_id))
+
+        # emprego atual
+        cur.execute(
+            "SELECT id::text, type FROM employment WHERE user_id = %s AND end_date IS NULL ORDER BY start_date DESC LIMIT 1",
+            (user_id,),
+        )
+        erow = cur.fetchone()
+        employment_id = (erow or {}).get("id")
+        current_type = (erow or {}).get("type")
+
+        # criar emprego se não existir e houver dados do emprego
+        if not employment_id and any([payload.tipo_vinculo, payload.status, payload.org_unit_code]):
+            desired_code = payload.org_unit_code or DEFAULT_ORG_UNIT_CODE
+            cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (desired_code,))
+            ou = cur.fetchone()
+            if not ou:
+                raise HTTPException(status_code=400, detail="org_unit_code inválido ou inativo")
+            cur.execute(
+                """
+                INSERT INTO employment (user_id, type, status, inactivity_reason, org_unit_id, start_date)
+                VALUES (%s,%s,%s,%s,%s,CURRENT_DATE)
+                RETURNING id::text
+                """,
+                (user_id, payload.tipo_vinculo or "efetivo", payload.status or "ativo", payload.motivo_inatividade, ou["id"]),
+            )
+            employment_id = (cur.fetchone() or {}).get("id")
+            current_type = payload.tipo_vinculo or "efetivo"
+
+        if employment_id:
+            # atualizar campos do emprego
+            esets: List[str] = []
+            eparams: List[Any] = []
+            if payload.tipo_vinculo is not None:
+                esets.append("type = %s"); eparams.append(payload.tipo_vinculo); current_type = payload.tipo_vinculo
+            if payload.status is not None:
+                esets.append("status = %s"); eparams.append(payload.status)
+            if payload.motivo_inatividade is not None:
+                esets.append("inactivity_reason = %s"); eparams.append(payload.motivo_inatividade)
+            if payload.org_unit_code is not None:
+                cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (payload.org_unit_code,))
+                ou = cur.fetchone()
+                if not ou:
+                    raise HTTPException(status_code=400, detail="org_unit_code inválido ou inativo")
+                esets.append("org_unit_id = %s"); eparams.append(ou["id"])
+            if esets:
+                cur.execute("UPDATE employment SET " + ", ".join(esets) + " WHERE id::text = %s", (*eparams, employment_id))
+
+            # substituir especializações conforme tipo atual (apenas se payload da especialização foi enviado)
+            if current_type == "efetivo" and payload.efetivo is not None:
+                cur.execute("DELETE FROM employment_efetivo WHERE employment_id = %s", (employment_id,))
+                cur.execute("DELETE FROM efetivo_capacitacoes WHERE employment_id = %s", (employment_id,))
+                cur.execute("DELETE FROM efetivo_giti WHERE employment_id = %s", (employment_id,))
+                cur.execute("DELETE FROM employment_efetivo_outro_cargo WHERE employment_id = %s", (employment_id,))
+                e = payload.efetivo.model_dump()
+                cur.execute(
+                    """
+                    INSERT INTO employment_efetivo (
+                        employment_id, decreto_nomeacao_numero, decreto_nomeacao_data, posse_data, exercicio_data,
+                        lotacao_portaria, cedido_de, cedido_para, classe, classe_nivel,
+                        estabilidade_data, estabilidade_protocolo, estabilidade_resolucao_conjunta, estabilidade_publicacao_data
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        employment_id,
+                        e.get("decreto_nomeacao_numero"),
+                        e.get("decreto_nomeacao_data"),
+                        e.get("posse_data"),
+                        e.get("exercicio_data"),
+                        e.get("lotacao_portaria"),
+                        e.get("cedido_de"),
+                        e.get("cedido_para"),
+                        e.get("classe"),
+                        e.get("classe_nivel"),
+                        e.get("estabilidade_data"),
+                        e.get("estabilidade_protocolo"),
+                        e.get("estabilidade_resolucao_conjunta"),
+                        e.get("estabilidade_publicacao_data"),
+                    ),
+                )
+                for cap in (payload.efetivo.capacitacoes or []):
+                    cur.execute(
+                        """
+                        INSERT INTO efetivo_capacitacoes
+                          (employment_id, protocolo, curso, conclusao_data, decreto_numero, resolucao_conjunta, classe)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        """,
+                        (employment_id, cap.protocolo, cap.curso, cap.conclusao_data, cap.decreto_numero, cap.resolucao_conjunta, cap.classe),
+                    )
+                for g in (payload.efetivo.giti or []):
+                    cur.execute(
+                        "INSERT INTO efetivo_giti (employment_id, curso, conclusao_data, tipo, percentual) VALUES (%s,%s,%s,%s,%s)",
+                        (employment_id, g.curso, g.conclusao_data, g.tipo, int(g.percentual)),
+                    )
+                oc = payload.efetivo.outro_cargo
+                if oc:
+                    cur.execute(
+                        """
+                        INSERT INTO employment_efetivo_outro_cargo
+                          (employment_id, funcao_ou_cc, decreto_nomeacao_numero, decreto_nomeacao_data,
+                           posse_data, exercicio_data, simbolo, decreto_exoneracao_numero, decreto_exoneracao_data)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        """,
+                        (
+                            employment_id,
+                            oc.funcao_ou_cc, oc.decreto_nomeacao_numero, oc.decreto_nomeacao_data,
+                            oc.posse_data, oc.exercicio_data, oc.simbolo, oc.decreto_exoneracao_numero, oc.decreto_exoneracao_data,
+                        ),
+                    )
+            elif current_type == "comissionado" and payload.comissionado is not None:
+                cur.execute("DELETE FROM employment_comissionado WHERE employment_id = %s", (employment_id,))
+                c = payload.comissionado
+                cur.execute(
+                    """
+                    INSERT INTO employment_comissionado
+                      (employment_id, decreto_nomeacao_numero, decreto_nomeacao_data, posse_data, exercicio_data,
+                       simbolo, decreto_exoneracao_numero, decreto_exoneracao_data, com_vinculo, funcao_exercida)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        employment_id,
+                        c.decreto_nomeacao_numero, c.decreto_nomeacao_data, c.posse_data, c.exercicio_data,
+                        c.simbolo, c.decreto_exoneracao_numero, c.decreto_exoneracao_data, c.com_vinculo, c.funcao_exercida,
+                    ),
+                )
+            elif current_type == "estagiario" and payload.estagiario is not None:
+                cur.execute("DELETE FROM employment_estagiario WHERE employment_id = %s", (employment_id,))
+                s = payload.estagiario
+                cur.execute(
+                    """
+                    INSERT INTO employment_estagiario
+                      (employment_id, tce_numero, tce_ano, inicio_data, fim_data, aditivo_novo_fim_data, rescisao_data,
+                       fluxogramas, frequencia, pagamento, vale_transporte)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        employment_id,
+                        s.tce_numero, s.tce_ano, s.inicio_data, s.fim_data, s.aditivo_novo_fim_data, s.rescisao_data,
+                        s.fluxogramas, s.frequencia, s.pagamento, s.vale_transporte,
+                    ),
+                )
+
+        # formação listas (replace quando fornecidas)
+        if payload.formacao is not None:
+            cur.execute("DELETE FROM user_education_graduacao WHERE user_id = %s", (user_id,))
+            cur.execute("DELETE FROM user_education_posgrad WHERE user_id = %s", (user_id,))
+            for g in (payload.formacao.graduacoes or []):
+                cur.execute(
+                    "INSERT INTO user_education_graduacao (user_id, curso, instituicao, conclusao_data) VALUES (%s,%s,%s,%s)",
+                    (user_id, g.curso, g.instituicao, g.conclusao_data),
+                )
+            for p in (payload.formacao.pos_graduacoes or []):
+                cur.execute(
+                    "INSERT INTO user_education_posgrad (user_id, curso, tipo, instituicao, conclusao_data) VALUES (%s,%s,%s,%s,%s)",
+                    (user_id, p.curso, p.tipo, p.instituicao, p.conclusao_data),
+                )
+
+        actor = request.session.get("user") or {}
+        add_audit("usuarios", "user.update", actor, {"user_id": user_id})
+    return {"ok": True, "id": user_id}
 
 
 # ---------------------------------------------------------------------

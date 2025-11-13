@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Editar usuário · v0.1.0</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --ok:#059669; --err:#b91c1c; --bd:#e2e8f0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  .muted { color:var(--muted); }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; text-decoration:none; display:inline-block; cursor:pointer; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.small { padding:8px 12px; font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); padding:16px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .col { flex:1; min-width:220px; }
+  label { display:block; font-size:12px; color: var(--muted); margin:12px 0 6px; }
+  input:not([type="checkbox"]), textarea, select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; background:#fff; }
+  .note { font-size:12px; color:var(--muted); }
+  .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+  .list { border:1px dashed var(--bd); padding:10px; border-radius:10px; background:#fff; }
+  .item { border:1px solid var(--bd); border-radius:10px; padding:10px; margin:10px 0; background:#fff; }
+  .actions { display:flex; gap:12px; justify-content:flex-end; flex-wrap:wrap; margin-top:12px; }
+  .toast { position:fixed; right:16px; bottom:16px; padding:10px 12px; border-radius:10px; color:#fff; background:var(--pri); box-shadow:0 8px 20px rgba(2,6,23,.25); z-index:50 }
+  .toast.ok{ background:var(--ok) } .toast.err{ background:var(--err) }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Editar usuário <span class="muted">· v0.1.0</span></h1>
+    <div>
+      <a class="btn secondary small" id="btn_voltar" href="#">Voltar</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:16px;margin:0 0 8px">Núcleo</h2>
+    <div class="row">
+      <div class="col"><label>Nome completo</label><input id="nome_completo"/></div>
+      <div class="col"><label>CPF</label><input id="cpf" inputmode="numeric" minlength="11" maxlength="14"/></div>
+      <div class="col"><label>RG</label><input id="rg"/></div>
+    </div>
+    <div class="row">
+      <div class="col"><label>ID funcional</label><input id="id_funcional" inputmode="numeric"/></div>
+      <div class="col"><label>Data de nascimento</label><input id="data_nascimento" type="date"/></div>
+      <div class="col"><label>E-mail principal</label><input id="email_principal"/></div>
+    </div>
+    <div class="row">
+      <div class="col"><label>E-mail institucional</label><input id="email_institucional"/></div>
+      <div class="col"><label>Telefone principal</label><input id="telefone_principal"/></div>
+      <div class="col"><label>Ramal</label><input id="ramal"/></div>
+    </div>
+    <div class="row">
+      <div class="col" style="flex:2"><label>Endereço</label><input id="endereco"/></div>
+      <div class="col" style="max-width:200px"><label>Dependentes (qtde)</label><input id="dependentes_qtde" type="number" min="0" step="1"/></div>
+    </div>
+    <div class="row">
+      <div class="col" style="max-width:220px">
+        <label><input type="checkbox" id="form_nivel_medio"/> Concluiu nível médio</label>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2 style="font-size:16px;margin:0 0 8px">Emprego</h2>
+    <div class="row">
+      <div class="col">
+        <label>Tipo de vínculo</label>
+        <select id="tipo_vinculo">
+          <option value="efetivo">Efetivo</option>
+          <option value="comissionado">Comissionado</option>
+          <option value="estagiario">Estagiário</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Status do vínculo</label>
+        <select id="status">
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </select>
+      </div>
+      <div class="col" id="motivo_wrap" style="display:none">
+        <label>Motivo da inatividade</label>
+        <select id="motivo_inatividade">
+          <option value="">--</option>
+          <option value="exoneracao">Exoneração</option>
+          <option value="aposentadoria">Aposentadoria</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Unidade organizacional</label>
+        <select id="org_unit_code"><option value="">(usar padrão)</option></select>
+      </div>
+    </div>
+
+    <div id="grupo-efetivo" class="hr"></div>
+    <div id="ef_campos">
+      <h3 style="font-size:14px;margin:6px 0">Efetivo — Atos e marcos</h3>
+      <div class="row">
+        <div class="col"><label>Decreto nomeação (nº)</label><input id="ef_decreto_num"/></div>
+        <div class="col"><label>Decreto nomeação (data)</label><input id="ef_decreto_data" type="date"/></div>
+        <div class="col"><label>Posse (data)</label><input id="ef_posse_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Exercício (data)</label><input id="ef_exercicio_data" type="date"/></div>
+        <div class="col"><label>Lotação (portaria)</label><input id="ef_lotacao_portaria"/></div>
+        <div class="col"><label>Cedido de</label><input id="ef_cedido_de"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Cedido para</label><input id="ef_cedido_para"/></div>
+        <div class="col"><label>Classe</label><input id="ef_classe"/></div>
+        <div class="col"><label>Nível</label><input id="ef_classe_nivel" type="number" min="0" step="1"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Estabilidade (data)</label><input id="ef_estab_data" type="date"/></div>
+        <div class="col"><label>Estabilidade (protocolo)</label><input id="ef_estab_protocolo"/></div>
+        <div class="col"><label>Estabilidade (resolução conjunta)</label><input id="ef_estab_resolucao"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Estabilidade (publicação data)</label><input id="ef_estab_pub_data" type="date"/></div>
+      </div>
+
+      <h4 style="font-size:13px;margin:10px 0 4px">Capacitações</h4>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn secondary small" id="btn_add_cap" type="button">Adicionar</button>
+      </div>
+      <div id="ef_cap_list" class="list"></div>
+
+      <h4 style="font-size:13px;margin:10px 0 4px">GITI</h4>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="btn secondary small" id="btn_add_giti" type="button">Adicionar</button>
+      </div>
+      <div id="ef_giti_list" class="list"></div>
+
+      <div class="hr"></div>
+      <h3 style="font-size:14px;margin:6px 0">Efetivo — Outro cargo (opcional)</h3>
+      <div class="row">
+        <div class="col" style="max-width:260px"><label><input type="checkbox" id="ef_outro_enable"/> Possui outro cargo</label></div>
+      </div>
+      <div id="ef_outro_wrap" style="display:none">
+        <div class="row">
+          <div class="col"><label>Função/CC</label><input id="ef_out_funcao"/></div>
+          <div class="col"><label>Decreto nomeação (nº)</label><input id="ef_out_decreto_num"/></div>
+          <div class="col"><label>Decreto nomeação (data)</label><input id="ef_out_decreto_data" type="date"/></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Posse (data)</label><input id="ef_out_posse_data" type="date"/></div>
+          <div class="col"><label>Exercício (data)</label><input id="ef_out_exercicio_data" type="date"/></div>
+          <div class="col"><label>Símbolo</label><input id="ef_out_simbolo"/></div>
+        </div>
+        <div class="row">
+          <div class="col"><label>Decreto exoneração (nº)</label><input id="ef_out_exon_num"/></div>
+          <div class="col"><label>Decreto exoneração (data)</label><input id="ef_out_exon_data" type="date"/></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="co_campos" style="display:none">
+      <div class="hr"></div>
+      <h3 style="font-size:14px;margin:6px 0">Comissionado</h3>
+      <div class="row">
+        <div class="col"><label>Decreto nomeação (nº)</label><input id="co_decreto_num"/></div>
+        <div class="col"><label>Decreto nomeação (data)</label><input id="co_decreto_data" type="date"/></div>
+        <div class="col"><label>Posse (data)</label><input id="co_posse_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Exercício (data)</label><input id="co_exercicio_data" type="date"/></div>
+        <div class="col"><label>Símbolo</label><input id="co_simbolo"/></div>
+        <div class="col"><label>Função exercida</label><input id="co_funcao"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Decreto exoneração (nº)</label><input id="co_exon_num"/></div>
+        <div class="col"><label>Decreto exoneração (data)</label><input id="co_exon_data" type="date"/></div>
+        <div class="col">
+          <label>Com vínculo?</label>
+          <select id="co_com_vinculo"><option value="">--</option><option value="true">Sim</option><option value="false">Não</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="es_campos" style="display:none">
+      <div class="hr"></div>
+      <h3 style="font-size:14px;margin:6px 0">Estagiário</h3>
+      <div class="row">
+        <div class="col"><label>TCE (nº)</label><input id="es_tce_num"/></div>
+        <div class="col"><label>TCE (ano)</label><input id="es_tce_ano" type="number" min="1900" max="2100"/></div>
+        <div class="col"><label>Início</label><input id="es_inicio_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Fim</label><input id="es_fim_data" type="date"/></div>
+        <div class="col"><label>Aditivo (novo fim)</label><input id="es_aditivo_novo_fim" type="date"/></div>
+        <div class="col"><label>Rescisão (data)</label><input id="es_rescisao_data" type="date"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Fluxogramas</label><textarea id="es_fluxogramas"></textarea></div>
+        <div class="col"><label>Frequência</label><textarea id="es_frequencia"></textarea></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Pagamento</label><textarea id="es_pagamento"></textarea></div>
+        <div class="col" style="max-width:260px;align-self:flex-end"><label><input type="checkbox" id="es_vale_transporte"/> Vale-transporte</label></div>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <h2 style="font-size:16px;margin:0 0 8px">Formação</h2>
+    <div class="row">
+      <div class="col">
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <h4 style="font-size:13px;margin:4px 0">Graduações</h4>
+          <button class="btn secondary small" id="btn_add_grad" type="button">Adicionar</button>
+        </div>
+        <div id="grad_list" class="list"></div>
+      </div>
+      <div class="col">
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <h4 style="font-size:13px;margin:4px 0">Pós-graduações</h4>
+          <button class="btn secondary small" id="btn_add_pos" type="button">Adicionar</button>
+        </div>
+        <div id="pos_list" class="list"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a class="btn secondary" id="cancelar" href="#">Cancelar</a>
+      <button class="btn" id="salvar" type="button">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+  const API = "/api/automations/usuarios";
+  const $ = sel => document.querySelector(sel);
+  const byId = id => document.getElementById(id);
+
+  // ===== Correção: obter userId de forma robusta (evita pegar "edit")
+  function getUserIdFromPath(){
+    const parts = location.pathname.split("/").filter(Boolean);
+    // .../ui/user/{id}/edit
+    const idx = parts.lastIndexOf("user");
+    if (idx >= 0 && parts[idx+1] && parts[idx+1] !== "edit") {
+      return decodeURIComponent(parts[idx+1]);
+    }
+    if (parts.length >= 2 && parts[parts.length-1] === "edit") {
+      return decodeURIComponent(parts[parts.length-2]);
+    }
+    const qs = new URLSearchParams(location.search).get("id");
+    return qs ? decodeURIComponent(qs) : "";
+  }
+  const userId = getUserIdFromPath();
+
+  function toast(msg, kind="ok", ms=3500){
+    const el = byId("toast"); el.textContent = msg; el.className = "toast " + kind; el.hidden = false;
+    clearTimeout(el._t); el._t = setTimeout(()=> el.hidden = true, ms);
+  }
+  function onlyDigits(s){ return (s||"").replace(/\D+/g,""); }
+  function asIntOrNull(v){ const n = Number(v); return Number.isFinite(n) ? n : null; }
+  function escapeHtml(s){
+    return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,'&quot;').replace(/'/g,"&#039;");
+  }
+
+  function makeGradItem(data){
+    const d = data || {};
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso" value="${escapeHtml(d.curso||"")}"/></div>
+        <div class="col"><label>Instituição</label><input data-k="instituicao" value="${escapeHtml(d.instituicao||"")}"/></div>
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date" value="${escapeHtml(d.conclusao_data||"")}"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="btn secondary small" data-act="remove">Remover</button></div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function makePosItem(data){
+    const d = data || {};
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso" value="${escapeHtml(d.curso||"")}"/></div>
+        <div class="col"><label>Tipo</label>
+          <select data-k="tipo">
+            <option value="">--</option>
+            <option value="especializacao"${d.tipo==="especializacao"?" selected":""}>Especialização</option>
+            <option value="mestrado"${d.tipo==="mestrado"?" selected":""}>Mestrado</option>
+            <option value="doutorado"${d.tipo==="doutorado"?" selected":""}>Doutorado</option>
+            <option value="pos"${d.tipo==="pos"?" selected":""}>Pós-graduação</option>
+          </select>
+        </div>
+        <div class="col"><label>Instituição</label><input data-k="instituicao" value="${escapeHtml(d.instituicao||"")}"/></div>
+      </div>
+      <div class="row"><div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date" value="${escapeHtml(d.conclusao_data||"")}"/></div></div>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="btn secondary small" data-act="remove">Remover</button></div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function makeCapItem(d){
+    d = d || {};
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso" value="${escapeHtml(d.curso||"")}"/></div>
+        <div class="col"><label>Protocolo</label><input data-k="protocolo" value="${escapeHtml(d.protocolo||"")}"/></div>
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date" value="${escapeHtml(d.conclusao_data||"")}"/></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Decreto (nº)</label><input data-k="decreto_numero" value="${escapeHtml(d.decreto_numero||"")}"/></div>
+        <div class="col"><label>Resolução conjunta</label><input data-k="resolucao_conjunta" value="${escapeHtml(d.resolucao_conjunta||"")}"/></div>
+        <div class="col"><label>Classe</label><input data-k="classe" value="${escapeHtml(d.classe||"")}"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="btn secondary small" data-act="remove">Remover</button></div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function makeGitiItem(d){
+    d = d || {};
+    const div = document.createElement("div"); div.className="item";
+    div.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso" value="${escapeHtml(d.curso||"")}"/></div>
+        <div class="col"><label>Conclusão (data)</label><input data-k="conclusao_data" type="date" value="${escapeHtml(d.conclusao_data||"")}"/></div>
+        <div class="col"><label>Tipo</label>
+          <select data-k="tipo">
+            <option value="">--</option>
+            <option value="graduacao"${d.tipo==="graduacao"?" selected":""}>Graduação</option>
+            <option value="mestrado"${d.tipo==="mestrado"?" selected":""}>Mestrado</option>
+            <option value="doutorado"${d.tipo==="doutorado"?" selected":""}>Doutorado</option>
+            <option value="pos"${d.tipo==="pos"?" selected":""}>Pós-graduação</option>
+          </select>
+        </div>
+        <div class="col"><label>Percentual</label>
+          <select data-k="percentual">
+            <option value="">--</option>
+            <option value="10"${String(d.percentual)==="10"?" selected":""}>10</option>
+            <option value="15"${String(d.percentual)==="15"?" selected":""}>15</option>
+            <option value="20"${String(d.percentual)==="20"?" selected":""}>20</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="btn secondary small" data-act="remove">Remover</button></div>`;
+    div.querySelector('[data-act="remove"]').onclick = ()=> div.remove();
+    return div;
+  }
+  function collectList(container, mapFn){
+    return Array.from(container.children).map(div => mapFn(div)).filter(x => x && Object.values(x).some(v => v !== null && v !== "" && v !== false));
+  }
+  function getVal(div, k){ const el = div.querySelector(`[data-k="${k}"]`); return el ? (el.value || "") : ""; }
+
+  function showTipo(){
+    const t = byId("tipo_vinculo")?.value || "efetivo";
+    $("#ef_campos").style.display = (t==="efetivo")?"":"none";
+    $("#co_campos").style.display = (t==="comissionado")?"":"none";
+    $("#es_campos").style.display = (t==="estagiario")?"":"none";
+    $("#motivo_wrap").style.display = (byId("status")?.value==="inativo")?"":"none";
+  }
+
+  async function loadSchema(){
+    const res = await fetch(`${API}/schema`, { credentials:"include" });
+    const s = await res.json();
+    const sel = byId("org_unit_code");
+    sel.innerHTML = `<option value="">(usar padrão: ${s.default_org_unit_code||"AGEPAR"})</option>`;
+    (s.org_units||[]).forEach(o => {
+      const opt = document.createElement("option");
+      opt.value = o.code; opt.textContent = (o.code && o.code!==o.name) ? `${o.code} — ${o.name}` : o.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  async function loadData(){
+    if (!userId){
+      toast("ID do usuário ausente na URL.", "err");
+      return;
+    }
+    const res = await fetch(`${API}/users/${encodeURIComponent(userId)}`, { credentials:"include" });
+    if (!res.ok){ toast("Falha ao carregar dados", "err"); return; }
+    const d = await res.json();
+    const u = d.user||{};
+    const e = d.employment||{};
+    const edu = d.educacao||{};
+    // núcleo
+    byId("nome_completo").value = u.nome_completo||"";
+    byId("cpf").value = u.cpf||"";
+    byId("rg").value = u.rg||"";
+    byId("id_funcional").value = u.id_funcional ?? "";
+    byId("data_nascimento").value = u.data_nascimento||"";
+    byId("email_principal").value = u.email_principal||"";
+    byId("email_institucional").value = u.email_institucional||"";
+    byId("telefone_principal").value = u.telefone_principal||"";
+    byId("ramal").value = u.ramal||"";
+    byId("endereco").value = u.endereco||"";
+    byId("dependentes_qtde").value = (u.dependentes_qtde ?? "");
+    byId("form_nivel_medio").checked = !!u.formacao_nivel_medio;
+    // emprego
+    byId("tipo_vinculo").value = e.tipo_vinculo || "efetivo";
+    byId("status").value = e.status_vinculo || "ativo";
+    byId("motivo_inatividade").value = e.motivo_inatividade || "";
+    if (e.org_unit && e.org_unit.code){ byId("org_unit_code").value = e.org_unit.code; }
+    // especializações
+    if (e.tipo_vinculo==="efetivo" && e.efetivo){
+      const ef = e.efetivo;
+      byId("ef_decreto_num").value = ef.decreto_nomeacao_numero||"";
+      byId("ef_decreto_data").value = ef.decreto_nomeacao_data||"";
+      byId("ef_posse_data").value = ef.posse_data||"";
+      byId("ef_exercicio_data").value = ef.exercicio_data||"";
+      byId("ef_lotacao_portaria").value = ef.lotacao_portaria||"";
+      byId("ef_cedido_de").value = ef.cedido_de||"";
+      byId("ef_cedido_para").value = ef.cedido_para||"";
+      byId("ef_classe").value = ef.classe||"";
+      byId("ef_classe_nivel").value = ef.classe_nivel ?? "";
+      byId("ef_estab_data").value = ef.estabilidade_data||"";
+      byId("ef_estab_protocolo").value = ef.estabilidade_protocolo||"";
+      byId("ef_estab_resolucao").value = ef.estabilidade_resolucao_conjunta||"";
+      byId("ef_estab_pub_data").value = ef.estabilidade_publicacao_data||"";
+      (ef.capacitacoes||[]).forEach(c => byId("ef_cap_list").appendChild(makeCapItem(c)));
+      (ef.giti||[]).forEach(g => byId("ef_giti_list").appendChild(makeGitiItem(g)));
+      if (ef.outro_cargo){
+        byId("ef_outro_enable").checked = true;
+        $("#ef_outro_wrap").style.display = "";
+        byId("ef_out_funcao").value = ef.outro_cargo.funcao_ou_cc||"";
+        byId("ef_out_decreto_num").value = ef.outro_cargo.decreto_nomeacao_numero||"";
+        byId("ef_out_decreto_data").value = ef.outro_cargo.decreto_nomeacao_data||"";
+        byId("ef_out_posse_data").value = ef.outro_cargo.posse_data||"";
+        byId("ef_out_exercicio_data").value = ef.outro_cargo.exercicio_data||"";
+        byId("ef_out_simbolo").value = ef.outro_cargo.simbolo||"";
+        byId("ef_out_exon_num").value = ef.outro_cargo.decreto_exoneracao_numero||"";
+        byId("ef_out_exon_data").value = ef.outro_cargo.decreto_exoneracao_data||"";
+      }
+    }
+    if (e.tipo_vinculo==="comissionado" && e.comissionado){
+      const c = e.comissionado;
+      byId("co_decreto_num").value = c.decreto_nomeacao_numero||"";
+      byId("co_decreto_data").value = c.decreto_nomeacao_data||"";
+      byId("co_posse_data").value = c.posse_data||"";
+      byId("co_exercicio_data").value = c.exercicio_data||"";
+      byId("co_simbolo").value = c.simbolo||"";
+      byId("co_funcao").value = c.funcao_exercida||"";
+      byId("co_exon_num").value = c.decreto_exoneracao_numero||"";
+      byId("co_exon_data").value = c.decreto_exoneracao_data||"";
+      byId("co_com_vinculo").value = (c.com_vinculo===true)?"true":(c.com_vinculo===false?"false":"");
+    }
+    if (e.tipo_vinculo==="estagiario" && e.estagiario){
+      const s = e.estagiario;
+      byId("es_tce_num").value = s.tce_numero||"";
+      byId("es_tce_ano").value = s.tce_ano ?? "";
+      byId("es_inicio_data").value = s.inicio_data||"";
+      byId("es_fim_data").value = s.fim_data||"";
+      byId("es_aditivo_novo_fim").value = s.aditivo_novo_fim_data||"";
+      byId("es_rescisao_data").value = s.rescisao_data||"";
+      byId("es_fluxogramas").value = s.fluxogramas||"";
+      byId("es_frequencia").value = s.frequencia||"";
+      byId("es_pagamento").value = s.pagamento||"";
+      byId("es_vale_transporte").checked = !!s.vale_transporte;
+    }
+    // formação
+    (edu.graduacoes||[]).forEach(g => byId("grad_list").appendChild(makeGradItem(g)));
+    (edu.pos_graduacoes||[]).forEach(p => byId("pos_list").appendChild(makePosItem(p)));
+    if (!(edu.graduacoes||[]).length) byId("grad_list").appendChild(makeGradItem({}));
+    if (!(edu.pos_graduacoes||[]).length) byId("pos_list").appendChild(makePosItem({}));
+    showTipo();
+  }
+
+  function collectEfetivo(){
+    const out = {};
+    out.decreto_nomeacao_numero = byId("ef_decreto_num").value||null;
+    out.decreto_nomeacao_data = byId("ef_decreto_data").value||null;
+    out.posse_data = byId("ef_posse_data").value||null;
+    out.exercicio_data = byId("ef_exercicio_data").value||null;
+    out.lotacao_portaria = byId("ef_lotacao_portaria").value||null;
+    out.cedido_de = byId("ef_cedido_de").value||null;
+    out.cedido_para = byId("ef_cedido_para").value||null;
+    out.classe = (byId("ef_classe").value||"").trim()||null;
+    out.classe_nivel = asIntOrNull(byId("ef_classe_nivel").value);
+    out.estabilidade_data = byId("ef_estab_data").value||null;
+    out.estabilidade_protocolo = byId("ef_estab_protocolo").value||null;
+    out.estabilidade_resolucao_conjunta = byId("ef_estab_resolucao").value||null;
+    out.estabilidade_publicacao_data = byId("ef_estab_pub_data").value||null;
+    out.capacitacoes = collectList(byId("ef_cap_list"), div => ({
+      protocolo: getVal(div,"protocolo")||null,
+      curso: getVal(div,"curso"),
+      conclusao_data: getVal(div,"conclusao_data")||null,
+      decreto_numero: getVal(div,"decreto_numero")||null,
+      resolucao_conjunta: getVal(div,"resolucao_conjunta")||null,
+      classe: getVal(div,"classe")||null
+    }));
+    out.giti = collectList(byId("ef_giti_list"), div => ({
+      curso: getVal(div,"curso"),
+      conclusao_data: getVal(div,"conclusao_data")||null,
+      tipo: getVal(div,"tipo")||null,
+      percentual: getVal(div,"percentual")||null
+    }));
+    if (byId("ef_outro_enable").checked){
+      out.outro_cargo = {
+        funcao_ou_cc: byId("ef_out_funcao").value||null,
+        decreto_nomeacao_numero: byId("ef_out_decreto_num").value||null,
+        decreto_nomeacao_data: byId("ef_out_decreto_data").value||null,
+        posse_data: byId("ef_out_posse_data").value||null,
+        exercicio_data: byId("ef_out_exercicio_data").value||null,
+        simbolo: byId("ef_out_simbolo").value||null,
+        decreto_exoneracao_numero: byId("ef_out_exon_num").value||null,
+        decreto_exoneracao_data: byId("ef_out_exon_data").value||null
+      };
+    }
+    return out;
+  }
+
+  async function onSave(){
+    const status = byId("status").value;
+    const motivo = byId("motivo_inatividade").value || null;
+    const tipo = byId("tipo_vinculo").value;
+    const payload = {
+      nome_completo: byId("nome_completo").value.trim(),
+      cpf: onlyDigits(byId("cpf").value) || null,
+      rg: byId("rg").value.trim() || null,
+      id_funcional: asIntOrNull(byId("id_funcional").value),
+      data_nascimento: byId("data_nascimento").value || null,
+      email_principal: byId("email_principal").value.trim() || null,
+      email_institucional: byId("email_institucional").value.trim() || null,
+      telefone_principal: byId("telefone_principal").value.trim() || null,
+      ramal: byId("ramal").value.trim() || null,
+      endereco: byId("endereco").value.trim() || null,
+      dependentes_qtde: asIntOrNull(byId("dependentes_qtde").value),
+      formacao: {
+        nivel_medio: !!byId("form_nivel_medio").checked,
+        graduacoes: collectList(byId("grad_list"), d => ({
+          curso: getVal(d,"curso"),
+          instituicao: getVal(d,"instituicao")||null,
+          conclusao_data: getVal(d,"conclusao_data")||null
+        })),
+        pos_graduacoes: collectList(byId("pos_list"), d => ({
+          curso: getVal(d,"curso"),
+          tipo: getVal(d,"tipo")||null,
+          instituicao: getVal(d,"instituicao")||null,
+          conclusao_data: getVal(d,"conclusao_data")||null
+        })),
+      },
+      tipo_vinculo: tipo,
+      status: status,
+      motivo_inatividade: (status === "inativo") ? motivo : null,
+      org_unit_code: byId("org_unit_code").value || null
+    };
+    if (tipo === "efetivo") payload.efetivo = collectEfetivo();
+    if (tipo === "comissionado"){
+      payload.comissionado = {
+        decreto_nomeacao_numero: byId("co_decreto_num").value||null,
+        decreto_nomeacao_data: byId("co_decreto_data").value||null,
+        posse_data: byId("co_posse_data").value||null,
+        exercicio_data: byId("co_exercicio_data").value||null,
+        simbolo: byId("co_simbolo").value||null,
+        decreto_exoneracao_numero: byId("co_exon_num").value||null,
+        decreto_exoneracao_data: byId("co_exon_data").value||null,
+        com_vinculo: (function(){ const v = byId("co_com_vinculo").value; return v===""?null:(v==="true"); })(),
+        funcao_exercida: byId("co_funcao").value||null
+      };
+    }
+    if (tipo === "estagiario"){
+      payload.estagiario = {
+        tce_numero: byId("es_tce_num").value||null,
+        tce_ano: asIntOrNull(byId("es_tce_ano").value),
+        inicio_data: byId("es_inicio_data").value||null,
+        fim_data: byId("es_fim_data").value||null,
+        aditivo_novo_fim_data: byId("es_aditivo_novo_fim").value||null,
+        rescisao_data: byId("es_rescisao_data").value||null,
+        fluxogramas: byId("es_fluxogramas").value||null,
+        frequencia: byId("es_frequencia").value||null,
+        pagamento: byId("es_pagamento").value||null,
+        vale_transporte: !!byId("es_vale_transporte").checked
+      };
+    }
+    try{
+      const res = await fetch(`${API}/users/${encodeURIComponent(userId)}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok){
+        const t = await res.text().catch(()=>String(res.status));
+        throw new Error(`HTTP ${res.status}: ${t}`);
+      }
+      toast("Alterações salvas.", "ok");
+      setTimeout(()=> location.href = `/api/automations/usuarios/ui/user/${encodeURIComponent(userId)}`, 600);
+    }catch(e){
+      toast("Falha ao salvar: " + (e?.message||"erro"), "err");
+    }
+  }
+
+  // Navegação
+  byId("btn_voltar").href = `/api/automations/usuarios/ui/user/${encodeURIComponent(userId)}`;
+  byId("cancelar").href  = `/api/automations/usuarios/ui/user/${encodeURIComponent(userId)}`;
+
+  // Bindings
+  byId("tipo_vinculo").addEventListener("change", showTipo);
+  byId("status").addEventListener("change", showTipo);
+  byId("ef_outro_enable").addEventListener("change", ()=> { $("#ef_outro_wrap").style.display = byId("ef_outro_enable").checked ? "" : "none"; });
+  byId("btn_add_grad").addEventListener("click", ()=> byId("grad_list").appendChild(makeGradItem({})));
+  byId("btn_add_pos").addEventListener("click", ()=> byId("pos_list").appendChild(makePosItem({})));
+  byId("btn_add_cap").addEventListener("click", ()=> byId("ef_cap_list").appendChild(makeCapItem({})));
+  byId("btn_add_giti").addEventListener("click", ()=> byId("ef_giti_list").appendChild(makeGitiItem({})));
+  byId("salvar").addEventListener("click", onSave);
+
+  // Boot
+  (async function boot(){
+    await loadSchema();
+    await loadData();
+  })();
+</script>
+</body>
+</html>
