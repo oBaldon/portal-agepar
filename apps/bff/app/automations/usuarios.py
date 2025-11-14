@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import re
-from typing import Any, Dict, List, Optional, Literal, Tuple
+from typing import Any, Dict, List, Optional, Literal
 from secrets import choice
 from datetime import date, datetime, time
 from decimal import Decimal
