@@ -156,12 +156,11 @@
       <div class="row">
         <div class="col"><label for="ef_exercicio_data">Exercício (data)</label><input id="ef_exercicio_data" type="date"/></div>
         <div class="col"><label for="ef_lotacao_portaria">Lotação (portaria)</label><input id="ef_lotacao_portaria"/></div>
-        <div class="col"><label for="ef_cedido_de">Cedido de</label><input id="ef_cedido_de"/></div>
+        <div class="col"><label for="ef_classe">Classe (romanos)</label><input id="ef_classe" placeholder="Ex.: III"/></div>
       </div>
       <div class="row">
+        <div class="col"><label for="ef_cedido_de">Cedido de</label><input id="ef_cedido_de"/></div>
         <div class="col"><label for="ef_cedido_para">Cedido para</label><input id="ef_cedido_para"/></div>
-        <div class="col"><label for="ef_classe">Classe (romanos)</label><input id="ef_classe" placeholder="Ex.: III"/></div>
-        <div class="col"><label for="ef_classe_nivel">Nível (inteiro)</label><input id="ef_classe_nivel" type="number" min="0" step="1"/></div>
       </div>
       <div class="row">
         <div class="col"><label for="ef_estab_data">Estabilidade (data)</label><input id="ef_estab_data" type="date"/></div>
@@ -505,7 +504,6 @@
           cedido_de: byId("ef_cedido_de").value || null,
           cedido_para: byId("ef_cedido_para").value || null,
           classe: (byId("ef_classe").value || "").trim() || null,
-          classe_nivel: asIntOrNull(byId("ef_classe_nivel").value),
           estabilidade_data: byId("ef_estab_data").value || null,
           estabilidade_protocolo: byId("ef_estab_protocolo").value || null,
           estabilidade_resolucao_conjunta: byId("ef_estab_resolucao").value || null,

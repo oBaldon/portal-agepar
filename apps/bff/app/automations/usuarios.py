@@ -226,7 +226,6 @@ class EfetivoIn(BaseModel):
     cedido_de: Optional[str] = None
     cedido_para: Optional[str] = None
     classe: Optional[str] = None
-    classe_nivel: Optional[int] = Field(default=None, ge=0)
     estabilidade_data: Optional[str] = None
     estabilidade_protocolo: Optional[str] = None
     estabilidade_resolucao_conjunta: Optional[str] = None
@@ -595,10 +594,10 @@ def create_user(payload: UserCreateIn, request: Request):
                 INSERT INTO employment_efetivo (
                     employment_id, decreto_nomeacao_numero, decreto_nomeacao_data, posse_data, exercicio_data,
                     lotacao_portaria, cedido_de, cedido_para,
-                    classe, classe_nivel,
+                    classe,
                     estabilidade_data, estabilidade_protocolo, estabilidade_resolucao_conjunta, estabilidade_publicacao_data
                 )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
                     emp_id,
@@ -610,7 +609,6 @@ def create_user(payload: UserCreateIn, request: Request):
                     e.get("cedido_de"),
                     e.get("cedido_para"),
                     e.get("classe"),
-                    e.get("classe_nivel"),
                     e.get("estabilidade_data"),
                     e.get("estabilidade_protocolo"),
                     e.get("estabilidade_resolucao_conjunta"),
@@ -865,9 +863,9 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                     """
                     INSERT INTO employment_efetivo (
                         employment_id, decreto_nomeacao_numero, decreto_nomeacao_data, posse_data, exercicio_data,
-                        lotacao_portaria, cedido_de, cedido_para, classe, classe_nivel,
+                        lotacao_portaria, cedido_de, cedido_para, classe,
                         estabilidade_data, estabilidade_protocolo, estabilidade_resolucao_conjunta, estabilidade_publicacao_data
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         employment_id,
@@ -879,7 +877,6 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                         e.get("cedido_de"),
                         e.get("cedido_para"),
                         e.get("classe"),
-                        e.get("classe_nivel"),
                         e.get("estabilidade_data"),
                         e.get("estabilidade_protocolo"),
                         e.get("estabilidade_resolucao_conjunta"),
@@ -1104,7 +1101,7 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
                       decreto_nomeacao_numero, decreto_nomeacao_data,
                       posse_data, exercicio_data,
                       lotacao_portaria, cedido_de, cedido_para,
-                      classe, classe_nivel,
+                      classe,
                       estabilidade_data, estabilidade_protocolo,
                       estabilidade_resolucao_conjunta, estabilidade_publicacao_data
                     FROM employment_efetivo

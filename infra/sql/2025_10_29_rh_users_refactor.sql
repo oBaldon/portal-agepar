@@ -147,7 +147,6 @@ ALTER TABLE employment_efetivo
   ADD COLUMN IF NOT EXISTS cedido_de                       TEXT,
   ADD COLUMN IF NOT EXISTS cedido_para                     TEXT,
   ADD COLUMN IF NOT EXISTS classe                          TEXT,
-  ADD COLUMN IF NOT EXISTS classe_nivel                    INTEGER,
   ADD COLUMN IF NOT EXISTS estabilidade_data               DATE,
   ADD COLUMN IF NOT EXISTS estabilidade_protocolo          TEXT,
   ADD COLUMN IF NOT EXISTS estabilidade_resolucao_conjunta TEXT,

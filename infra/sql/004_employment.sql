@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS employment_efetivo (
   posse_data DATE NULL,
   exercicio_data DATE NULL,
   classe TEXT NULL,
-  classe_nivel INTEGER NULL,
   estabilidade_data DATE NULL,
   estabilidade_protocolo TEXT NULL,
   estabilidade_resolucao_conjunta TEXT NULL,

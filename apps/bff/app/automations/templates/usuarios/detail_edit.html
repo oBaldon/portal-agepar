@@ -110,12 +110,11 @@
       <div class="row">
         <div class="col"><label>Exercício (data)</label><input id="ef_exercicio_data" type="date"/></div>
         <div class="col"><label>Lotação (portaria)</label><input id="ef_lotacao_portaria"/></div>
-        <div class="col"><label>Cedido de</label><input id="ef_cedido_de"/></div>
+        <div class="col"><label>Classe</label><input id="ef_classe"/></div>
       </div>
       <div class="row">
+        <div class="col"><label>Cedido de</label><input id="ef_cedido_de"/></div>
         <div class="col"><label>Cedido para</label><input id="ef_cedido_para"/></div>
-        <div class="col"><label>Classe</label><input id="ef_classe"/></div>
-        <div class="col"><label>Nível</label><input id="ef_classe_nivel" type="number" min="0" step="1"/></div>
       </div>
       <div class="row">
         <div class="col"><label>Estabilidade (data)</label><input id="ef_estab_data" type="date"/></div>
@@ -414,7 +413,6 @@
       byId("ef_cedido_de").value = ef.cedido_de||"";
       byId("ef_cedido_para").value = ef.cedido_para||"";
       byId("ef_classe").value = ef.classe||"";
-      byId("ef_classe_nivel").value = ef.classe_nivel ?? "";
       byId("ef_estab_data").value = ef.estabilidade_data||"";
       byId("ef_estab_protocolo").value = ef.estabilidade_protocolo||"";
       byId("ef_estab_resolucao").value = ef.estabilidade_resolucao_conjunta||"";
@@ -477,7 +475,6 @@
     out.cedido_de = byId("ef_cedido_de").value||null;
     out.cedido_para = byId("ef_cedido_para").value||null;
     out.classe = (byId("ef_classe").value||"").trim()||null;
-    out.classe_nivel = asIntOrNull(byId("ef_classe_nivel").value);
     out.estabilidade_data = byId("ef_estab_data").value||null;
     out.estabilidade_protocolo = byId("ef_estab_protocolo").value||null;
     out.estabilidade_resolucao_conjunta = byId("ef_estab_resolucao").value||null;
