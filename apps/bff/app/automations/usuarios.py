@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import re
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal, Tuple
 from secrets import choice
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -107,7 +107,7 @@ def _read_html(name: str) -> str:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        # fallback mínimo para não quebrar preview caso o template ainda não exista
+        # fallback mínimo
         return """<!doctype html>
 <html lang="pt-br">
 <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -491,171 +491,8 @@ def get_user_detail(user_id: str) -> Dict[str, Any]:
       - Especializações (efetivo/comissionado/estagiario) e listas
     - Formação (graduações/pos)
     """
-    with _pg() as conn, conn.cursor() as cur:
-        # Núcleo
-        cur.execute(
-            """
-            SELECT
-              u.id::text        AS id,
-              u.name            AS nome_completo,
-              u.cpf,
-              u.rg,
-              u.id_funcional,
-              u.data_nascimento::text AS data_nascimento,
-              u.email           AS email_principal,
-              u.email_institucional,
-              u.telefone_principal,
-              u.ramal,
-              u.endereco,
-              u.dependentes_qtde,
-              u.formacao_nivel_medio,
-              u.status          AS status_usuario
-            FROM users u
-            WHERE u.id::text = %s
-            """,
-            (user_id,),
-        )
-        urow = cur.fetchone()
-        if not urow:
-            raise HTTPException(status_code=404, detail="user not found")
-        user = dict(urow)
-
-        # Emprego atual
-        cur.execute(
-            """
-            SELECT
-              e.id::text AS employment_id,
-              e.type     AS tipo_vinculo,
-              e.status   AS status_vinculo,
-              e.inactivity_reason AS motivo_inatividade,
-              e.start_date,
-              e.end_date,
-              ou.code AS org_code,
-              ou.name AS org_name
-            FROM employment e
-            LEFT JOIN org_units ou ON ou.id = e.org_unit_id
-            WHERE e.user_id = %s AND e.end_date IS NULL
-            ORDER BY e.start_date DESC
-            LIMIT 1
-            """,
-            (user_id,),
-        )
-        erow = cur.fetchone()
-        employment: Dict[str, Any] | None = None
-        if erow:
-            e = dict(erow)
-            e["org_unit"] = {"code": e.pop("org_code", None), "name": e.pop("org_name", None)} if e.get("org_code") else None
-            employment = e
-
-            # Especializações
-            if e["tipo_vinculo"] == "efetivo":
-                cur.execute(
-                    """
-                    SELECT
-                      decreto_nomeacao_numero, decreto_nomeacao_data,
-                      posse_data, exercicio_data,
-                      lotacao_portaria, cedido_de, cedido_para,
-                      classe, classe_nivel,
-                      estabilidade_data, estabilidade_protocolo,
-                      estabilidade_resolucao_conjunta, estabilidade_publicacao_data
-                    FROM employment_efetivo
-                    WHERE employment_id = %s
-                    """,
-                    (e["employment_id"],),
-                )
-                eff = cur.fetchone()
-                efetivo = dict(eff) if eff else {}
-
-                # Listas
-                cur.execute(
-                    """
-                    SELECT protocolo, curso, conclusao_data, decreto_numero, resolucao_conjunta, classe
-                    FROM efetivo_capacitacoes
-                    WHERE employment_id = %s
-                    ORDER BY id
-                    """,
-                    (e["employment_id"],),
-                )
-                efetivo["capacitacoes"] = [dict(r) for r in (cur.fetchall() or [])]
-
-                cur.execute(
-                    """
-                    SELECT curso, conclusao_data, tipo, percentual
-                    FROM efetivo_giti
-                    WHERE employment_id = %s
-                    ORDER BY id
-                    """,
-                    (e["employment_id"],),
-                )
-                efetivo["giti"] = [dict(r) for r in (cur.fetchall() or [])]
-
-                cur.execute(
-                    """
-                    SELECT funcao_ou_cc, decreto_nomeacao_numero, decreto_nomeacao_data,
-                           posse_data, exercicio_data, simbolo, decreto_exoneracao_numero, decreto_exoneracao_data
-                    FROM employment_efetivo_outro_cargo
-                    WHERE employment_id = %s
-                    LIMIT 1
-                    """,
-                    (e["employment_id"],),
-                )
-                oc = cur.fetchone()
-                efetivo["outro_cargo"] = dict(oc) if oc else None
-                employment["efetivo"] = efetivo
-
-            elif e["tipo_vinculo"] == "comissionado":
-                cur.execute(
-                    """
-                    SELECT
-                      decreto_nomeacao_numero, decreto_nomeacao_data,
-                      posse_data, exercicio_data,
-                      simbolo, decreto_exoneracao_numero, decreto_exoneracao_data,
-                      com_vinculo, funcao_exercida
-                    FROM employment_comissionado
-                    WHERE employment_id = %s
-                    LIMIT 1
-                    """,
-                    (e["employment_id"],),
-                )
-                c = cur.fetchone()
-                employment["comissionado"] = dict(c) if c else {}
-
-            elif e["tipo_vinculo"] == "estagiario":
-                cur.execute(
-                    """
-                    SELECT
-                      tce_numero, tce_ano, inicio_data, fim_data,
-                      aditivo_novo_fim_data, rescisao_data,
-                      fluxogramas, frequencia, pagamento, vale_transporte
-                    FROM employment_estagiario
-                    WHERE employment_id = %s
-                    LIMIT 1
-                    """,
-                    (e["employment_id"],),
-                )
-                s = cur.fetchone()
-                employment["estagiario"] = dict(s) if s else {}
-
-        # Formação
-        cur.execute(
-            "SELECT curso, instituicao, conclusao_data FROM user_education_graduacao WHERE user_id = %s ORDER BY id",
-            (user_id,),
-        )
-        graduacoes = [dict(r) for r in (cur.fetchall() or [])]
-        cur.execute(
-            "SELECT curso, tipo, instituicao, conclusao_data FROM user_education_posgrad WHERE user_id = %s ORDER BY id",
-            (user_id,),
-        )
-        pos_graduacoes = [dict(r) for r in (cur.fetchall() or [])]
-
-    return {
-        "user": user,
-        "employment": employment,
-        "educacao": {
-            "graduacoes": graduacoes,
-            "pos_graduacoes": pos_graduacoes,
-        },
-    }
+    # Reutiliza a mesma lógica de snapshot completo
+    return _snapshot_full(user_id)
 
 
 @router.post("/users")
@@ -688,11 +525,10 @@ def create_user(payload: UserCreateIn, request: Request):
         cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (desired_code,))
         row = cur.fetchone()
         if not row:
-            # isso só ocorre se a seed da raiz não existir
             raise HTTPException(status_code=500, detail=f'Org Unit padrão "{desired_code}" não encontrada. Verifique as seeds.')
         org_unit_id = row["id"]
 
-        # cria usuário (novas colunas normalizadas)
+        # cria usuário
         cur.execute(
             """
             INSERT INTO users (
@@ -918,9 +754,10 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
     """
     Atualiza completamente os dados do usuário, emprego atual e especializações.
     Estratégia para listas: 'replace' (apaga e recria quando fornecidas).
+    Histórico: diff profundo 'antes vs depois', com paths detalhados.
     """
-    # snapshot "antes" para diff
-    before = _snapshot_minimo(user_id)
+    # snapshot "antes" para diff completo
+    before = _snapshot_full(user_id)
     payload_dict = payload.model_dump(exclude_unset=True)
 
     with _pg() as conn, conn.cursor() as cur:
@@ -1126,32 +963,34 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                     (user_id, p.curso, p.tipo, p.instituicao, p.conclusao_data),
                 )
 
-        # auditoria + histórico
-        actor = request.session.get("user") or {}
-        changes = _compute_changes(before, payload_dict)
-        add_audit("usuarios", "user.update", actor, {"user_id": user_id, "changes_count": len(changes)})
+    # === Snapshots antes/depois e diff profundo (fora do bloco para garantir commit visível)
+    after = _snapshot_full(user_id)
+    changes = _compute_changes(before, after)
 
-        insert_submission(_json_safe({
-            "kind": "usuarios",
-            "version": "0.1.0",
-            "actor_cpf": actor.get("cpf"),
-            "actor_nome": actor.get("name") or actor.get("nome"),
-            "actor_email": actor.get("email"),
-            "payload": {
-                "action": "update_user",
-                "user_id": user_id,
-                "changes": changes,
-            },
-            "status": "done",
-            "result": {"user_id": user_id, "changes": len(changes)},
-            "error": None,
-        }))
+    # auditoria + histórico
+    actor = request.session.get("user") or {}
+    add_audit("usuarios", "user.update", actor, {"user_id": user_id, "changes_count": len(changes)})
+    insert_submission(_json_safe({
+        "kind": "usuarios",
+        "version": "0.1.0",
+        "actor_cpf": actor.get("cpf"),
+        "actor_nome": actor.get("name") or actor.get("nome"),
+        "actor_email": actor.get("email"),
+        "payload": {
+            "action": "update_user",
+            "user_id": user_id,
+            "changes": changes,
+        },
+        "status": "done",
+        "result": {"user_id": user_id, "changes": len(changes)},
+        "error": None,
+    }))
 
     return {"ok": True, "id": user_id, "changes": len(changes)}
 
-# ===== Diff helpers e histórico =====================================
+# ===== Normalização, snapshots e diff profundo =======================
 
-def _normalize_bool(v):
+def _normalize_bool(v: Any) -> Any:
     if isinstance(v, bool):
         return v
     if v in (None, ""):
@@ -1163,7 +1002,7 @@ def _normalize_bool(v):
         return False
     return v
 
-def _norm_date(v):
+def _norm_date(v: Any) -> Any:
     if v in (None, ""):
         return None
     if isinstance(v, datetime):
@@ -1172,43 +1011,74 @@ def _norm_date(v):
         return v.isoformat()
     if isinstance(v, str):
         s = v.strip()
+        # aceita "YYYY-MM-DD" ou "YYYY-MM-DDTHH:MM:SS..."
         return s[:10] if len(s) >= 10 else s
     return v
 
-def _cmp_field(changes: List[Dict[str, Any]], path: str, before: Any, after: Any):
-    if before != after:
-        changes.append({"path": path, "before": before, "after": after})
+def _norm_value(v: Any) -> Any:
+    """Normaliza valores para comparação determinística."""
+    if isinstance(v, (datetime, date, time)):
+        return _norm_date(v)
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float, str)) or v is None:
+        return v
+    if isinstance(v, dict):
+        return {k: _norm_value(vv) for k, vv in v.items()}
+    if isinstance(v, list):
+        return [_norm_value(x) for x in v]
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, UUID):
+        return str(v)
+    # fallback
+    return v
 
-def _snapshot_minimo(user_id: str) -> Dict[str, Any]:
-    """Snapshot mínimo (núcleo + emprego + contadores de educação) para comparação rápida."""
+def _snapshot_full(user_id: str) -> Dict[str, Any]:
+    """Snapshot completo do usuário para diff (núcleo, emprego, especializações e listas de educação)."""
     with _pg() as conn, conn.cursor() as cur:
         # Núcleo
         cur.execute(
             """
             SELECT
-              u.name AS nome_completo,
-              u.cpf, u.rg, u.id_funcional, u.data_nascimento,
-              u.email AS email_principal, u.email_institucional,
-              u.telefone_principal, u.ramal, u.endereco,
-              u.dependentes_qtde, u.formacao_nivel_medio
+              u.id::text        AS id,
+              u.name            AS nome_completo,
+              u.cpf,
+              u.rg,
+              u.id_funcional,
+              u.data_nascimento   AS data_nascimento,
+              u.email           AS email_principal,
+              u.email_institucional,
+              u.telefone_principal,
+              u.ramal,
+              u.endereco,
+              u.dependentes_qtde,
+              u.formacao_nivel_medio,
+              u.status          AS status_usuario
             FROM users u
             WHERE u.id::text = %s
             """,
             (user_id,),
         )
-        u = cur.fetchone()
-        if not u:
+        urow = cur.fetchone()
+        if not urow:
             raise HTTPException(status_code=404, detail="user not found")
-        user = dict(u)
+        user = dict(urow)
+        user["data_nascimento"] = _norm_date(user.get("data_nascimento"))
+        user["formacao_nivel_medio"] = _normalize_bool(user.get("formacao_nivel_medio"))
 
         # Emprego atual
         cur.execute(
             """
             SELECT
-              e.type AS tipo_vinculo,
-              e.status AS status_vinculo,
+              e.id::text AS employment_id,
+              e.type     AS tipo_vinculo,
+              e.status   AS status_vinculo,
               e.inactivity_reason AS motivo_inatividade,
-              ou.code AS org_code
+              e.start_date,
+              e.end_date,
+              ou.code AS org_code,
+              ou.name AS org_name
             FROM employment e
             LEFT JOIN org_units ou ON ou.id = e.org_unit_id
             WHERE e.user_id = %s AND e.end_date IS NULL
@@ -1217,92 +1087,201 @@ def _snapshot_minimo(user_id: str) -> Dict[str, Any]:
             """,
             (user_id,),
         )
-        er = cur.fetchone()
-        emp = dict(er) if er else {
-            "tipo_vinculo": None, "status_vinculo": None,
-            "motivo_inatividade": None, "org_code": None
-        }
+        erow = cur.fetchone()
+        employment: Dict[str, Any] | None = None
+        if erow:
+            e = dict(erow)
+            e["start_date"] = _norm_date(e.get("start_date"))
+            e["end_date"] = _norm_date(e.get("end_date"))
+            e["org_unit"] = {"code": e.pop("org_code", None), "name": e.pop("org_name", None)} if e.get("org_code") else None
+            employment = e
 
-        # Contadores de formação
-        cur.execute("SELECT COUNT(*) AS c FROM user_education_graduacao WHERE user_id = %s", (user_id,))
-        grad_c = (cur.fetchone() or {}).get("c", 0) or 0
-        cur.execute("SELECT COUNT(*) AS c FROM user_education_posgrad WHERE user_id = %s", (user_id,))
-        pos_c = (cur.fetchone() or {}).get("c", 0) or 0
-        edu_counts = {"graduacoes_count": int(grad_c), "pos_graduacoes_count": int(pos_c)}
+            # Especializações
+            if e["tipo_vinculo"] == "efetivo":
+                cur.execute(
+                    """
+                    SELECT
+                      decreto_nomeacao_numero, decreto_nomeacao_data,
+                      posse_data, exercicio_data,
+                      lotacao_portaria, cedido_de, cedido_para,
+                      classe, classe_nivel,
+                      estabilidade_data, estabilidade_protocolo,
+                      estabilidade_resolucao_conjunta, estabilidade_publicacao_data
+                    FROM employment_efetivo
+                    WHERE employment_id = %s
+                    """,
+                    (e["employment_id"],),
+                )
+                eff = cur.fetchone()
+                efetivo = dict(eff) if eff else {}
+                # normalizações de datas
+                for k in ("decreto_nomeacao_data", "posse_data", "exercicio_data",
+                          "estabilidade_data", "estabilidade_publicacao_data"):
+                    if k in efetivo:
+                        efetivo[k] = _norm_date(efetivo.get(k))
 
-    return {"user": user, "employment": emp, "educacao": edu_counts}
+                # Listas
+                cur.execute(
+                    """
+                    SELECT protocolo, curso, conclusao_data, decreto_numero, resolucao_conjunta, classe
+                    FROM efetivo_capacitacoes
+                    WHERE employment_id = %s
+                    ORDER BY id
+                    """,
+                    (e["employment_id"],),
+                )
+                caps = [dict(r) for r in (cur.fetchall() or [])]
+                for c in caps:
+                    c["conclusao_data"] = _norm_date(c.get("conclusao_data"))
+                efetivo["capacitacoes"] = caps
 
+                cur.execute(
+                    """
+                    SELECT curso, conclusao_data, tipo, percentual
+                    FROM efetivo_giti
+                    WHERE employment_id = %s
+                    ORDER BY id
+                    """,
+                    (e["employment_id"],),
+                )
+                giti = [dict(r) for r in (cur.fetchall() or [])]
+                for g in giti:
+                    g["conclusao_data"] = _norm_date(g.get("conclusao_data"))
+                efetivo["giti"] = giti
 
-def _compute_changes(before: Dict[str, Any], payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    Compara snapshot mínimo vs payload (campos núcleo + emprego + contadores de formação).
-    Retorna lista de {path, before, after}.
-    """
+                cur.execute(
+                    """
+                    SELECT funcao_ou_cc, decreto_nomeacao_numero, decreto_nomeacao_data,
+                           posse_data, exercicio_data, simbolo, decreto_exoneracao_numero, decreto_exoneracao_data
+                    FROM employment_efetivo_outro_cargo
+                    WHERE employment_id = %s
+                    LIMIT 1
+                    """,
+                    (e["employment_id"],),
+                )
+                oc = cur.fetchone()
+                outro = dict(oc) if oc else None
+                if outro:
+                    for k in ("decreto_nomeacao_data", "posse_data", "exercicio_data", "decreto_exoneracao_data"):
+                        outro[k] = _norm_date(outro.get(k))
+                efetivo["outro_cargo"] = outro
+                employment["efetivo"] = efetivo
+
+            elif e["tipo_vinculo"] == "comissionado":
+                cur.execute(
+                    """
+                    SELECT
+                      decreto_nomeacao_numero, decreto_nomeacao_data,
+                      posse_data, exercicio_data,
+                      simbolo, decreto_exoneracao_numero, decreto_exoneracao_data,
+                      com_vinculo, funcao_exercida
+                    FROM employment_comissionado
+                    WHERE employment_id = %s
+                    LIMIT 1
+                    """,
+                    (e["employment_id"],),
+                )
+                c = cur.fetchone()
+                com = dict(c) if c else {}
+                for k in ("decreto_nomeacao_data", "posse_data", "exercicio_data", "decreto_exoneracao_data"):
+                    if k in com:
+                        com[k] = _norm_date(com.get(k))
+                com["com_vinculo"] = _normalize_bool(com.get("com_vinculo"))
+                employment["comissionado"] = com
+
+            elif e["tipo_vinculo"] == "estagiario":
+                cur.execute(
+                    """
+                    SELECT
+                      tce_numero, tce_ano, inicio_data, fim_data,
+                      aditivo_novo_fim_data, rescisao_data,
+                      fluxogramas, frequencia, pagamento, vale_transporte
+                    FROM employment_estagiario
+                    WHERE employment_id = %s
+                    LIMIT 1
+                    """,
+                    (e["employment_id"],),
+                )
+                s = cur.fetchone()
+                est = dict(s) if s else {}
+                for k in ("inicio_data", "fim_data", "aditivo_novo_fim_data", "rescisao_data"):
+                    if k in est:
+                        est[k] = _norm_date(est.get(k))
+                est["vale_transporte"] = _normalize_bool(est.get("vale_transporte"))
+                employment["estagiario"] = est
+
+        # Formação
+        with _pg() as c2, c2.cursor() as cur2:
+            # uso de segunda conexão para garantir consistência de ordering independente de curso principal
+            cur2.execute(
+                "SELECT curso, instituicao, conclusao_data FROM user_education_graduacao WHERE user_id = %s ORDER BY id",
+                (user_id,),
+            )
+            graduacoes = [dict(r) for r in (cur2.fetchall() or [])]
+            for g in graduacoes:
+                g["conclusao_data"] = _norm_date(g.get("conclusao_data"))
+
+            cur2.execute(
+                "SELECT curso, tipo, instituicao, conclusao_data FROM user_education_posgrad WHERE user_id = %s ORDER BY id",
+                (user_id,),
+            )
+            pos_graduacoes = [dict(r) for r in (cur2.fetchall() or [])]
+            for p in pos_graduacoes:
+                p["conclusao_data"] = _norm_date(p.get("conclusao_data"))
+
+    return {
+        "user": _norm_value(user),
+        "employment": _norm_value(employment) if employment else None,
+        "educacao": {
+            "graduacoes": _norm_value(graduacoes),
+            "pos_graduacoes": _norm_value(pos_graduacoes),
+        },
+    }
+
+def _path_join(base: str, part: str) -> str:
+    return f"{base}.{part}" if base else part
+
+def _compute_changes(before: Dict[str, Any], after: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Diff profundo entre snapshots completos. Gera paths para dicts e listas (com índices)."""
     changes: List[Dict[str, Any]] = []
-    bu = before.get("user", {})
-    be = before.get("employment", {})
-    be_edu = before.get("educacao", {}) or {}
 
-    def _cmp_field_local(path: str, before_v: Any, after_v: Any):
-        if before_v != after_v:
-            changes.append({"path": path, "before": before_v, "after": after_v})
+    def _diff(path: str, a: Any, b: Any):
+        a = _norm_value(a)
+        b = _norm_value(b)
 
-    # Núcleo (só compara se veio no payload)
-    if "nome_completo" in payload:
-        _cmp_field_local("user.nome_completo", bu.get("nome_completo"), payload.get("nome_completo"))
-    if "cpf" in payload:
-        _cmp_field_local("user.cpf", bu.get("cpf"), (safe_digits(payload.get("cpf") or "") or None))
-    if "rg" in payload:
-        _cmp_field_local("user.rg", bu.get("rg"), payload.get("rg"))
-    if "id_funcional" in payload:
-        _cmp_field_local("user.id_funcional", bu.get("id_funcional"), payload.get("id_funcional"))
-    if "data_nascimento" in payload:
-        _cmp_field_local(
-            "user.data_nascimento",
-            _norm_date(bu.get("data_nascimento")),
-            _norm_date(payload.get("data_nascimento")),
-        )
-    if "email_principal" in payload:
-        _cmp_field_local("user.email_principal", bu.get("email_principal"), payload.get("email_principal"))
-    if "email_institucional" in payload:
-        _cmp_field_local("user.email_institucional", bu.get("email_institucional"), payload.get("email_institucional"))
-    if "telefone_principal" in payload:
-        _cmp_field_local("user.telefone_principal", bu.get("telefone_principal"), payload.get("telefone_principal"))
-    if "ramal" in payload:
-        _cmp_field_local("user.ramal", bu.get("ramal"), payload.get("ramal"))
-    if "endereco" in payload:
-        _cmp_field_local("user.endereco", bu.get("endereco"), payload.get("endereco"))
-    if "dependentes_qtde" in payload:
-        _cmp_field_local("user.dependentes_qtde", bu.get("dependentes_qtde"), payload.get("dependentes_qtde"))
-    if "formacao" in payload and isinstance(payload["formacao"], dict) and "nivel_medio" in payload["formacao"]:
-        _cmp_field_local("user.formacao_nivel_medio", bool(bu.get("formacao_nivel_medio")), bool(payload["formacao"].get("nivel_medio")))
+        # igualdade direta
+        if a == b:
+            return
 
-    # Emprego
-    if "tipo_vinculo" in payload:
-        _cmp_field_local("employment.tipo_vinculo", be.get("tipo_vinculo"), payload.get("tipo_vinculo"))
-    if "status" in payload:
-        _cmp_field_local("employment.status_vinculo", be.get("status_vinculo"), payload.get("status"))
-    if "motivo_inatividade" in payload:
-        _cmp_field_local("employment.motivo_inatividade", be.get("motivo_inatividade"), payload.get("motivo_inatividade"))
-    if "org_unit_code" in payload:
-        _cmp_field_local("employment.org_unit_code", be.get("org_code"), payload.get("org_unit_code") or be.get("org_code"))
+        # dict
+        if isinstance(a, dict) and isinstance(b, dict):
+            keys = set(a.keys()) | set(b.keys())
+            for k in sorted(keys):
+                _diff(_path_join(path, k), a.get(k), b.get(k))
+            return
 
-    # Formação: comparar por contagem de itens para evitar falso positivo
-    if "formacao" in payload and isinstance(payload["formacao"], dict):
-        if "graduacoes" in payload["formacao"] and isinstance(payload["formacao"]["graduacoes"], list):
-            before_n = int(be_edu.get("graduacoes_count") or 0)
-            after_n = len(payload["formacao"]["graduacoes"] or [])
-            if before_n != after_n:
-                changes.append({"path": "educacao.graduacoes_count", "before": before_n, "after": after_n})
-        if "pos_graduacoes" in payload["formacao"] and isinstance(payload["formacao"]["pos_graduacoes"], list):
-            before_n = int(be_edu.get("pos_graduacoes_count") or 0)
-            after_n = len(payload["formacao"]["pos_graduacoes"] or [])
-            if before_n != after_n:
-                changes.append({"path": "educacao.pos_graduacoes_count", "before": before_n, "after": after_n})
+        # list
+        if isinstance(a, list) and isinstance(b, list):
+            la, lb = len(a), len(b)
+            # compara elementos comuns
+            for i in range(min(la, lb)):
+                _diff(f"{path}[{i}]", a[i], b[i])
+            # removidos
+            for i in range(min(la, lb), la):
+                changes.append({"path": f"{path}[{i}]", "before": a[i], "after": None})
+            # adicionados
+            for i in range(min(la, lb), lb):
+                changes.append({"path": f"{path}[{i}]", "before": None, "after": b[i]})
+            return
 
-    # Removido: sinais genéricos ("employment.efetivo/comissionado/estagiario") para não inflar o contador
+        # casos simples (tipos diferentes ou valores diferentes)
+        changes.append({"path": path, "before": a, "after": b})
 
-    return changes
+    _diff("", before, after)
+
+    # opcional: remover paths raiz vazios ("")
+    filtered = [c for c in changes if c.get("path") not in ("",)]
+    return filtered
 
 
 @router.get("/users/{user_id}/history")
@@ -1313,7 +1292,6 @@ def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[st
     """
     limit = clamp(limit, 1, 500)
     offset = max(0, offset)
-    # Pega um lote e filtra pelo user_id no payload
     subs = list_submissions_admin(kind="usuarios", limit=1000, offset=0)  # lote largo para filtrar em memória
     items = []
     for s in subs:
@@ -1334,9 +1312,7 @@ def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[st
             },
             "changes": p.get("changes") or [],  # lista [{path,before,after}] em updates
         })
-    # Ordena por data asc (antigos primeiro)
-    items.sort(key=lambda x: (x.get("at") or ""))
-    # Pagina o resultado solicitado
+    items.sort(key=lambda x: (x.get("at") or ""))  # antigos primeiro
     return {
         "items": items[offset: offset + limit],
         "count": len(items[offset: offset + limit]),
