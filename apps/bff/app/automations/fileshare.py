@@ -3,6 +3,7 @@ import hashlib, hmac, os, logging, secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, List
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/automations/fileshare",
     tags=["automations", "fileshare"],
-    dependencies=[Depends(require_roles_any("user","coordenador","admin"))],
+    dependencies=[Depends(require_roles_any("user", "coordenador", "admin"))],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -33,6 +34,11 @@ TTL_MAP = {
     "7d": timedelta(days=7),
     "30d": timedelta(days=30),
 }
+
+# Limites e política de upload
+MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", "0"))  # 0 = sem limite
+UPLOAD_CHUNK_SIZE = int(os.getenv("UPLOAD_CHUNK_SIZE", str(1024 * 1024)))  # 1 MiB padrão
+ALLOWED_MIME_PREFIXES = [p.strip() for p in os.getenv("ALLOWED_MIME_PREFIXES", "").split(",") if p.strip()]
 
 # --- Models ---
 class ItemOut(BaseModel):
@@ -76,7 +82,7 @@ def _sign_link(data: str, exp: datetime) -> str:
     sig = hmac.new(SESSION_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload}.{sig}"
 
-def _verify_link(token: str, now: Optional[datetime] = None) -> Optional[Dict[str,str]]:
+def _verify_link(token: str, now: Optional[datetime] = None) -> Optional[Dict[str, str]]:
     now = now or _utcnow()
     try:
         data, exp_ts, sig = token.rsplit(".", 2)
@@ -95,7 +101,7 @@ def _ensure_not_expired(row: Dict[str, Any]) -> None:
         raise HTTPException(status_code=404, detail="arquivo não encontrado")
     expires_at = row.get("expires_at")
     if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at.replace("Z","+00:00"))
+        expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
     if expires_at and _utcnow() > expires_at:
         raise HTTPException(status_code=404, detail="arquivo expirado")
 
@@ -108,14 +114,31 @@ def _is_super(user: Optional[Dict[str, Any]]) -> bool:
 def _save_stream(dest: Path, up: UploadFile) -> int:
     dest.parent.mkdir(parents=True, exist_ok=True)
     size = 0
+    chunk_size = UPLOAD_CHUNK_SIZE if UPLOAD_CHUNK_SIZE > 0 else 1024 * 1024
     with dest.open("wb") as f:
         while True:
-            chunk = up.file.read(1024*1024)
+            chunk = up.file.read(chunk_size)
             if not chunk:
                 break
             f.write(chunk)
             size += len(chunk)
+            if MAX_UPLOAD_SIZE and size > MAX_UPLOAD_SIZE:
+                try:
+                    f.flush()
+                finally:
+                    pass
+                dest.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="tamanho do arquivo excede o limite configurado")
     return size
+
+def _content_disposition_utf8(filename: str) -> Dict[str, str]:
+    """Content-Disposition compatível com UTF-8 (RFC 5987)."""
+    try:
+        ascii_fallback = filename.encode("ascii", "ignore").decode("ascii") or "download"
+    except Exception:
+        ascii_fallback = "download"
+    fn_star = "UTF-8''" + quote(filename, safe="")
+    return {"Content-Disposition": f'attachment; filename="{ascii_fallback}"; filename*={fn_star}'}
 
 # --- UI ---
 @router.get("/ui", response_class=HTMLResponse)
@@ -125,17 +148,19 @@ def get_ui(request: Request):
 @router.get("/schema")
 def get_schema():
     return {
-        "POST /submit": {"fields": {"file":"binary", "ttl":"1d|7d|30d", "secret":"(opcional)"}},
+        "POST /submit": {"fields": {"file": "binary", "ttl": "1d|7d|30d", "secret": "(opcional)"}},
         "GET /items": {"query": ["owner=(me|all)", "limit", "offset", "q"]},
-        "POST /items/{id}/download": {"body": {"secret":"(opcional; exigido se protegido, exceto superuser)"}},
+        "GET /items/{id}": {"retorna": "metadados do item"},
+        "POST /items/{id}/download": {"body": {"secret": "(opcional; exigido se protegido, exceto superuser)"}},
         # Regras:
         # - protegido (com senha): só o DONO pode gerar link e precisa informar a senha correta (superuser pode gerar sem senha)
         # - público (sem senha): qualquer usuário autenticado pode gerar link
-        "POST /items/{id}/share": {"body": {"expires":"1d|7d|30d", "secret":"(obrigatória se protegido, exceto superuser)"}},
-        "POST /items/{id}/delete": {"owner ou admin"},
+        "POST /items/{id}/share": {"body": {"expires": "1d|7d|30d", "secret": "(obrigatória se protegido, exceto superuser)"}},
+        "POST /items/{id}/delete": {"owner ou admin/superuser"},
+        "POST /tasks/cleanup": {"restrito": "admin/superuser"},
     }
 
-# --- Endpoints núcleo ---
+# --- Endpoints ---
 @router.post("/submit", response_model=ItemOut)
 async def upload(
     request: Request,
@@ -147,6 +172,12 @@ async def upload(
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
+
+    # Política de MIME (opcional; baseada em content_type informado)
+    if ALLOWED_MIME_PREFIXES:
+        ct = (file.content_type or "").lower()
+        if not any(ct.startswith(p.lower()) for p in ALLOWED_MIME_PREFIXES):
+            raise HTTPException(status_code=415, detail="tipo de arquivo não permitido pela política do servidor")
 
     ttl = ttl if ttl in TTL_MAP else "7d"
     exp = _utcnow() + TTL_MAP[ttl]
@@ -189,6 +220,23 @@ async def upload(
         "has_secret": bool(secret_hash), "downloads": 0, "deleted_at": None
     }
 
+@router.get("/items/{item_id}", response_model=ItemOut)
+def get_item(item_id: str, request: Request):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    r = db.fileshare_get(item_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="arquivo não encontrado")
+    _ensure_not_expired(r)
+    return {
+        "id": r["id"], "filename": r["filename"], "size": r["size"], "content_type": r.get("content_type"),
+        "owner_id": r.get("owner_id"), "owner_name": r.get("owner_name"),
+        "created_at": r["created_at"], "expires_at": r["expires_at"],
+        "has_secret": bool(r.get("secret_hash")), "downloads": r.get("downloads") or 0,
+        "deleted_at": r.get("deleted_at"),
+    }
+
 @router.get("/items", response_model=Page)
 def list_items(
     request: Request,
@@ -201,7 +249,7 @@ def list_items(
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
 
-    rows = db.fileshare_list(owner_id=user.get("cpf") if owner=="me" else None, q=q, limit=limit, offset=offset)
+    rows = db.fileshare_list(owner_id=user.get("cpf") if owner == "me" else None, q=q, limit=limit, offset=offset)
     items: List[Dict[str, Any]] = []
     for r in rows:
         try:
@@ -232,7 +280,7 @@ def download_item(item_id: str, request: Request, secret: Optional[str] = Form(N
     secret_hash = r.get("secret_hash")
     if secret_hash and not superuser:
         if not secret or not _check_secret(secret, secret_hash):
-            db.audit_log(actor=user, action="download_denied", kind="fileshare", target_id=item_id, meta={"reason":"secret_required"})
+            db.audit_log(actor=user, action="download_denied", kind="fileshare", target_id=item_id, meta={"reason": "secret_required"})
             raise HTTPException(status_code=403, detail="chave secreta inválida ou ausente")
 
     path = Path(r["path"])
@@ -250,10 +298,10 @@ def download_item(item_id: str, request: Request, secret: Optional[str] = Form(N
 
     def _iterfile():
         with path.open("rb") as f:
-            while chunk := f.read(1024*1024):
+            while chunk := f.read(1024 * 1024):
                 yield chunk
 
-    headers = {"Content-Disposition": f'attachment; filename="{r["filename"]}"'}
+    headers = _content_disposition_utf8(r["filename"])
     return StreamingResponse(_iterfile(), media_type=r.get("content_type") or "application/octet-stream", headers=headers)
 
 @router.post("/items/{item_id}/share")
@@ -266,7 +314,7 @@ def create_share_link(
     """
     Regras:
       - Item protegido (com senha): somente o DONO pode gerar link e deve informar a senha correta.
-        *Superuser pode gerar link para qualquer item (sem precisar da senha).*
+        Superuser pode gerar link para qualquer item (sem precisar da senha).
       - Item público (sem senha): qualquer usuário autenticado pode gerar link.
     """
     user = request.session.get("user")
@@ -282,15 +330,13 @@ def create_share_link(
     protected = bool(r.get("secret_hash"))
 
     if protected:
-        # superuser pode tudo; caso contrário, apenas dono + senha correta
         if not superuser:
             if not _owner_match(r, user):
-                db.audit_log(actor=user, action="share_link_denied", kind="fileshare", target_id=item_id, meta={"reason":"not_owner_protected"})
+                db.audit_log(actor=user, action="share_link_denied", kind="fileshare", target_id=item_id, meta={"reason": "not_owner_protected"})
                 raise HTTPException(status_code=403, detail="apenas o dono pode gerar link para arquivo protegido")
             if not secret or not _check_secret(secret, r["secret_hash"]):
-                db.audit_log(actor=user, action="share_link_denied", kind="fileshare", target_id=item_id, meta={"reason":"invalid_secret"})
+                db.audit_log(actor=user, action="share_link_denied", kind="fileshare", target_id=item_id, meta={"reason": "invalid_secret"})
                 raise HTTPException(status_code=403, detail="senha requerida para gerar link")
-    # público: qualquer autenticado pode gerar link (sem checagens adicionais)
 
     ttl = TTL_MAP.get(expires, TTL_MAP["7d"])
     exp = _utcnow() + ttl
@@ -321,14 +367,14 @@ def share_download(token: str):
         raise HTTPException(status_code=404, detail="arquivo indisponível")
 
     db.fileshare_inc_downloads(item_id)
-    db.audit_log(actor={"cpf":"anonymous"}, action="downloaded_shared_link", kind="fileshare", target_id=item_id, meta={"via":"token"})
+    db.audit_log(actor={"cpf": "anonymous"}, action="downloaded_shared_link", kind="fileshare", target_id=item_id, meta={"via": "token"})
 
     def _iterfile():
         with path.open("rb") as f:
-            while chunk := f.read(1024*1024):
+            while chunk := f.read(1024 * 1024):
                 yield chunk
 
-    headers = {"Content-Disposition": f'attachment; filename="{r["filename"]}"'}
+    headers = _content_disposition_utf8(r["filename"])
     return StreamingResponse(_iterfile(), media_type=r.get("content_type") or "application/octet-stream", headers=headers)
 
 @router.post("/items/{item_id}/delete")
@@ -340,7 +386,7 @@ def delete_item(item_id: str, request: Request, background: BackgroundTasks):
     r = db.fileshare_get(item_id)
     if not r:
         raise HTTPException(status_code=404, detail="arquivo não encontrado")
-    if not (_owner_match(r, user) or "admin" in (user.get("roles") or [])):
+    if not (_owner_match(r, user) or "admin" in (user.get("roles") or []) or _is_super(user)):
         raise HTTPException(status_code=403, detail="forbidden")
 
     db.fileshare_soft_delete(item_id)
@@ -352,6 +398,11 @@ def delete_item(item_id: str, request: Request, background: BackgroundTasks):
     return {"ok": True}
 
 @router.post("/tasks/cleanup")
-def cleanup_now(limit: int = 200):
+def cleanup_now(request: Request, limit: int = 200):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    if not (_is_super(user) or "admin" in (user.get("roles") or [])):
+        raise HTTPException(status_code=403, detail="admin required")
     deleted = db.fileshare_cleanup_expired(limit=limit)
     return {"expired_deleted": deleted}

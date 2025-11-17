@@ -93,10 +93,13 @@
   <h1>Uploader temporário (Fileshare)</h1>
 
   <div class="card">
-    <form id="frm" enctype="multipart/form-data">
+    <form id="frm" enctype="multipart/form-data" novalidate>
       <label>Arquivo</label>
       <!-- input real fica oculto; a interação acontece pela dropzone -->
       <input id="fileInput" type="file" name="file" required style="display:none" />
+      <!-- opcional: restrição de tipos (se desejar, descomente e ajuste no backend: ALLOWED_MIME_PREFIXES)
+           <input id="fileInput" type="file" name="file" accept="image/*,application/pdf" required style="display:none" />
+      -->
       <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Área para arrastar ou clicar para selecionar arquivo">
         <div class="title">Arraste e solte o arquivo aqui</div>
         <div class="hint">ou clique para selecionar no seu computador</div>
@@ -120,7 +123,7 @@
 
       <!-- Somente o ENVIAR aqui, à direita -->
       <div class="btn-row right" style="margin-top:10px">
-        <button class="btn" type="submit">Enviar</button>
+        <button class="btn" id="btnSend" type="submit">Enviar</button>
       </div>
     </form>
   </div>
@@ -143,9 +146,9 @@
       </div>
     </div>
 
-    <!-- Toolbar inferior: status à esquerda; à direita: Atualizar lista e Filtrar (Filtrar mais à direita) -->
+    <!-- Toolbar inferior: status à esquerda; à direita: Atualizar lista e Filtrar -->
     <div class="toolbar">
-      <span class="muted" id="status"></span>
+      <span class="muted" id="status" aria-live="polite"></span>
       <div class="spacer"></div>
       <button class="btn secondary" id="btnRefresh" type="button">Atualizar lista</button>
       <button class="btn" id="btnApply" type="button">Filtrar</button>
@@ -222,25 +225,77 @@
     fi.addEventListener("change", ()=> showFileInfo(fi.files?.[0]));
   }
 
+  // ---------- Upload ----------
   async function upload(ev){
     ev.preventDefault();
+
+    const fi = $("#fileInput");
+    const btn = $("#btnSend");
+    if(!fi.files || fi.files.length === 0){
+      alert("Selecione um arquivo para enviar.");
+      return;
+    }
+
     const fd = new FormData(ev.target);
-    const r = await fetch("/api/automations/fileshare/submit", { method:"POST", body: fd, credentials:"include" });
-    if (!r.ok){ alert("Falha no upload"); return; }
+
+    btn.disabled = true;
+    btn.textContent = "Enviando...";
+
+    let r;
+    try{
+      r = await fetch("/api/automations/fileshare/submit", {
+        method:"POST",
+        body: fd,
+        credentials:"include"
+      });
+    }catch(e){
+      alert("Falha de rede ao enviar o arquivo.");
+      btn.disabled = false;
+      btn.textContent = "Enviar";
+      return;
+    }
+
+    if(!r.ok){
+      let msg = "";
+      try { msg = await r.text(); } catch(_){}
+      if(r.status === 413){
+        alert("Arquivo excede o limite configurado no servidor.");
+      }else if(r.status === 415){
+        alert("Tipo de arquivo não permitido pela política do servidor.");
+      }else{
+        alert(`Falha no upload (${r.status}). ${msg||""}`.trim());
+      }
+      btn.disabled = false;
+      btn.textContent = "Enviar";
+      return;
+    }
+
     await load();
     ev.target.reset();
-    // limpar indicação visual
-    const info = $("#fileInfo"); if(info){ info.textContent=""; info.style.display="none"; }
+    const info = $("#fileInfo");
+    if(info){ info.textContent=""; info.style.display="none"; }
+    btn.disabled = false;
+    btn.textContent = "Enviar";
   }
 
+  // ---------- Listagem ----------
   async function load(){
     const owner = $("#owner").value;
     const q = $("#q").value.trim();
     const url = `/api/automations/fileshare/items?owner=${encodeURIComponent(owner)}&limit=100${q?`&q=${encodeURIComponent(q)}`:""}`;
-    const r = await fetch(url, { credentials:"include" });
-    const data = await r.json();
-    $("#status").textContent = `${data.count} item(ns)`;
-    render(data.items || []);
+    $("#status").textContent = "Carregando...";
+    try{
+      const r = await fetch(url, { credentials:"include" });
+      if(!r.ok){
+        $("#status").textContent = `Erro ${r.status} ao carregar.`;
+        return;
+      }
+      const data = await r.json();
+      $("#status").textContent = `${data.count} item(ns)`;
+      render(data.items || []);
+    }catch(e){
+      $("#status").textContent = "Falha de rede ao carregar.";
+    }
   }
 
   function render(items){
@@ -330,9 +385,12 @@
     }
   }
 
+  // Eventos
   $("#frm").addEventListener("submit", upload);
   $("#btnRefresh").addEventListener("click", load);
   $("#btnApply").addEventListener("click", load);
+  // Enter no campo de busca aciona filtro
+  $("#q").addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ e.preventDefault(); load(); } });
 
   document.addEventListener("DOMContentLoaded", async ()=>{
     $("#owner").value = "all";
