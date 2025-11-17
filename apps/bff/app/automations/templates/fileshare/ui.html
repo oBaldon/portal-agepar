@@ -9,7 +9,7 @@
   * { box-sizing:border-box }
   html,body { margin:0; background:var(--bg); color:var(--fg); font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
 
-  /* Bloco de cima: largura padrão (antes) */
+  /* Bloco de cima: largura padrão */
   .wrap { max-width: 960px; margin: 20px auto; padding: 0 16px; }
 
   /* Bloco de baixo: largura dinâmica, centralizado */
@@ -31,13 +31,29 @@
   .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
   .btn[disabled] { opacity:.55; cursor:not-allowed; }
 
-  .btn-row {
-    display:flex;
-    gap:8px;
-    align-items:center;
-    justify-content:center;  /* centraliza os botões */
-    flex-wrap:nowrap;        /* mantém lado a lado em desktop */
+  .btn-row { display:flex; gap:8px; align-items:center; }
+  .btn-row.right { justify-content:flex-end; }
+
+  /* Toolbar inferior (status à esquerda; botões à direita) */
+  .toolbar { display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .toolbar .spacer { flex:1; }
+
+  /* Dropzone */
+  .dropzone {
+    border:2px dashed #94a3b8;
+    background:#f8fafc;
+    border-radius:12px;
+    padding:22px;
+    text-align:center;
+    color:#475569;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
   }
+  .dropzone:hover { background:#f1f5f9; }
+  .dropzone.dragover { border-color:#2563eb; background:#eff6ff; }
+  .dropzone .title { font-weight:600; color:#0f172a; }
+  .dropzone .hint { font-size:12px; color:#64748b; margin-top:6px; }
+  .file-info { margin-top:8px; font-size:12px; color:#475569; }
 
   table { width:100%; border-collapse:collapse; margin-top:12px; background:#fff; }
   th, td { padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left; }
@@ -45,10 +61,18 @@
   .nowrap { white-space:nowrap }
   .muted { color:#64748b; font-size:12px; }
 
-  /* Centraliza e reserva espaço para a coluna AÇÕES */
+  /* Coluna AÇÕES */
   th:nth-child(5), td:nth-child(5) { text-align:center; width:280px; }
 
-  /* Evita “vazar” em telas estreitas; permite scroll horizontal da tabela */
+  /* Badges */
+  .badge {
+    display:inline-block; font-size:11px; line-height:1; padding:4px 6px;
+    border-radius:999px; border:1px solid #cbd5e1; background:#f1f5f9; color:#334155; margin-left:6px;
+    vertical-align:middle;
+  }
+  .badge.lock { border-color:#94a3b8; background:#e2e8f0; }
+
+  /* Tabela com rolagem horizontal em telas estreitas */
   .table-wrap { overflow-x:auto; }
 
   /* Responsividade */
@@ -56,21 +80,28 @@
     .row { flex-direction:column; }
   }
   @media (max-width: 600px){
-    .btn-row { flex-wrap:wrap; }             /* pode quebrar em telas pequenas */
     th:nth-child(5), td:nth-child(5) { width:auto; }
+    .btn-row.right { justify-content:flex-end; }
+    .toolbar { gap:6px; }
   }
 </style>
 </head>
 <body>
 
-<!-- BLOCO DE CIMA (padrão) -->
+<!-- BLOCO DE CIMA -->
 <div class="wrap">
   <h1>Uploader temporário (Fileshare)</h1>
 
   <div class="card">
     <form id="frm" enctype="multipart/form-data">
       <label>Arquivo</label>
-      <input type="file" name="file" required />
+      <!-- input real fica oculto; a interação acontece pela dropzone -->
+      <input id="fileInput" type="file" name="file" required style="display:none" />
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Área para arrastar ou clicar para selecionar arquivo">
+        <div class="title">Arraste e solte o arquivo aqui</div>
+        <div class="hint">ou clique para selecionar no seu computador</div>
+        <div id="fileInfo" class="file-info" style="display:none"></div>
+      </div>
 
       <div class="row">
         <div>
@@ -87,15 +118,15 @@
         </div>
       </div>
 
-      <div style="margin-top:10px" class="btn-row">
+      <!-- Somente o ENVIAR aqui, à direita -->
+      <div class="btn-row right" style="margin-top:10px">
         <button class="btn" type="submit">Enviar</button>
-        <button class="btn secondary" type="button" id="btnRefresh">Atualizar lista</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- BLOCO DE BAIXO (largo dinâmico) -->
+<!-- BLOCO DE BAIXO -->
 <div class="wide">
   <div class="card">
     <div class="row">
@@ -111,9 +142,13 @@
         <input id="q" placeholder="nome do arquivo..." />
       </div>
     </div>
-    <div class="btn-row" style="margin-top:10px">
-      <button class="btn" id="btnApply">Aplicar</button>
+
+    <!-- Toolbar inferior: status à esquerda; à direita: Atualizar lista e Filtrar (Filtrar mais à direita) -->
+    <div class="toolbar">
       <span class="muted" id="status"></span>
+      <div class="spacer"></div>
+      <button class="btn secondary" id="btnRefresh" type="button">Atualizar lista</button>
+      <button class="btn" id="btnApply" type="button">Filtrar</button>
     </div>
 
     <div class="table-wrap">
@@ -151,6 +186,42 @@
     }catch(_){}
   }
 
+  // ---------- Dropzone ----------
+  function setupDropzone(){
+    const dz = $("#dropzone");
+    const fi = $("#fileInput");
+    const info = $("#fileInfo");
+
+    function showFileInfo(file){
+      if(!file){ info.style.display="none"; info.textContent=""; return; }
+      info.style.display="block";
+      info.textContent = `Selecionado: ${file.name} (${fmtSize(file.size)})`;
+    }
+
+    dz.addEventListener("click", () => fi.click());
+    dz.addEventListener("keydown", (ev) => {
+      if(ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); fi.click(); }
+    });
+
+    ["dragenter","dragover"].forEach(evt => {
+      dz.addEventListener(evt, (ev)=>{ ev.preventDefault(); ev.stopPropagation(); dz.classList.add("dragover"); });
+    });
+    ["dragleave","drop"].forEach(evt => {
+      dz.addEventListener(evt, (ev)=>{ ev.preventDefault(); ev.stopPropagation(); dz.classList.remove("dragover"); });
+    });
+    dz.addEventListener("drop", (ev)=>{
+      const files = ev.dataTransfer?.files;
+      if(!files || files.length===0) return;
+      if(files.length>1){ alert("Selecione apenas um arquivo por envio."); return; }
+      const dt = new DataTransfer();
+      dt.items.add(files[0]);
+      fi.files = dt.files;
+      showFileInfo(files[0]);
+    });
+
+    fi.addEventListener("change", ()=> showFileInfo(fi.files?.[0]));
+  }
+
   async function upload(ev){
     ev.preventDefault();
     const fd = new FormData(ev.target);
@@ -158,6 +229,8 @@
     if (!r.ok){ alert("Falha no upload"); return; }
     await load();
     ev.target.reset();
+    // limpar indicação visual
+    const info = $("#fileInfo"); if(info){ info.textContent=""; info.style.display="none"; }
   }
 
   async function load(){
@@ -175,7 +248,7 @@
     for(const it of items){
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${it.filename}${it.has_secret?' 🔒':''}</td>
+        <td>${it.filename}${it.has_secret?'<span class="badge lock">Protegido</span>':''}</td>
         <td class="nowrap">${fmtSize(it.size)}</td>
         <td class="nowrap">${fmtDate(it.expires_at)}</td>
         <td class="nowrap">${it.owner_name || it.owner_id || "—"}</td>
@@ -185,7 +258,7 @@
       const actions = document.createElement("div");
       actions.className = "btn-row";
 
-      // Baixar (sempre visível; superuser baixa sem senha)
+      // Baixar
       const btnDown = document.createElement("button");
       btnDown.className="btn";
       btnDown.type="button";
@@ -262,8 +335,9 @@
   $("#btnApply").addEventListener("click", load);
 
   document.addEventListener("DOMContentLoaded", async ()=>{
-    $("#owner").value = "all";     // pré-seta para ver todos
-    await getMe();                 // pega cpf e is_superuser
+    $("#owner").value = "all";
+    await getMe();
+    setupDropzone();
     await load();
   });
 </script>
