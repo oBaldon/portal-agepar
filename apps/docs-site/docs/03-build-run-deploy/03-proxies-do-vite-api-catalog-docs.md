@@ -19,11 +19,13 @@ Esta página documenta como o **Host (Vite/React)** encaminha as requisições p
 
 ```mermaid
 flowchart LR
-  Client -->|/api,/catalog| Host[Vite :5173]
+  Client -->|/api, /catalog| Host[Vite :5173]
   Client -->|/docs| Host
-  Host -->|/api,/catalog| BFF[FastAPI :8000]
-  Host -->|/docs| DOCS[Docusaurus :8000 (Compose) / 3000 (local)]
+  Host -->|/api, /catalog| BFF[FastAPI :8000]
+  Host -->|/docs| DOCS[Docs dev server]
 ````
+
+> Portas típicas: **BFF `:8000`**, **Docs dev `:8000` (Compose) ou `:3000` (local)**, **Host `:5173`**.
 
 ---
 
