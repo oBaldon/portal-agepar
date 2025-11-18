@@ -61,4 +61,4 @@ curl -s http://localhost:8000/api/eprotocolo/ping
 
 ---
 
-> _Criado em 2025-10-27 13:37:46_
+> _Criado em 2025-10-27_

@@ -157,4 +157,4 @@ curl -i http://localhost:8000/api/me -b cookies.txt
 
 ---
 
-> _Criado em 2025-10-27 12:47:50_
+> _Criado em 2025-10-27_

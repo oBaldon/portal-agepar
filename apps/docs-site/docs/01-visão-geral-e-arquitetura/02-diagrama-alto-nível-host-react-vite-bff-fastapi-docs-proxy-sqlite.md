@@ -73,4 +73,4 @@ curl -s http://localhost:8000/api/automations/dfd/ui
 
 ---
 
-> _Criado em 2025-10-27 12:36:31_
+> _Criado em 2025-10-27_

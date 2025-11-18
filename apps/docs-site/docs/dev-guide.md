@@ -4,7 +4,7 @@ title: Guia de Dev (setup & run)
 sidebar_position: 1
 ---
 
-_Criado em 2025-10-27 11:10:25_
+_Criado em 2025-10-27_
 
 Este guia descreve o _setup_ local, execução com **Docker Compose**, estrutura do monorepo e _troubleshooting_.
 
@@ -140,4 +140,4 @@ curl -i http://localhost:8000/api/health
 
 ---
 
-_Criado em 2025-10-27 11:10:25_
+_Criado em 2025-10-27_

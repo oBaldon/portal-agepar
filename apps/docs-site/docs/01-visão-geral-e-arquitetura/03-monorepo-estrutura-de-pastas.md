@@ -94,4 +94,4 @@ curl -s http://localhost:8000/catalog/dev | jq .
 
 ---
 
-> _Criado em 2025-10-27 12:39:04_
+> _Criado em 2025-10-27_

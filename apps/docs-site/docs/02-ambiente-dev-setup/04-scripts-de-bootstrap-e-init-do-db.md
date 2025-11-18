@@ -149,4 +149,4 @@ O `db.py` expõe utilitários para:
 
 ---
 
-> _Criado em 2025-10-27 13:10:00_
+> _Criado em 2025-10-27_

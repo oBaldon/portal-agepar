@@ -145,4 +145,4 @@ docker compose up --build
 
 ---
 
-> _Criado em 2025-10-27 13:48:02_
+> _Criado em 2025-10-27_

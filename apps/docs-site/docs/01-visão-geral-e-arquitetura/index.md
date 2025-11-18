@@ -56,4 +56,4 @@ flowchart LR
 - **Docs / MkDocs**: servidas via `/docs` pelo host; conteúdo para não-devs; tema Material com Mermaid/Glightbox.
 - **Catálogo**: servido em `/catalog/dev` com `categories[]` e `blocks[]`; blocos com `ui.type="iframe"`.
 
-> _Criado em 2025-10-27 12:49:10_
+> _Criado em 2025-10-27_

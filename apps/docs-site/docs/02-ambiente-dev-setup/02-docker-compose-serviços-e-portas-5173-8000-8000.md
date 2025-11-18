@@ -124,4 +124,4 @@ curl -i -X POST http://localhost:8000/api/auth/login \\
 
 ---
 
-> _Criado em 2025-10-27 13:54:16_
+> _Criado em 2025-10-27_
