@@ -66,7 +66,7 @@
       <div class="col"><label for="cpf">CPF *</label><input id="cpf" placeholder="Somente números" inputmode="numeric" minlength="11" maxlength="14" required/></div>
     </div>
     <div class="row">
-      <div class="col"><label for="id_funcional">ID funcional</label><input id="id_funcional" inputmode="numeric" placeholder="Ex.: 12345"/></div>
+      <div class="col"><label for="id_funcional">ID funcional</label><input id="id_funcional" inputmode="numeric" pattern="\d*" placeholder="Ex.: 12345" title="Apenas números"/></div>
       <div class="col"><label for="data_nascimento">Data de nascimento</label><input id="data_nascimento" type="date"/></div>
       <div class="col"><label for="email_institucional">E-mail institucional</label><input id="email_institucional" placeholder="nome@org.gov.br"/></div>
     </div>
@@ -245,7 +245,7 @@
       </div>
       <div class="row">
         <div class="col"><label for="es_fim_data">Fim</label><input id="es_fim_data" type="date"/></div>
-        <div class="col"><label for="es_limite_alerta_data">Limite alerta (auto: +2 anos)</label><input id="es_limite_alerta_data" type="date" disabled/></div>
+        <div class="col"><label for="es_limite_alerta_data">Limite alerta (auto: fim − 1 mês)</label><input id="es_limite_alerta_data" type="date" disabled/></div>
         <div class="col"><label for="es_aditivo_novo_fim">Aditivo (novo fim)</label><input id="es_aditivo_novo_fim" type="date"/></div>
       </div>
       <div class="row">
@@ -303,6 +303,45 @@
   }
   function onlyDigits(s){ return (s||"").replace(/\D+/g,""); }
   function asIntOrNull(v){ const n = Number(v); return Number.isFinite(n) ? n : null; }
+
+  // ===== Restringe inputs a dígitos
+  function bindDigitsOnly(id){
+    const el = byId(id);
+    if(!el) return;
+    el.setAttribute("inputmode","numeric");
+    el.setAttribute("pattern","\\d*");
+    el.addEventListener("input", () => {
+      const v = onlyDigits(el.value);
+      if (el.value !== v) el.value = v;
+    });
+    el.addEventListener("blur", () => { el.value = onlyDigits(el.value); });
+  }
+
+  // ===== Datas: Limite alerta = (Fim efetivo − 1 mês), usando Aditivo se existir
+  function ymd(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+  // adiciona meses com clamp de dia
+  function addMonthsClamp(date, months){
+    const src = new Date(date.getTime());
+    const day = src.getDate();
+    const d = new Date(src.getTime());
+    d.setDate(1);
+    d.setMonth(d.getMonth()+months);
+    const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+    return d;
+  }
+  function recomputeLimiteAlerta(){
+    const out = byId("es_limite_alerta_data");
+    if(!out) return;
+    const fimEfetivo = byId("es_aditivo_novo_fim")?.value || byId("es_fim_data")?.value;
+    if(!fimEfetivo){ out.value = ""; return; }
+    const end = new Date(fimEfetivo+"T00:00:00");
+    if(isNaN(end.getTime())){ out.value = ""; return; }
+    out.value = ymd(addMonthsClamp(end, -1));
+  }
 
   // ===== Schema (org_units)
   async function loadSchema(){
@@ -588,23 +627,19 @@
   on("#btn_add_cap", "click", () => byId("ef_cap_list")?.appendChild(makeCapacitacaoItem()));
   on("#btn_add_giti", "click", () => byId("ef_giti_list")?.appendChild(makeGitiItem()));
 
-  on("#es_inicio_data", "input", ()=> {
-    const out = byId("es_limite_alerta_data");
-    const ini = byId("es_inicio_data")?.value;
-    if(!out) return;
-    if(!ini){ out.value = ""; return; }
-    const d = new Date(ini+"T00:00:00");
-    if(isNaN(d.getTime())){ out.value = ""; return; }
-    d.setFullYear(d.getFullYear()+2);
-    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
-    out.value = `${y}-${m}-${day}`;
-  });
+  // Recalcula Limite alerta quando Fim ou Aditivo mudarem
+  on("#es_fim_data", "input", recomputeLimiteAlerta);
+  on("#es_aditivo_novo_fim", "input", recomputeLimiteAlerta);
 
   // ===== Boot
   (async function boot(){
     await loadSchema();
     showTipoGroup();
     onStatusChange();
+    // Restrições de dígitos
+    bindDigitsOnly("id_funcional");
+    // Inicializa Limite alerta conforme valores atuais
+    recomputeLimiteAlerta();
     // slots iniciais (UX)
     byId("grad_list")?.appendChild(makeGradItem());
     byId("pos_list")?.appendChild(makePosItem());

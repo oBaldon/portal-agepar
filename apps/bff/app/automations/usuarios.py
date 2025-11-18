@@ -697,10 +697,10 @@ def create_user(payload: UserCreateIn, request: Request):
             cur.execute(
                 """
                 INSERT INTO employment_estagiario (
-                    employment_id, tce_numero, tce_ano, inicio_data, fim_data, aditivo_novo_fim_data, rescisao_data,
+                    employment_id, tce_numero, tce_ano, inicio_data, fim_data,
+                    aditivo_novo_fim_data, rescisao_data,
                     fluxogramas, frequencia, pagamento, vale_transporte
-                )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
                     emp_id,
@@ -934,13 +934,15 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                 cur.execute(
                     """
                     INSERT INTO employment_estagiario
-                      (employment_id, tce_numero, tce_ano, inicio_data, fim_data, aditivo_novo_fim_data, rescisao_data,
+                      (employment_id, tce_numero, tce_ano, inicio_data, fim_data,
+                       aditivo_novo_fim_data, rescisao_data,
                        fluxogramas, frequencia, pagamento, vale_transporte)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         employment_id,
-                        s.tce_numero, s.tce_ano, s.inicio_data, s.fim_data, s.aditivo_novo_fim_data, s.rescisao_data,
+                        s.tce_numero, s.tce_ano, s.inicio_data, s.fim_data,
+                        s.aditivo_novo_fim_data, s.rescisao_data,
                         s.fluxogramas, s.frequencia, s.pagamento, s.vale_transporte,
                     ),
                 )
@@ -1191,7 +1193,7 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
                     """
                     SELECT
                       tce_numero, tce_ano, inicio_data, fim_data,
-                      aditivo_novo_fim_data, rescisao_data,
+                      aditivo_novo_fim_data, limite_alerta_data, rescisao_data,
                       fluxogramas, frequencia, pagamento, vale_transporte
                     FROM employment_estagiario
                     WHERE employment_id = %s
@@ -1201,7 +1203,7 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
                 )
                 s = cur.fetchone()
                 est = dict(s) if s else {}
-                for k in ("inicio_data", "fim_data", "aditivo_novo_fim_data", "rescisao_data"):
+                for k in ("inicio_data", "fim_data", "aditivo_novo_fim_data", "limite_alerta_data", "rescisao_data"):
                     if k in est:
                         est[k] = _norm_date(est.get(k))
                 est["vale_transporte"] = _normalize_bool(est.get("vale_transporte"))

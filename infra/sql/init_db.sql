@@ -319,7 +319,7 @@ CREATE TABLE IF NOT EXISTS employment_estagiario (
   frequencia    TEXT,
   pagamento     TEXT,
   vale_transporte BOOLEAN,
-  limite_alerta_data DATE GENERATED ALWAYS AS ((inicio_data + INTERVAL '2 years')::date) STORED,
+  limite_alerta_data DATE GENERATED ALWAYS AS ((COALESCE(aditivo_novo_fim_data, fim_data) - INTERVAL '1 month')::date) STORED,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 DROP TRIGGER IF EXISTS trg_emp_estag_touch ON employment_estagiario;
