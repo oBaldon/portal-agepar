@@ -28,12 +28,21 @@
   .checkline { display:flex; align-items:center; gap:8px; margin-top:10px; user-select:none; cursor:pointer; }
   .checkline input[type="checkbox"] { width:16px; height:16px; accent-color: var(--pri); margin:0; }
   @media (max-width: 640px) { .row { flex-direction: column; } }
+
+  /* Barra superior com botão "Voltar" */
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .btn-link { display:inline-flex; align-items:center; gap:8px; text-decoration:none; background:var(--pri); color:#fff; border-radius:12px; padding:10px 14px; font-weight:600; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Suporte & Feedback</h1>
-  <p class="help">Relate problemas ou melhorias. Descreva o módulo impactado, a gravidade no processo e como reproduzir.</p>
+  <div class="bar">
+    <div>
+      <h1>Suporte & Feedback</h1>
+      <p class="help">Relate problemas ou melhorias. Descreva o módulo impactado, a gravidade no processo e como reproduzir.</p>
+    </div>
+    <a class="btn-link" href="/api/automations/support/padrao.html" title="Voltar para a versão simples">Versão simples</a>
+  </div>
 
   <div class="card">
     <form id="frm" novalidate>

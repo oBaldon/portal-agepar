@@ -203,6 +203,7 @@
       "categoryId": "util",
       "description": "Relate bugs e melhorias (módulo impactado, gravidade, passos, anexos).",
       "ui": { "type": "iframe", "url": "/api/automations/support/ui" },
+      "ui": { "type": "iframe", "url": "/api/automations/support/padrao.html" },
       "navigation": [
         { "label": "Suporte & Feedback", "path": "/support", "icon": "LifeBuoy" }
       ],

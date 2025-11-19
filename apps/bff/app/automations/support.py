@@ -155,9 +155,16 @@ def get_schema() -> JSONResponse:
     )
 
 
+# --------------------------------------------------------------------
+# UIs
+#  - /ui           → UI técnica (já existente)
+#  - /ui.html      → alias (para compatibilidade com botão/link)
+#  - /padrao.html  → UI padrão para usuários comuns
+# --------------------------------------------------------------------
+
 @router.get("/ui")
 def support_ui(request: Request) -> HTMLResponse:
-    """Página HTML simples (iframe) com formulário de relato."""
+    """Página HTML técnica (iframe) com formulário detalhado."""
     modules = _safe_load_catalog_blocks()
     return templates.TemplateResponse(
         "support/ui.html",
@@ -166,10 +173,43 @@ def support_ui(request: Request) -> HTMLResponse:
             "modules": modules,
             "severities": SEVERITIES,
             "repro": REPRO,
-            # a UI de suporte não exibe botões de download
+            # a UI técnica não exibe botões de download nesta tela
             "show_downloads": False,
         },
     )
+
+
+@router.get("/ui.html")
+def support_ui_html_alias(request: Request) -> HTMLResponse:
+    """
+    Alias com sufixo .html da UI técnica.
+    Útil para navegação a partir do botão no canto superior direito da UI padrão.
+    """
+    return support_ui(request)
+
+
+@router.get("/padrao.html")
+def support_ui_padrao(request: Request) -> HTMLResponse:
+    """
+    UI padrão (usuários comuns) — formulário simplificado.
+    O template deve exibir um botão no canto superior direito que redireciona para /ui.html.
+    """
+    # A UI padrão normalmente não precisa de 'modules/severities/repro',
+    # mas deixamos disponível caso o template queira sugerir módulo ou metadados.
+    modules = _safe_load_catalog_blocks()
+    return templates.TemplateResponse(
+        "support/padrao.html",
+        {
+            "request": request,
+            "modules": modules,
+            "severities": SEVERITIES,
+            "repro": REPRO,
+            "show_downloads": False,
+            # Hints para o template controlar navegação entre UIs
+            "go_tech_href": "/api/automations/support/ui.html",
+        },
+    )
+
 
 # ------------------------- Utils de serialização segura -------------------------
 def _coerce_jsonable(obj: Any) -> Any:

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Suporte (Comum) — Portal AGEPAR</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --ok:#16a34a; --err:#dc2626; }
+  * { box-sizing:border-box }
+  html,body { margin:0; background:var(--bg); color:var(--fg); font:14px system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
+  .wrap { max-width: 960px; margin: 20px auto; padding: 0 16px; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .card { background:var(--card); border:1px solid #e2e8f0; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  h1 { font-size:18px; margin:0 0 10px }
+  p.help { color:var(--muted); margin: 6px 0 16px }
+  label { display:block; font-size:12px; color:var(--muted); margin: 10px 0 6px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; background:#fff; }
+  textarea { min-height: 110px; resize: vertical; }
+  .row { display:flex; gap:12px; }
+  .row > * { flex:1; }
+  button, .btn-link { appearance:none; border:none; background:var(--pri); color:#fff; border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:8px; }
+  button[disabled] { opacity:.7; cursor:progress; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
+  .pill { display:inline-block; background:#eef2ff; border:1px solid #e2e8f0; padding:4px 8px; border-radius:999px; font-size:12px; }
+  .counter { font-size:12px; color:var(--muted); float:right; margin-top:4px; }
+  .invalid { border-color: var(--err) !important; outline-color: var(--err) !important; }
+  .checkline { display:flex; align-items:center; gap:8px; margin-top:10px; user-select:none; cursor:pointer; }
+  .checkline input[type="checkbox"] { width:16px; height:16px; accent-color: var(--pri); margin:0; }
+  @media (max-width: 640px) { .row { flex-direction: column; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div>
+      <h1>Suporte & Feedback</h1>
+      <p class="help">Relato rápido para usuários comuns. Se precisar de campos avançados, acesse a interface técnica.</p>
+    </div>
+    <a class="btn-link" href="{{ go_tech_href or '/api/automations/support/ui.html' }}" title="Ir para Suporte Técnico">Suporte técnico</a>
+  </div>
+
+  <div class="card">
+    <form id="frm" novalidate>
+      <label for="relato">Relato</label>
+      <textarea id="relato" name="relato" placeholder="Descreva o problema (ex.: onde clicou, mensagem exibida, documento/etapa)." required minlength="10"></textarea>
+      <div class="counter" data-for="relato">0/10</div>
+
+      <div class="row">
+        <div>
+          <label for="contact_email">E-mail (opcional)</label>
+          <input id="contact_email" type="email" name="contact_email" placeholder="nome@agepar.pr.gov.br" />
+        </div>
+        <div>
+          <label for="contact_phone">Telefone/Ramal (opcional)</label>
+          <input id="contact_phone" type="text" name="contact_phone" placeholder="(41) 3333-3333 / Ramal 1234" maxlength="60" />
+        </div>
+      </div>
+
+      <label class="checkline" for="consent_contact">
+        <input id="consent_contact" type="checkbox" name="consent_contact" />
+        <span>Aceito ser contatado para esclarecimentos</span>
+      </label>
+
+      <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
+        <button id="btnSubmit" type="submit">Enviar relato</button>
+        <span id="msg" class="muted" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+
+  <p class="help">Dica: inclua <span class="pill">passos</span> e, se possível, <span class="pill">prints</span>. Para detalhar gravidade/módulo, use a interface técnica.</p>
+</div>
+
+<script>
+(function(){
+  const $ = (s,el=document)=>el.querySelector(s);
+  const frm = $("#frm");
+  const msg = $("#msg");
+  const btn = $("#btnSubmit");
+  const relatoEl = frm.elements["relato"];
+
+  function refreshCounter(el, min) {
+    const len = (el.value || "").trim().length;
+    const c = document.querySelector(`.counter[data-for="${el.id}"]`);
+    if (c) c.textContent = `${len}/${min}`;
+  }
+  function validateLive() { refreshCounter(relatoEl, 10); }
+  relatoEl.addEventListener("input", validateLive);
+  document.addEventListener("DOMContentLoaded", validateLive);
+
+  function makeSummary(text){
+    const t = (text||"").trim();
+    if(!t) return "Relato de suporte";
+    const m = t.match(/[.!?]\s|\n/);
+    const s = m ? t.slice(0, m.index+1) : t.slice(0, 160);
+    const out = s.length > 160 ? s.slice(0,160) : s;
+    return out.length < 8 ? "Relato de suporte" : out;
+  }
+  function isValidEmail(v){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
+
+  frm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const relato = (relatoEl.value||"").trim();
+    const email = (frm.elements["contact_email"].value||"").trim();
+    const phone = (frm.elements["contact_phone"].value||"").trim();
+    const consent = !!frm.elements["consent_contact"].checked;
+
+    // validação mínima alinhada ao backend
+    if (relato.length < 10){
+      msg.textContent = "Descreva o relato (≥ 10 caracteres).";
+      msg.className = "err";
+      relatoEl.classList.add("invalid");
+      return;
+    }
+    if (email && !isValidEmail(email)){
+      msg.textContent = "E-mail inválido.";
+      msg.className = "err";
+      $("#contact_email").classList.add("invalid");
+      return;
+    }
+
+    msg.textContent = "Enviando…";
+    msg.className = "muted";
+    btn.disabled = true;
+    frm.setAttribute("aria-busy", "true");
+
+    const body = {
+      module: "support",                 // satisfaz campo obrigatório
+      summary: makeSummary(relato),       // ≥ 8 chars garantido acima
+      description: relato,                // campo obrigatório (≥ 10)
+      severity: "none",                  // padrão para UI comum
+      reproducibility: "untested",       // padrão
+      contact_email: email || null,
+      contact_phone: phone || null,
+      consent_contact: !!consent
+    };
+
+    try {
+      const res = await fetch("/api/automations/support/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const err = await res.json();
+          if (Array.isArray(err?.detail)) {
+            detail = err.detail.map(e => {
+              const path = Array.isArray(e.loc) ? e.loc.slice(1).join(".") : "";
+              return `${path}: ${e.msg}`;
+            }).join(" | ");
+          } else if (err?.message) { detail = err.message; }
+        } catch(_) {}
+        throw new Error(detail || `Falha no envio (HTTP ${res.status})`);
+      }
+
+      const out = await res.json();
+      msg.textContent = `Relato recebido! ID: ${out.id}`;
+      msg.className = "ok";
+      frm.reset();
+      validateLive();
+    } catch (e) {
+      console.error(e);
+      msg.textContent = "Erro: " + (e.message || e);
+      msg.className = "err";
+    } finally {
+      btn.disabled = false;
+      frm.removeAttribute("aria-busy");
+    }
+  });
+})();
+</script>
+</body>
+</html>
