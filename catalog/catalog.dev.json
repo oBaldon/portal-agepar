@@ -176,6 +176,7 @@
       "routes": [
         { "path": "/usuarios", "kind": "iframe" }
       ],
+      "tags": ["RH", "usuários", "gestão"],
       "requiredRoles": ["rh", "admin", "teste"],
       "description": "Cadastro e gestão de usuários corporativos pelo RH."
     },
