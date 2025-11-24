@@ -5,20 +5,21 @@ import { useAuth } from "@/auth/AuthProvider";
 
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
 // Domínio padrão para completar e-mails sem "@"
-const DEFAULT_DOMAIN =
-  (import.meta as any)?.env?.VITE_DEFAULT_LOGIN_DOMAIN || "agepar.pr.gov.br";
+const DEFAULT_DOMAIN = import.meta.env.VITE_DEFAULT_LOGIN_DOMAIN || "agepar.pr.gov.br";
 
 function onlyDigits(s: string) {
   return (s || "").replace(/\D+/g, "");
 }
-// Considera como "numérico" qualquer entrada composta apenas de dígitos e pontuações comuns (., -, /, espaço).
-// Ex.: "043.429.199-40" => true  |  "12345" => true  |  "joao.silva" => false  |  "maria@x" => false
+
+// Considera "numérico-like" entradas só com dígitos e pontuações comuns (., -, /, espaço).
+// Ex.: "043.429.199-40" => true | "12345" => true | "joao.silva" => false | "maria@x" => false
 function isNumericLike(s: string) {
   const t = (s || "").trim();
   if (!t) return false;
   if (/[a-zA-Z@]/.test(t)) return false;
   return /^[\d.\-\/\s]+$/.test(t);
 }
+
 function buildLoginCandidates(raw: string): string[] {
   const id = (raw || "").trim();
   if (!id) return [];
@@ -28,7 +29,7 @@ function buildLoginCandidates(raw: string): string[] {
   if (isNumericLike(id)) return [onlyDigits(id)];
   // Caso contrário, tenta como digitado e também com o domínio padrão
   const canon = `${id}@${String(DEFAULT_DOMAIN).trim().toLowerCase()}`;
-  return [id, canon];
+  return Array.from(new Set([id, canon])); // dedupe por segurança
 }
 
 export default function Login() {
@@ -93,6 +94,21 @@ export default function Login() {
         }
       }
       if (lastErr) throw lastErr;
+
+      // Após login, checa se precisa trocar a senha antes de liberar o sistema
+      try {
+        const meRes = await fetch("/api/me", { credentials: "include" });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (me?.must_change_password === true) {
+            nav("/trocar-senha?first=1", { replace: true });
+            return;
+          }
+        }
+      } catch {
+        // se /api/me falhar, segue fluxo normal (não bloqueia)
+      }
+
       nav("/inicio", { replace: true });
     } catch (e: any) {
       setErr(e?.message || "Falha no login");
@@ -135,7 +151,7 @@ export default function Login() {
               type="text"
               inputMode="email"
               autoComplete="username"
-              placeholder="joao.silva@agepar.pr.gov.br ou joao.silva ou  00000000000"
+              placeholder="joao.silva@agepar.pr.gov.br ou joao.silva ou 00000000000"
               className={`${inputCls} mt-1 w-full text-sm`}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
@@ -149,13 +165,13 @@ export default function Login() {
           </div>
 
           <div>
-            <div className="flex items-center justify-content-between">
+            <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-slate-700">
                 Senha
               </label>
               {/* Indicador de CapsLock (quando ativo) */}
               {capsOn && (
-                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 ml-auto">
+                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                   Caps Lock ativo
                 </span>
               )}
@@ -169,10 +185,12 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyUp={(e) => {
-                  const ke = e as unknown as KeyboardEvent;
+                  const ke = (e as unknown as React.KeyboardEvent<HTMLInputElement>).nativeEvent as KeyboardEvent;
                   const isLetter = ke.key.length === 1 && /[a-zA-Z]/.test(ke.key);
                   if (isLetter) {
-                    const shifted = ke.getModifierState && ke.getModifierState("CapsLock");
+                    const shifted =
+                      typeof ke.getModifierState === "function" &&
+                      ke.getModifierState("CapsLock");
                     setCapsOn(!!shifted);
                   }
                 }}
@@ -230,7 +248,7 @@ export default function Login() {
             Suporte: <span className="tabular-nums">ramal 4895</span>
           </p>
 
-        <Link
+          <Link
             to="/devdocs/"
             target="_blank"
             rel="noopener noreferrer nofollow"
