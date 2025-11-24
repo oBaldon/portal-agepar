@@ -132,7 +132,7 @@
 
   <!-- 1b) Roles do sistema — CARD SEMPRE VISÍVEL -->
   <div class="card" style="margin-top:16px">
-    <h2>Roles do sistema</h2>
+    <h2>Roles do sistema <span class="muted" style="font-weight:400">(ordenadas A→Z)</span></h2>
     <div class="row" aria-label="Criar novo role">
       <input class="col" id="role_name" placeholder="nome do role ex.: automations.dfd" aria-label="Nome do role"/>
       <input class="col" id="role_desc" placeholder="descrição (opcional)" aria-label="Descrição do role"/>
@@ -163,14 +163,14 @@
     <div class="toolbar">
       <input id="q" class="search" type="search" placeholder="Buscar por nome, email ou CPF…" aria-label="Buscar usuários" autocomplete="off"/>
       <div class="btn-row">
-        <button class="btn secondary small" onclick="loadUsers()">Atualizar</button>
+        <button class="btn secondary small" onclick="loadUsers()" title="Atualizar a lista">Atualizar</button>
       </div>
     </div>
     <div class="table-wrap">
       <table aria-label="Usuários">
         <thead>
           <tr>
-            <th>Nome</th><th>Email</th><th>CPF</th><th>Flags</th>
+            <th>Nome <span class="muted" style="font-weight:400">(A→Z)</span></th><th>Email</th><th>CPF</th><th>Flags</th>
             <th>Roles
               <span class="inline-help">
                 <button type="button" class="help" aria-label="Ajuda sobre roles na lista">?</button>
@@ -244,7 +244,8 @@
       const list = document.getElementById('env_defaults');
       if(list){ list.innerHTML = ''; }
       if ((ACC_CFG.default_roles||[]).length){
-        ACC_CFG.default_roles.forEach(x=> list.appendChild(rolePillEnv(x)));
+        // Ordena as herdadas (somente leitura)
+        ACC_CFG.default_roles.slice().sort((a,b)=>a.localeCompare(b,'pt-BR',{sensitivity:'base'})).forEach(x=> list.appendChild(rolePillEnv(x)));
         if(wrap){ wrap.style.display = 'block'; }
       } else {
         if(wrap){ wrap.style.display = 'none'; }
@@ -264,12 +265,17 @@
     const q = qEl ? qEl.value : '';
     setStatus('Carregando...');
     try{
-      const resp = await fetch(`/api/automations/accounts/users?q=${encodeURIComponent(q||'')}`);
+      const resp = await fetch(`/api/automations/accounts/users?q=${encodeURIComponent((q||'').trim())}`);
       const data = await resp.json();
       const tbody = document.getElementById('users');
       if(!tbody) return;
       tbody.innerHTML = '';
-      for(const u of (data.items||[])){
+      // Ordena alfabeticamente por nome (pt-BR, case-insensitive)
+      const items = ((data.items||[]).slice().sort((a,b)=>
+        (a?.name||'').localeCompare(b?.name||'', 'pt-BR', { sensitivity:'base' })
+      ));
+
+      for(const u of items){
         const tr = document.createElement('tr');
 
         // Flags (is_superuser não editável)
@@ -277,8 +283,9 @@
         if (u.is_superuser){ const b=document.createElement('span'); b.className='badge super'; b.textContent='superusuário'; flags.appendChild(b); }
         const rolesCell = document.createElement('td');
         const rolesWrap = document.createElement('div');
-        const assigned = (u.roles||[]);
-        const env = (u.roles_env || ACC_CFG.default_roles || []);
+        // Ordena roles atribuídas e herdadas alfabeticamente
+        const assigned = (u.roles||[]).slice().sort((a,b)=> a.localeCompare(b, 'pt-BR', { sensitivity:'base' }));
+        const env = (u.roles_env || ACC_CFG.default_roles || []).slice().sort((a,b)=> a.localeCompare(b, 'pt-BR', { sensitivity:'base' }));
         // Atribuídas (BD)
         if (assigned.length){
           const legendA = document.createElement('div'); legendA.className='legend'; legendA.textContent='Atribuídas (BD):';
@@ -465,7 +472,11 @@
     const el = document.getElementById('roles_list');
     if(!el) return;
     el.innerHTML = '';
-    (j.items||[]).forEach(x=>{
+    // Ordena a lista de roles do sistema por nome (A→Z)
+    const items = (j.items||[]).slice().sort((a,b)=>
+      (a?.name||'').localeCompare(b?.name||'', 'pt-BR', { sensitivity:'base' })
+    );
+    items.forEach(x=>{
       const wrap = document.createElement('span'); wrap.className='badge'; wrap.title = x.description || '';
       const label = document.createElement('span'); label.textContent = x.name;
       const del = document.createElement('button');

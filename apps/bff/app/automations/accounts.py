@@ -17,6 +17,9 @@ from app.auth.rbac import require_roles_any
 
 logger = logging.getLogger(__name__)
 
+# Limite máximo configurável para listagem de usuários
+ACCOUNTS_MAX_LIST = int(os.getenv("ACCOUNTS_MAX_LIST", "5000"))
+
 # -----------------------------------------------------------------------------
 # Config & RBAC
 # -----------------------------------------------------------------------------
@@ -293,10 +296,10 @@ def config() -> Dict[str, Any]:
 @router.get("/users")
 def list_users(
     q: Optional[str] = Query(default=None),
-    limit: int = 50,
+    limit: int = 5000,
     offset: int = 0,
 ) -> Dict[str, Any]:
-    limit = clamp(limit, 1, 200)
+    limit = clamp(limit, 1, ACCOUNTS_MAX_LIST)
     offset = max(0, offset)
 
     wheres = ["1=1"]
@@ -323,7 +326,7 @@ def list_users(
       LEFT JOIN roles r ON r.id = ur.role_id
       WHERE {where_sql}
       GROUP BY u.id
-      ORDER BY u.created_at DESC
+      ORDER BY u.name ASC NULLS LAST
       LIMIT %s OFFSET %s
     """
     params.extend([limit, offset])
@@ -768,8 +771,8 @@ def delete_role(role_name: str, request: Request):
 # Compat com contrato de "automations"
 # -----------------------------------------------------------------------------
 @router.get("/submissions")
-def submissions(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
-    limit = clamp(limit, 1, 200)
+def submissions(limit: int = 5000, offset: int = 0) -> Dict[str, Any]:
+    limit = clamp(limit, 1, ACCOUNTS_MAX_LIST)
     offset = max(0, offset)
     return {"items": list_submissions_admin(kind="accounts", limit=limit, offset=offset)}
 
