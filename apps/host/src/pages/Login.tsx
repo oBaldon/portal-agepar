@@ -4,6 +4,32 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
+// Domínio padrão para completar e-mails sem "@"
+const DEFAULT_DOMAIN =
+  (import.meta as any)?.env?.VITE_DEFAULT_LOGIN_DOMAIN || "agepar.pr.gov.br";
+
+function onlyDigits(s: string) {
+  return (s || "").replace(/\D+/g, "");
+}
+// Considera como "numérico" qualquer entrada composta apenas de dígitos e pontuações comuns (., -, /, espaço).
+// Ex.: "043.429.199-40" => true  |  "12345" => true  |  "joao.silva" => false  |  "maria@x" => false
+function isNumericLike(s: string) {
+  const t = (s || "").trim();
+  if (!t) return false;
+  if (/[a-zA-Z@]/.test(t)) return false;
+  return /^[\d.\-\/\s]+$/.test(t);
+}
+function buildLoginCandidates(raw: string): string[] {
+  const id = (raw || "").trim();
+  if (!id) return [];
+  // Se já tem "@", usa exatamente o que foi digitado
+  if (id.includes("@")) return [id];
+  // Se é numérico (mesmo com máscara/pontuação), tratar como CPF/ID → usa só dígitos
+  if (isNumericLike(id)) return [onlyDigits(id)];
+  // Caso contrário, tenta como digitado e também com o domínio padrão
+  const canon = `${id}@${String(DEFAULT_DOMAIN).trim().toLowerCase()}`;
+  return [id, canon];
+}
 
 export default function Login() {
   const nav = useNavigate();
@@ -38,13 +64,35 @@ export default function Login() {
     return () => window.removeEventListener("keydown", onKey);
   }, [nav]);
 
+  // Dica só aparece quando NÃO é numérico-like e NÃO tem "@"
+  const derivedEmailHint = useMemo(() => {
+    const id = identifier.trim();
+    if (!id || id.includes("@") || isNumericLike(id)) return null;
+    return `${id}@${String(DEFAULT_DOMAIN).trim().toLowerCase()}`;
+  }, [identifier]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     setSubmitting(true);
     setErr(null);
     try {
-      await login(identifier.trim(), password, remember);
+      // Tenta sequencialmente: [digitado, digitado@dominio] ou só dígitos se for CPF/máscara
+      const candidates = buildLoginCandidates(identifier);
+      if (candidates.length === 0) {
+        throw new Error("Informe seu e-mail, usuário ou CPF.");
+      }
+      let lastErr: any = null;
+      for (const id of candidates) {
+        try {
+          await login(id, password, remember);
+          lastErr = null;
+          break; // sucesso
+        } catch (e: any) {
+          lastErr = e;
+        }
+      }
+      if (lastErr) throw lastErr;
       nav("/inicio", { replace: true });
     } catch (e: any) {
       setErr(e?.message || "Falha no login");
@@ -80,24 +128,34 @@ export default function Login() {
         {/* Formulário */}
         <form id="login-form" onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700">E-mail ou CPF</label>
+            <label className="block text-sm font-medium text-slate-700">
+              E-mail, usuário ou CPF
+            </label>
             <input
               type="text"
               inputMode="email"
               autoComplete="username"
-              placeholder="seu@email.gov.br ou 00000000000"
+              placeholder="joao.silva@agepar.pr.gov.br ou joao.silva ou  00000000000"
               className={`${inputCls} mt-1 w-full text-sm`}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
             />
+            {derivedEmailHint && (
+              <p className="mt-1 text-xs text-slate-500">
+                Dica: também tentaremos{" "}
+                <span className="font-mono">{derivedEmailHint}</span>
+              </p>
+            )}
           </div>
 
           <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-700">Senha</label>
+            <div className="flex items-center justify-content-between">
+              <label className="block text-sm font-medium text-slate-700">
+                Senha
+              </label>
               {/* Indicador de CapsLock (quando ativo) */}
               {capsOn && (
-                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 ml-auto">
                   Caps Lock ativo
                 </span>
               )}
@@ -111,10 +169,10 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyUp={(e) => {
-                  // Heurística para CapsLock (não é 100%, mas ajuda)
-                  const isLetter = e.key.length === 1 && /[a-zA-Z]/.test(e.key);
+                  const ke = e as unknown as KeyboardEvent;
+                  const isLetter = ke.key.length === 1 && /[a-zA-Z]/.test(ke.key);
                   if (isLetter) {
-                    const shifted = e.getModifierState && e.getModifierState("CapsLock");
+                    const shifted = ke.getModifierState && ke.getModifierState("CapsLock");
                     setCapsOn(!!shifted);
                   }
                 }}
@@ -142,8 +200,6 @@ export default function Login() {
             </label>
 
             <div className="flex items-center gap-3 text-sm">
-              {/* (opcional) rota de recuperação de senha no futuro */}
-              {/* <Link to="/recuperar" className="text-sky-700 hover:underline">Esqueci a senha</Link> */}
               {ENABLE_SELF_REGISTER ? (
                 <Link to="/registrar" className="text-sky-700 hover:underline">
                   Criar conta
@@ -174,8 +230,7 @@ export default function Login() {
             Suporte: <span className="tabular-nums">ramal 4895</span>
           </p>
 
-          {/* Link sutil: cor neutra, tamanho mínimo, sem destaque visual */}
-          <Link
+        <Link
             to="/devdocs/"
             target="_blank"
             rel="noopener noreferrer nofollow"
