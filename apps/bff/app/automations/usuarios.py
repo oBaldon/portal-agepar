@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import pathlib
 import re
 from typing import Any, Dict, List, Optional, Literal
@@ -19,6 +20,10 @@ from app.auth.rbac import require_roles_any
 from app.db import insert_submission, get_submission, list_submissions_admin, add_audit, _pg  # type: ignore
 
 logger = logging.getLogger(__name__)
+# === Config (histórico) ===
+# Máximo de eventos de histórico (somatório paginado) e tamanho do lote por consulta
+USUARIOS_HISTORY_MAX = int(os.getenv("USUARIOS_HISTORY_MAX", "20000"))
+USUARIOS_HISTORY_BATCH = int(os.getenv("USUARIOS_HISTORY_BATCH", "1000"))
 
 # ---------------------------------------------------------------------
 # Config & RBAC
@@ -401,7 +406,7 @@ def list_users(
     tipo_vinculo: Optional[TipoVinculo] = Query(default=None),
     status_vinculo: Optional[StatusVinculo] = Query(default=None),
     org_unit: Optional[str] = Query(default=None, description="code da org unit"),
-    limit: int = 50,
+    limit: int = 500,
     offset: int = 0,
 ) -> Dict[str, Any]:
     limit = clamp(limit, 1, 200)
@@ -452,7 +457,7 @@ def list_users(
       LEFT JOIN employment e ON e.user_id = u.id AND e.end_date IS NULL
       LEFT JOIN org_units ou ON ou.id = e.org_unit_id
       WHERE {where_sql}
-      ORDER BY u.created_at DESC
+      ORDER BY u.name ASC NULLS LAST
       LIMIT %s OFFSET %s
     """
     params.extend([limit, offset])
@@ -1288,34 +1293,64 @@ def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[st
     """
     Retorna histórico de eventos (criação/atualizações) do usuário,
     baseado em submissions com kind="usuarios".
+
+    - Busca em lotes para não ficar preso ao limite interno (ex.: 50) do list_submissions_admin.
+    - Aplica paginação (limit/offset) apenas após filtrar os eventos do usuário alvo.
     """
+    # Limites de resposta desta rota
     limit = clamp(limit, 1, 500)
     offset = max(0, offset)
-    subs = list_submissions_admin(kind="usuarios", limit=1000, offset=0)  # lote largo para filtrar em memória
-    items = []
-    for s in subs:
-        p = (s or {}).get("payload") or {}
-        if p.get("user_id") != user_id:
-            continue
-        act = p.get("action")
-        if act not in ("create_user", "update_user"):
-            continue
-        items.append({
-            "id": s.get("id"),
-            "at": s.get("created_at") or s.get("created") or s.get("ts"),
-            "action": act,
-            "actor": {
-                "cpf": s.get("actor_cpf"),
-                "nome": s.get("actor_nome"),
-                "email": s.get("actor_email"),
-            },
-            "changes": p.get("changes") or [],  # lista [{path,before,after}] em updates
-        })
-    items.sort(key=lambda x: (x.get("at") or ""))  # antigos primeiro
+
+    # Parâmetros de coleta paginada (teto amplo e lote generoso)
+    HISTORY_MAX = 20000   # total máximo de eventos a vasculhar (somados)
+    BATCH_SIZE = 1000     # tamanho do lote por consulta
+
+    items_all: List[Dict[str, Any]] = []
+    fetched = 0
+    ofs = 0
+
+    while fetched < HISTORY_MAX:
+        # tamanho solicitado neste passo
+        req = min(BATCH_SIZE, HISTORY_MAX - fetched)
+
+        batch = list_submissions_admin(kind="usuarios", limit=req, offset=ofs)
+        if not batch:
+            break
+
+        fetched += len(batch)
+        ofs += len(batch)
+
+        for s in batch:
+            p = (s or {}).get("payload") or {}
+            if p.get("user_id") != user_id:
+                continue
+            act = p.get("action")
+            if act not in ("create_user", "update_user"):
+                continue
+            items_all.append({
+                "id": s.get("id"),
+                "at": s.get("created_at") or s.get("created") or s.get("ts"),
+                "action": act,
+                "actor": {
+                    "cpf": s.get("actor_cpf"),
+                    "nome": s.get("actor_nome"),
+                    "email": s.get("actor_email"),
+                },
+                "changes": p.get("changes") or [],  # lista [{path,before,after}] em updates
+            })
+
+        # Se o lote veio menor que o requisitado, não há mais páginas
+        if len(batch) < req:
+            break
+
+    # Ordena (antigos primeiro) e aplica paginação final
+    items_all.sort(key=lambda x: (x.get("at") or ""))
+
+    window = items_all[offset: offset + limit]
     return {
-        "items": items[offset: offset + limit],
-        "count": len(items[offset: offset + limit]),
-        "total": len(items),
+        "items": window,
+        "count": len(window),
+        "total": len(items_all),
         "limit": limit,
         "offset": offset,
     }
@@ -1325,8 +1360,9 @@ def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[st
 # Compat "automations" (submissions)
 # ---------------------------------------------------------------------
 @router.get("/submissions")
-def submissions(limit: int = 50, offset: int = 0) -> Dict[str, Any]:
-    limit = clamp(limit, 1, 200)
+def submissions(limit: int = 500, offset: int = 0) -> Dict[str, Any]:
+    # aumenta o teto para consultas administrativas
+    limit = clamp(limit, 1, max(500, USUARIOS_HISTORY_BATCH))
     offset = max(0, offset)
     return {"items": list_submissions_admin(kind="usuarios", limit=limit, offset=offset)}
 

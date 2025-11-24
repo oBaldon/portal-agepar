@@ -72,7 +72,7 @@
   async function fetchUsers(query) {
     const url = new URL("/api/automations/usuarios/users", window.location.origin);
     if (query && query.trim()) url.searchParams.set("q", query.trim());
-    url.searchParams.set("limit", "50");
+    url.searchParams.set("limit", "500");
     url.searchParams.set("offset", "0");
     const res = await fetch(url.toString(), { credentials: "include" });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -89,10 +89,13 @@
     }
     for (const u of items) {
       const id = u.id ?? u.user_id ?? "";
+      // pega o e-mail e mostra só o que vem antes do '@'
+      const emailFull = (u.email_principal ?? u.email ?? "") || "";
+      const emailShown = emailFull ? String(emailFull).split("@")[0] : "";
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${(u.nome_completo ?? u.name ?? "")}</td>
-        <td>${(u.email_principal ?? u.email ?? "")}</td>
+        <td title="${emailFull}">${emailShown}</td>
         <td class="mono">${(u.cpf ?? "")}</td>
         <td class="mono">${(u.id_funcional ?? u.idFuncional ?? "-")}</td>
         <td>${(u.status_vinculo ?? u.status ?? "")}</td>

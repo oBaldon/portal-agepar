@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 KIND = "dfd"
 DFD_VERSION = "2.4.0"  # validação de unicidade: 'numero' e 'protocolo'
-REQUIRED_ROLES = ("automations.dfd",)
+REQUIRED_ROLES = ("compras",)
 # Papéis elevados que devem poder baixar qualquer arquivo via Controle
 ELEVATED_ROLES = ("admin", "coordenador")
 
