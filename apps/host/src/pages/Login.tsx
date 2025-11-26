@@ -6,6 +6,7 @@ import { useAuth } from "@/auth/AuthProvider";
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
 // Domínio padrão para completar e-mails sem "@"
 const DEFAULT_DOMAIN = import.meta.env.VITE_DEFAULT_LOGIN_DOMAIN || "agepar.pr.gov.br";
+const FORCE_PATH = "/auth/force-change-password";
 
 function onlyDigits(s: string) {
   return (s || "").replace(/\D+/g, "");
@@ -36,8 +37,9 @@ export default function Login() {
   const nav = useNavigate();
   const { user, login } = useAuth();
 
-  // Se já autenticado, manda pra Home
-  if (user) return <Navigate to="/inicio" replace />;
+  // Se já autenticado, decide destino conforme a flag must_change_password
+  const mustChange = (user as any)?.must_change_password === true;
+  if (user) return <Navigate to={mustChange ? FORCE_PATH : "/inicio"} replace />;
 
   // Login real (POST /api/auth/login)
   const [identifier, setIdentifier] = useState("");
@@ -95,20 +97,7 @@ export default function Login() {
       }
       if (lastErr) throw lastErr;
 
-      // Após login, checa se precisa trocar a senha antes de liberar o sistema
-      try {
-        const meRes = await fetch("/api/me", { credentials: "include" });
-        if (meRes.ok) {
-          const me = await meRes.json();
-          if (me?.must_change_password === true) {
-            nav("/trocar-senha?first=1", { replace: true });
-            return;
-          }
-        }
-      } catch {
-        // se /api/me falhar, segue fluxo normal (não bloqueia)
-      }
-
+      // Deixa o AuthProvider/guard global decidir (se precisar força troca, ele redireciona)
       nav("/inicio", { replace: true });
     } catch (e: any) {
       setErr(e?.message || "Falha no login");
@@ -185,14 +174,25 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyUp={(e) => {
+                  // Blindagem: 'key' pode ser undefined/unidentified em alguns eventos
                   const ke = (e as unknown as React.KeyboardEvent<HTMLInputElement>).nativeEvent as KeyboardEvent;
-                  const isLetter = ke.key.length === 1 && /[a-zA-Z]/.test(ke.key);
+                  const k = (ke as any)?.key ?? "";
+                  const isSingleChar = typeof k === "string" && k.length === 1;
+                  const isLetter = isSingleChar && /[a-zA-Z]/.test(k);
                   if (isLetter) {
                     const shifted =
                       typeof ke.getModifierState === "function" &&
                       ke.getModifierState("CapsLock");
                     setCapsOn(!!shifted);
                   }
+                }}
+                onKeyDown={(e) => {
+                  const ks = (e as any)?.getModifierState?.("CapsLock");
+                  if (typeof ks === "boolean") setCapsOn(ks);
+                }}
+                onFocus={(e) => {
+                  const ks = (e as any)?.getModifierState?.("CapsLock");
+                  if (typeof ks === "boolean") setCapsOn(ks);
                 }}
               />
               <button

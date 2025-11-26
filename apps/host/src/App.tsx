@@ -296,6 +296,9 @@ export default function App() {
         />
         <Route path="/403" element={<Forbidden />} />
 
+        {/* <<< NOVA ROTA: troca de senha obrigatória >>> */}
+        <Route path="/auth/force-change-password" element={<LazyForceChangePassword />} />
+
         {/* Home com cards agrupados por categorias */}
         <Route path="/inicio" element={<HomeDashboard catalog={catalog} user={user} />} />
 
@@ -365,6 +368,17 @@ function LazyRegisterDisabled() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
     import("@/pages/RegisterDisabled").then((m) => setComp(() => m.default));
+  }, []);
+  return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
+}
+
+/* ============================================================================
+ * Lazy loader da página de troca forçada de senha
+ * ==========================================================================*/
+function LazyForceChangePassword() {
+  const [Comp, setComp] = useState<null | React.ComponentType>(null);
+  useEffect(() => {
+    import("@/pages/ForceChangePassword").then((m) => setComp(() => m.default));
   }, []);
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }

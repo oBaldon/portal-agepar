@@ -185,13 +185,14 @@ VALUES ('admin','Acesso administrativo'), ('coordenador','Papel de coordenação
 ON CONFLICT (name) DO NOTHING;
 
 WITH upsert AS (
-  INSERT INTO users (name, email, status, source, is_superuser, attrs)
-  VALUES ('Dev Admin', 'dev@local', 'active', 'local', TRUE, '{"seed": true}')
+  INSERT INTO users (name, email, status, source, is_superuser, must_change_password, attrs)
+  VALUES ('Dev Admin', 'dev@local', 'active', 'local', TRUE, FALSE, '{"seed": true}')
   ON CONFLICT (email) DO UPDATE SET
     name = EXCLUDED.name,
     status = EXCLUDED.status,
     source = EXCLUDED.source,
     is_superuser = EXCLUDED.is_superuser,
+    must_change_password = EXCLUDED.must_change_password,
     attrs = EXCLUDED.attrs
   RETURNING id
 )

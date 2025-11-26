@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, Request, HTTPException, Query
+from fastapi import FastAPI, Request, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -29,6 +29,7 @@ from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
 from app.auth.sessions import router as auth_sessions_router
+from app.auth.rbac import require_password_changed
 
 # ------------------------------------------------------------------------------
 # Configuração (envs)
@@ -95,11 +96,12 @@ APP.add_middleware(
     session_cookie="portal_agepar_session",
 )
 
-# Routers básicos de infra/autenticação
-APP.include_router(snake_router)
-APP.include_router(auth_router)          # /api/auth/login (POST), /api/auth/logout (POST), /api/auth/register...
-APP.include_router(auth_sessions_router) # /api/auth/sessions[...]
-APP.include_router(fileshare_router)     # /api/automations/fileshare/...
+# ------------------------------------------------------------------------------
+# Routers básicos de infra/autenticação (sem enforcement)
+# ------------------------------------------------------------------------------
+APP.include_router(snake_router)             # health / ping e mini-jogo
+APP.include_router(auth_router)              # /api/auth/* (login, change-password, logout, register...)
+APP.include_router(auth_sessions_router)     # /api/auth/sessions[...]
 
 # ------------------------------------------------------------------------------
 # Startup
@@ -259,23 +261,23 @@ def automations_index() -> Dict[str, Any]:
             {"kind": "support", "version": "1.0.0", "title": "Suporte & Feedback"},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
             {"kind": "whoisonline", "version": "0.1.0", "title": "Quem está online (Superuser)"},
-            {"kind": "usuarios", "version": "1.0.0", "title": "Admin — Gestão de Usuários"},    
+            {"kind": "usuarios", "version": "1.0.0", "title": "Admin — Gestão de Usuários"},
         ]
     }
 
 # ------------------------------------------------------------------------------
-# Routers de automações
+# Routers de automações — protegidos por troca de senha obrigatória
 # ------------------------------------------------------------------------------
-APP.include_router(form2json_router)
-APP.include_router(dfd_router)
-APP.include_router(ferias_router)
-APP.include_router(controle_router)
-APP.include_router(controle_ferias_router)  # calendário de férias (aba dentro do controle)
-APP.include_router(support_router)
-APP.include_router(accounts_router)
-APP.include_router(whoisonline_router)
-APP.include_router(usuarios_router)
-# (removido) APP.include_router(snake_router)  # já incluído acima
+APP.include_router(fileshare_router,       dependencies=[Depends(require_password_changed)])
+APP.include_router(form2json_router,       dependencies=[Depends(require_password_changed)])
+APP.include_router(dfd_router,             dependencies=[Depends(require_password_changed)])
+APP.include_router(ferias_router,          dependencies=[Depends(require_password_changed)])
+APP.include_router(controle_router,        dependencies=[Depends(require_password_changed)])
+APP.include_router(controle_ferias_router, dependencies=[Depends(require_password_changed)])  # calendário de férias (aba dentro do controle)
+APP.include_router(support_router,         dependencies=[Depends(require_password_changed)])
+APP.include_router(accounts_router,        dependencies=[Depends(require_password_changed)])
+APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
+APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])
 
 # ------------------------------------------------------------------------------
 # Nota de segurança (prod)

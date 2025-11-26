@@ -93,6 +93,29 @@ export async function loginWithPassword(params: {
   return j<User>(res);
 }
 
+/**
+ * Troca de senha (POST /api/auth/change-password)
+ * Retorna o mesmo payload de usuário do login (já com must_change_password=false).
+ * Erros tratados pelo backend:
+ *  - 401: { detail: "invalid_credentials" } → senha atual incorreta
+ *  - 422: { detail: { confirm: "..." } }    → confirmação não confere
+ *  - 400: { detail: { password: [ ... ] } } → violações de política
+ */
+export async function changePassword(params: {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}): Promise<User> {
+  const res = await fetch(`${API_BASE}/auth/change-password`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return j<User>(res);
+}
+
+
 export type RegisterResponse = {
   id: string;
   name: string;

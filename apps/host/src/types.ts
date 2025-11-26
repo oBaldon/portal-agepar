@@ -108,6 +108,11 @@ export type User = {
   /** Mecanismo de auth atual. "mock" é legado e só deve aparecer em DEV. */
   auth_mode?: AuthMode;
   is_superuser?: boolean;
+  /**
+   * Quando true, o servidor exige troca de senha antes de permitir navegação normal.
+   * Retornado por /api/auth/login e /api/me.
+   */
+  must_change_password?: boolean;
 };
 
 /* =============================================================================
