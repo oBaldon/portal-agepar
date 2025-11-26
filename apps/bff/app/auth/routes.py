@@ -1,4 +1,47 @@
 # apps/bff/app/auth/routes.py
+"""
+Rotas de autenticação do BFF do Portal AGEPAR.
+
+Visão geral
+-----------
+Fornece endpoints para:
+- Registro local de usuário (`POST /api/auth/register`).
+- Login local com criação de sessão persistida (`POST /api/auth/login`).
+- Troca de senha do usuário autenticado com revogação de sessão (`POST /api/auth/change-password`).
+- Logout com revogação da sessão atual (`POST /api/auth/logout`).
+
+Sessões
+-------
+- As sessões são persistidas em `auth_sessions` (PostgreSQL) e espelhadas na
+  sessão web (`request.session["db_session_id"]` e `["user"]`).
+- TTL padrão configurável, com opção "lembre-me".
+
+Rate limit
+----------
+- Anti brute-force baseado em janela de tempo sobre `login_attempts`.
+- Escopos: por identificador, por IP, ambos ou desativado.
+
+Papéis (roles)
+--------------
+- As permissões do usuário são calculadas a partir de `roles` associados no BD
+  somadas a `AUTH_DEFAULT_ROLES`. Usuários `is_superuser=True` recebem
+  papel lógico `"admin"` (se ainda não presente).
+
+Variáveis de ambiente relevantes
+--------------------------------
+- DATABASE_URL
+- ENV
+- AUTH_DEV_ALLOW_ANY_PASSWORD
+- SESSION_TTL_HOURS
+- REMEMBER_ME_TTL_DAYS
+- AUTH_RATE_LIMIT_SCOPE            (both|identifier|ip|off)
+- AUTH_RATE_LIMIT_WINDOW_MINUTES
+- AUTH_RATE_LIMIT_MAX_ATTEMPTS
+- AUTH_REVOKE_ALL_ON_PASSWORD_CHANGE
+- AUTH_DEFAULT_ROLES               (lista separada por vírgula)
+- AUTH_ENABLE_SELF_REGISTER / ACCOUNTS_CREATE_LEGACY_ENABLED
+"""
+
 from __future__ import annotations
 
 import os
@@ -25,23 +68,20 @@ from .password_policy import (
 
 router = APIRouter()
 
-# -------- Config --------
 DATABASE_URL = os.getenv("DATABASE_URL")
 ENV = os.getenv("ENV", "dev")
 AUTH_DEV_ALLOW_ANY_PASSWORD = os.getenv("AUTH_DEV_ALLOW_ANY_PASSWORD", "1") in ("1", "true", "True")
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "8"))
 REMEMBER_ME_TTL_DAYS = int(os.getenv("REMEMBER_ME_TTL_DAYS", "30"))
-AUTH_RATE_LIMIT_SCOPE = os.getenv("AUTH_RATE_LIMIT_SCOPE", "both")  # both|identifier|ip|off
+AUTH_RATE_LIMIT_SCOPE = os.getenv("AUTH_RATE_LIMIT_SCOPE", "both")
 AUTH_RATE_LIMIT_WINDOW_MINUTES = int(os.getenv("AUTH_RATE_LIMIT_WINDOW_MINUTES", "15"))
 AUTH_RATE_LIMIT_MAX_ATTEMPTS = int(os.getenv("AUTH_RATE_LIMIT_MAX_ATTEMPTS", "5"))
 AUTH_REVOKE_ALL_ON_PASSWORD_CHANGE = os.getenv("AUTH_REVOKE_ALL_ON_PASSWORD_CHANGE", "0") in ("1", "true", "True")
 
-# Roles padrão vindas do ambiente (ex.: "user,automations.dfd")
 AUTH_DEFAULT_ROLES: List[str] = [
     r.strip() for r in os.getenv("AUTH_DEFAULT_ROLES", "").split(",") if r.strip()
 ]
 
-# Toggle de auto-registro (preferência para AUTH_ENABLE_SELF_REGISTER; compat com ACCOUNTS_CREATE_LEGACY_ENABLED)
 _auth_enable_self_register = os.getenv("AUTH_ENABLE_SELF_REGISTER")
 _accounts_create_legacy_enabled = os.getenv("ACCOUNTS_CREATE_LEGACY_ENABLED")
 if _auth_enable_self_register is not None:
@@ -51,26 +91,58 @@ elif _accounts_create_legacy_enabled is not None:
 else:
     SELF_REGISTER_ENABLED = False
 
-ph = PasswordHasher()  # Argon2id
+ph = PasswordHasher()
 CPF_RE = re.compile(r"^\d{11}$")
 
 
 def _pg_conn():
+    """
+    Abre conexão curta com o PostgreSQL usando `DATABASE_URL`.
+
+    Retorna
+    -------
+    psycopg.Connection
+        Conexão com `autocommit=True`.
+
+    Levanta
+    -------
+    RuntimeError
+        Se `DATABASE_URL` não estiver configurada.
+    """
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not configured")
     return psycopg.connect(DATABASE_URL, autocommit=True)
 
 
 def _now() -> datetime:
-    # UTC na aplicação; o banco usa timezone próprio via NOW().
+    """
+    Retorna o timestamp atual em UTC para uso na aplicação.
+    """
     return datetime.utcnow()
 
 
 def _normalize_identifier(identifier: str) -> Dict[str, Optional[str]]:
+    """
+    Normaliza o identificador de login.
+
+    Regras
+    ------
+    - Se possui 11 dígitos → tratado como CPF.
+    - Caso contrário → tratado como e-mail/usuário em minúsculas.
+
+    Parâmetros
+    ----------
+    identifier : str
+        Identificador informado no login.
+
+    Retorna
+    -------
+    Dict[str, Optional[str]]
+        Estrutura com chaves `cpf` e `email`, uma delas preenchida.
+    """
     ident = (identifier or "").strip()
     if CPF_RE.fullmatch(ident):
         return {"cpf": ident, "email": None}
-    # e-mail/usuário: normalize para lower
     return {"cpf": None, "email": ident.lower()}
 
 
@@ -85,6 +157,30 @@ def _insert_audit(
     ip: Optional[str],
     ua: Optional[str],
 ) -> None:
+    """
+    Registra evento de auditoria.
+
+    Parâmetros
+    ----------
+    conn : psycopg.Connection
+        Conexão ativa.
+    actor_user_id : Optional[str]
+        Usuário ator do evento.
+    action : str
+        Ação realizada (ex.: 'auth.login').
+    obj_type : Optional[str]
+        Tipo do objeto-alvo (ex.: 'user').
+    obj_id : Optional[str]
+        ID do objeto-alvo.
+    message : str
+        Mensagem descritiva.
+    metadata : Dict[str, Any]
+        Metadados adicionais (serializados como JSONB).
+    ip : Optional[str]
+        IP de origem, se disponível.
+    ua : Optional[str]
+        User-Agent.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -104,6 +200,23 @@ def _insert_login_attempt(
     ip: Optional[str],
     ua: Optional[str],
 ) -> None:
+    """
+    Registra tentativa de login para fins de auditoria e rate limit.
+
+    Parâmetros
+    ----------
+    conn : psycopg.Connection
+    user_id : Optional[str]
+        ID do usuário (quando conhecido).
+    identifier : str
+        Identificador usado na tentativa.
+    success : bool
+        Resultado da tentativa.
+    reason : Optional[str]
+        Motivo do fracasso (ex.: 'bad_credentials').
+    ip : Optional[str]
+    ua : Optional[str]
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -119,6 +232,19 @@ def _insert_login_attempt(
 
 
 def _load_roles(conn, user_id: str) -> List[str]:
+    """
+    Carrega os papéis (roles) associados a um usuário no banco.
+
+    Parâmetros
+    ----------
+    conn : psycopg.Connection
+    user_id : str
+
+    Retorna
+    -------
+    List[str]
+        Lista com nomes de papéis.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -133,10 +259,39 @@ def _load_roles(conn, user_id: str) -> List[str]:
         return [r[0] for r in rows] if rows else []
 
 
-def _rate_limited(conn, identifier: str, ip: Optional[str],
-                  window_minutes: int = AUTH_RATE_LIMIT_WINDOW_MINUTES,
-                  max_attempts: int = AUTH_RATE_LIMIT_MAX_ATTEMPTS) -> bool:
-    scope = AUTH_RATE_LIMIT_SCOPE  # both|identifier|ip|off
+def _rate_limited(
+    conn,
+    identifier: str,
+    ip: Optional[str],
+    window_minutes: int = AUTH_RATE_LIMIT_WINDOW_MINUTES,
+    max_attempts: int = AUTH_RATE_LIMIT_MAX_ATTEMPTS,
+) -> bool:
+    """
+    Verifica se o identificador/IP está em situação de rate limit.
+
+    Estratégia
+    ----------
+    Conta tentativas de login malsucedidas em janela móvel. O escopo é
+    controlado por `AUTH_RATE_LIMIT_SCOPE`.
+
+    Parâmetros
+    ----------
+    conn : psycopg.Connection
+    identifier : str
+        Identificador normalizado do login.
+    ip : Optional[str]
+        IP de origem.
+    window_minutes : int
+        Janela de observação em minutos.
+    max_attempts : int
+        Máximo de tentativas permitidas na janela.
+
+    Retorna
+    -------
+    bool
+        True se ultrapassou o limite.
+    """
+    scope = AUTH_RATE_LIMIT_SCOPE
     if scope == "off":
         return False
     with conn.cursor() as cur:
@@ -160,7 +315,7 @@ def _rate_limited(conn, identifier: str, ip: Optional[str],
                 """,
                 (window_minutes, ip),
             )
-        else:  # both
+        else:
             cur.execute(
                 """
                 SELECT count(*) FROM login_attempts
@@ -174,14 +329,24 @@ def _rate_limited(conn, identifier: str, ip: Optional[str],
         return (count or 0) >= max_attempts
 
 
-# -------- helpers de roles --------
 def _merge_default_roles(roles: Optional[List[str]]) -> List[str]:
+    """
+    Combina papéis vindos do banco com `AUTH_DEFAULT_ROLES` do ambiente.
+
+    Parâmetros
+    ----------
+    roles : Optional[List[str]]
+        Papéis carregados do banco.
+
+    Retorna
+    -------
+    List[str]
+        Conjunto unido e ordenado.
+    """
     merged = set(roles or [])
     merged.update(AUTH_DEFAULT_ROLES)
     return sorted(merged)
 
-
-# ---------------------------- Routes ----------------------------
 
 @router.post(
     "/api/auth/register",
@@ -195,6 +360,35 @@ def _merge_default_roles(roles: Optional[List[str]]) -> List[str]:
     },
 )
 def register_user(payload: RegisterIn, request: Request):
+    """
+    Registra um novo usuário local.
+
+    Regras
+    ------
+    - Requer `SELF_REGISTER_ENABLED` ativo.
+    - Valida regras de negócio do payload.
+    - Gera hash Argon2 e insere em `users`.
+    - Registra auditoria.
+
+    Parâmetros
+    ----------
+    payload : RegisterIn
+        Dados do usuário para criação.
+    request : Request
+        Requisição atual (usa IP/UA para auditoria).
+
+    Retorna
+    -------
+    RegisterOut
+
+    Levanta
+    -------
+    HTTPException
+        410 se auto-registro desativado.
+        422 se validação de negócio falhar.
+        409 se email/CPF já existirem.
+        400 para falhas ao hashear a senha.
+    """
     if not SELF_REGISTER_ENABLED:
         raise HTTPException(status_code=410, detail="Auto-registro desativado.")
 
@@ -262,6 +456,30 @@ def register_user(payload: RegisterIn, request: Request):
     },
 )
 def login_user(payload: LoginIn, request: Request):
+    """
+    Realiza login local, cria sessão persistida e popula a sessão web.
+
+    Fluxo
+    -----
+    - Aplica rate limit por identificador/IP conforme configuração.
+    - Busca usuário por e-mail ou CPF.
+    - Em desenvolvimento, pode aceitar qualquer senha para `dev@local` se habilitado.
+    - Verifica hash Argon2 da senha.
+    - Cria registro em `auth_sessions` e persiste `roles` no payload da sessão.
+    - Registra auditoria e tentativa de login.
+
+    Retorna
+    -------
+    LoginOut
+        Payload achatado para uso no frontend.
+
+    Levanta
+    -------
+    HTTPException
+        429 para rate limit.
+        401 para credenciais inválidas.
+        403 se `status` do usuário não for 'active'.
+    """
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
 
@@ -320,7 +538,6 @@ def login_user(payload: LoginIn, request: Request):
             _insert_login_attempt(conn, str(user_id), identifier_norm, False, "bad_credentials", ip, ua)
             raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
-        # Session
         sess_id = uuid.uuid4()
         ttl = timedelta(days=REMEMBER_ME_TTL_DAYS) if payload.remember_me else timedelta(hours=SESSION_TTL_HOURS)
         expires = _now() + ttl
@@ -332,7 +549,6 @@ def login_user(payload: LoginIn, request: Request):
             (str(sess_id), user_id, expires, ip, ua),
         )
 
-        # Roles
         roles_db = _load_roles(conn, user_id)
         roles = _merge_default_roles(roles_db)
         if is_superuser and "admin" not in roles:
@@ -350,7 +566,6 @@ def login_user(payload: LoginIn, request: Request):
             "is_superuser": bool(is_superuser),
             "must_change_password": bool(must_change_password),
         }
-        # Persistir na sessão web
         request.session.clear()
         request.session["user"] = user_payload
         request.session["db_session_id"] = str(sess_id)
@@ -371,9 +586,19 @@ def login_user(payload: LoginIn, request: Request):
         return LoginOut(**user_payload)
 
 
-# ---------------------------- Change Password ----------------------------
-
 class ChangePasswordIn(BaseModel):
+    """
+    Entrada para troca de senha.
+
+    Campos
+    ------
+    current_password : str
+        Senha atual do usuário.
+    new_password : str
+        Nova senha proposta.
+    new_password_confirm : str
+        Confirmação da nova senha.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     current_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=1, max_length=128)
@@ -392,12 +617,24 @@ class ChangePasswordIn(BaseModel):
 )
 def change_password(payload: ChangePasswordIn, request: Request):
     """
-    Troca a senha do usuário autenticado:
-    - Verifica a senha atual
-    - Aplica política à nova senha
-    - Atualiza hash e marca must_change_password=false
-    - Revoga a sessão atual (ou todas) e cria **nova sessão**
-    - Retorna LoginOut (flat)
+    Troca a senha do usuário autenticado.
+
+    Fluxo
+    -----
+    - Carrega usuário pela sessão `db_session_id`.
+    - Verifica a senha atual.
+    - Valida a nova senha com a política.
+    - Atualiza o hash e marca `must_change_password=False`.
+    - Revoga sessão atual (ou todas) e cria nova sessão padrão.
+    - Retorna novo payload `LoginOut`.
+
+    Levanta
+    -------
+    HTTPException
+        401 se a sessão for inválida ou senha atual incorreta.
+        403 se o usuário não estiver ativo.
+        400 para violações de política de senha.
+        422 quando a confirmação divergir.
     """
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
@@ -410,7 +647,6 @@ def change_password(payload: ChangePasswordIn, request: Request):
         raise HTTPException(status_code=422, detail={"confirm": confirm_err})
 
     with _pg_conn() as conn, conn.cursor() as cur:
-        # Carrega usuário pela sessão atual
         cur.execute(
             """
             SELECT u.id, u.cpf, u.email, u.name, u.password_hash, u.status, u.is_superuser, u.must_change_password
@@ -435,7 +671,6 @@ def change_password(payload: ChangePasswordIn, request: Request):
         if status != "active":
             raise HTTPException(status_code=403, detail=f"Usuário {status}.")
 
-        # Verifica senha atual
         try:
             if not pwd_hash:
                 raise VerifyMismatchError
@@ -443,12 +678,10 @@ def change_password(payload: ChangePasswordIn, request: Request):
         except VerifyMismatchError:
             raise HTTPException(status_code=401, detail="invalid_credentials")
 
-        # Política de senha (usa identificadores)
         policy_errors = evaluate_password(payload.new_password, identifiers=[u_email, u_cpf, u_name])
         if policy_errors:
             raise HTTPException(status_code=400, detail={"password": policy_errors})
 
-        # Hash e update
         try:
             new_hash = ph.hash(payload.new_password)
         except Exception:
@@ -477,7 +710,6 @@ def change_password(payload: ChangePasswordIn, request: Request):
             ua=ua,
         )
 
-        # Revogar sessões
         if AUTH_REVOKE_ALL_ON_PASSWORD_CHANGE:
             cur.execute(
                 "UPDATE auth_sessions SET revoked_at = now() WHERE user_id = %s AND revoked_at IS NULL",
@@ -489,7 +721,6 @@ def change_password(payload: ChangePasswordIn, request: Request):
                 (db_sess_id,),
             )
 
-        # Criar nova sessão (TTL padrão)
         new_sess_id = uuid.uuid4()
         ttl = timedelta(hours=SESSION_TTL_HOURS)
         new_expires = _now() + ttl
@@ -501,7 +732,6 @@ def change_password(payload: ChangePasswordIn, request: Request):
             (str(new_sess_id), user_id, new_expires, ip, ua),
         )
 
-        # Roles
         roles_db = _load_roles(conn, user_id)
         roles = _merge_default_roles(roles_db)
         if is_superuser and "admin" not in roles:
@@ -520,7 +750,6 @@ def change_password(payload: ChangePasswordIn, request: Request):
             "must_change_password": False,
         }
 
-        # Zera e grava a **nova** sessão web (evita staleness e flicker)
         request.session.clear()
         request.session["user"] = user_payload
         request.session["db_session_id"] = str(new_sess_id)
@@ -530,6 +759,18 @@ def change_password(payload: ChangePasswordIn, request: Request):
 
 @router.post("/api/auth/logout", status_code=204, response_class=Response)
 def logout_user(request: Request):
+    """
+    Realiza logout revogando a sessão no banco e limpando a sessão web.
+
+    Parâmetros
+    ----------
+    request : Request
+
+    Retorna
+    -------
+    Response
+        204 No Content.
+    """
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
     db_sess_id = request.session.get("db_session_id")
