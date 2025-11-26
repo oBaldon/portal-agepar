@@ -10,7 +10,7 @@ function cls(...xs: (string | false | null | undefined)[]) {
 
 export default function ForceChangePassword() {
   const nav = useNavigate();
-  const { user, replaceUser } = useAuth();
+  const { user, refresh } = useAuth(); // ⬅️ usamos refresh() em vez de replaceUser
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -22,17 +22,18 @@ export default function ForceChangePassword() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // debug opcional
+  const [rawError, setRawError] = useState<any>(null);
+  const debug = typeof window !== "undefined" && localStorage.getItem("AUTH_DEBUG") === "1";
+
   const [show, setShow] = useState<{ cur: boolean; neu: boolean; cnf: boolean }>({
     cur: false,
     neu: false,
     cnf: false,
   });
 
-  // ✅ Nada de chamar /api/me aqui. O AuthProvider já garante o redirecionamento:
-  // - Se must_change_password=false e o usuário está nesta página, ele manda pra /inicio.
-  // - Se não autenticado, o guard de rotas deve te levar ao /login.
+  // ✅ Sem chamar /api/me aqui. O AuthProvider já cuida dos redirecionamentos globais.
   useEffect(() => {
-    // Defesa extra: se já não precisa trocar, vá para /inicio
     if (user && user.must_change_password === false) {
       nav("/inicio", { replace: true });
     }
@@ -50,27 +51,31 @@ export default function ForceChangePassword() {
     setServerErrors([]);
     setConfirmError(null);
     setGlobalError(null);
+    setRawError(null);
 
     try {
-      // ⬇️ Chama a API e usa o payload retornado (LoginOut)
-      const me = await changePassword({
+      // ⬇️ Chama a API que retorna LoginOut (já com must_change_password=false)
+      await changePassword({
         current_password: currentPassword,
         new_password: newPassword,
         new_password_confirm: confirmPassword,
       });
 
-      // ⬇️ Atualiza o contexto sem refresh()/getMe()
-      replaceUser(me);
-
       setSuccess(true);
 
-      // O guard do AuthProvider já detecta must_change_password=false e redireciona.
-      // Ainda assim, navegamos de forma defensiva.
+      // ⬇️ Atualiza estado global via refresh (evita exigir replaceUser no provider)
+      //     Uma única chamada a /api/me, sem loops, pois o flag já veio false.
+      await refresh();
+
+      // Guard do AuthProvider também redireciona, mas garantimos navegação aqui.
       nav("/inicio", { replace: true });
     } catch (err: any) {
+      // api.ts agora lança { status, data }
       const status = err?.status ?? err?.response?.status;
       const data = err?.data ?? err?.response?.data ?? {};
       const detail = data?.detail;
+
+      if (debug) setRawError({ status, data });
 
       if (status === 401 && (detail === "invalid_credentials" || typeof detail === "string")) {
         setGlobalError("Senha atual incorreta.");
@@ -216,7 +221,7 @@ export default function ForceChangePassword() {
                 Trocar senha
               </button>
               <Link
-                to="/logout" /* ajuste se sua rota for diferente */
+                to="/auth/logout"
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 replace
               >
@@ -224,6 +229,16 @@ export default function ForceChangePassword() {
               </Link>
             </div>
           </form>
+        )}
+
+        {/* Debug opcional (aparece apenas com AUTH_DEBUG=1) */}
+        {debug && rawError && (
+          <details className="mt-4 text-xs text-slate-600">
+            <summary className="cursor-pointer">DEBUG: erro bruto da API</summary>
+            <pre className="mt-2 whitespace-pre-wrap break-words bg-slate-50 p-2 rounded border">
+{JSON.stringify(rawError, null, 2)}
+            </pre>
+          </details>
         )}
 
         {/* Rodapé discreto (mesmo estilo do Login) */}

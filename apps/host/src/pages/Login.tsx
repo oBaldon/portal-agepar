@@ -30,7 +30,32 @@ function buildLoginCandidates(raw: string): string[] {
   if (isNumericLike(id)) return [onlyDigits(id)];
   // Caso contrário, tenta como digitado e também com o domínio padrão
   const canon = `${id}@${String(DEFAULT_DOMAIN).trim().toLowerCase()}`;
-  return Array.from(new Set([id, canon])); // dedupe por segurança
+  return Array.from(new Set([id, canon])); // dedupe
+}
+
+/** Extrai mensagem amigável do nosso HttpError `{ status, data }` (definido em api.ts). */
+function messageFromHttpError(err: any, fallback = "Falha no login"): string {
+  const status = err?.status ?? err?.response?.status;
+  const data = err?.data ?? err?.response?.data;
+  const detail = data?.detail;
+
+  if (status === 401) {
+    // Login inválido
+    if (typeof detail === "string") return detail; // ex.: "Credenciais inválidas."
+    return "Credenciais inválidas.";
+  }
+
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    // Pydantic/FastAPI validation array
+    return detail[0]?.msg || fallback;
+  }
+
+  if (typeof data?.error === "string") return data.error;
+
+  if (typeof err?.message === "string") return err.message;
+
+  return fallback;
 }
 
 export default function Login() {
@@ -80,10 +105,10 @@ export default function Login() {
     setSubmitting(true);
     setErr(null);
     try {
-      // Tenta sequencialmente: [digitado, digitado@dominio] ou só dígitos se for CPF/máscara
       const candidates = buildLoginCandidates(identifier);
       if (candidates.length === 0) {
-        throw new Error("Informe seu e-mail, usuário ou CPF.");
+        setErr("Informe seu e-mail, usuário ou CPF.");
+        return;
       }
       let lastErr: any = null;
       for (const id of candidates) {
@@ -92,7 +117,7 @@ export default function Login() {
           lastErr = null;
           break; // sucesso
         } catch (e: any) {
-          lastErr = e;
+          lastErr = e; // guarda para tentar o próximo candidato
         }
       }
       if (lastErr) throw lastErr;
@@ -100,7 +125,7 @@ export default function Login() {
       // Deixa o AuthProvider/guard global decidir (se precisar força troca, ele redireciona)
       nav("/inicio", { replace: true });
     } catch (e: any) {
-      setErr(e?.message || "Falha no login");
+      setErr(messageFromHttpError(e, "Falha no login"));
     } finally {
       setSubmitting(false);
     }
@@ -174,8 +199,9 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyUp={(e) => {
-                  // Blindagem: 'key' pode ser undefined/unidentified em alguns eventos
-                  const ke = (e as unknown as React.KeyboardEvent<HTMLInputElement>).nativeEvent as KeyboardEvent;
+                  // Blindagem para navegadores/eventos onde key pode vir undefined
+                  const ke = (e as unknown as React.KeyboardEvent<HTMLInputElement>)
+                    .nativeEvent as KeyboardEvent;
                   const k = (ke as any)?.key ?? "";
                   const isSingleChar = typeof k === "string" && k.length === 1;
                   const isLetter = isSingleChar && /[a-zA-Z]/.test(k);
