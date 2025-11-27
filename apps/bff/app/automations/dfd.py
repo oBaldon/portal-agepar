@@ -751,7 +751,7 @@ async def submit_dfd(
 async def download_result(
     sid: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("compras", "coordenador", "admin")),
 ):
     """
     Download primário do resultado: retorna PDF quando disponível; caso contrário, DOCX.
@@ -760,7 +760,7 @@ async def download_result(
     ----------
     - Dono da submissão, ou
     - Papéis elevados (`admin`/`coordenador`), ou
-    - Papel específico da automação (`automations.dfd`).
+    - Papel específico da automação (`compras`).
     """
     try:
         row = get_submission(sid)
@@ -816,7 +816,7 @@ async def download_result_fmt(
     sid: str,
     fmt: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("compras", "coordenador", "admin")),
 ):
     """
     Download explícito por formato.
