@@ -10,8 +10,8 @@ Fornece uma UI simples e endpoints para consulta e exportação de:
 
 Segurança
 ---------
-- Todos os endpoints são protegidos por RBAC e exigem **qualquer um** dos papéis:
-  `coordenador` **ou** `admin`.
+- Todos os endpoints são protegidos por RBAC e exigem **qualquer um** dos seguintes:
+  `coordenador`, `admin` **ou** usuário com `is_superuser == true`.
 
 Compatibilidade
 ---------------
@@ -56,15 +56,25 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.auth.rbac import require_roles_any
+from app.auth.rbac import require_roles_any  # segue utilizado em alguns pontos
 from app import db as db
 
 logger = logging.getLogger(__name__)
 
+def require_admin_coord_or_superuser(request: Request) -> Dict[str, Any]:
+    """
+    Autoriza se o usuário for superuser OU tiver 'admin' OU 'coordenador'.
+    """
+    user = (getattr(request, "session", {}) or {}).get("user") or {}
+    roles = set((user.get("roles") or []))
+    if user.get("is_superuser") is True or "admin" in roles or "coordenador" in roles:
+        return user
+    raise HTTPException(status_code=403, detail="forbidden")
+
 router = APIRouter(
     prefix="/api/automations/controle",
     tags=["automations", "controle"],
-    dependencies=[Depends(require_roles_any("coordenador", "admin"))],
+    dependencies=[Depends(require_admin_coord_or_superuser)],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -106,6 +116,8 @@ class AuditOut(BaseModel):
     download_url : Optional[str]
         URL de download na automação de origem (quando inferível).
     submission_url : Optional[str]
+        URL de detalhes da submissão **no painel de controle** (read-only).
+    origin_submission_url : Optional[str]
         URL de detalhes da submissão na automação de origem (quando inferível).
     """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
@@ -125,6 +137,7 @@ class AuditOut(BaseModel):
     status: Optional[str] = None
     download_url: Optional[str] = None
     submission_url: Optional[str] = None
+    origin_submission_url: Optional[str] = None
 
 
 class SubmissionOut(BaseModel):
@@ -190,7 +203,10 @@ def get_schema():
             "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
             "offset": {"type": "integer", "minimum": 0, "default": 0},
         },
-        "notes": "Painel de controle é somente leitura. Baixes/ver ações na automação de origem.",
+        "notes": (
+            "Painel de controle é somente leitura. "
+            "Downloads devem ser feitos na automação de origem; a ação 'ver' usa o próprio Controle."
+        ),
     }
 
 
@@ -373,7 +389,7 @@ def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
     """
     Enriquecimento *in-place* dos registros de auditoria com dados da submissão:
     - `alvo` (kind normalizado), `protocolo`, `filename`, `status`
-    - `download_url` e `submission_url` quando (alvo, sid) puderem ser inferidos.
+    - `download_url`, `submission_url` (controle) e `origin_submission_url` quando inferíveis.
     """
     for it in rows:
         extra = it.get("extra") or {}
@@ -403,9 +419,11 @@ def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
 
         download_url = None
         submission_url = None
+        origin_submission_url = None
         if alvo and sid:
             download_url = f"/api/automations/{alvo}/submissions/{sid}/download"
-            submission_url = f"/api/automations/{alvo}/submissions/{sid}"
+            submission_url = f"/api/automations/controle/submissions/{sid}"
+            origin_submission_url = f"/api/automations/{alvo}/submissions/{sid}"
 
         it["alvo"] = alvo or ""
         it["protocolo"] = protocolo or ""
@@ -413,6 +431,7 @@ def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
         it["status"] = status or ""
         it["download_url"] = download_url
         it["submission_url"] = submission_url
+        it["origin_submission_url"] = origin_submission_url
         it["extra"] = extra_obj
 
 
