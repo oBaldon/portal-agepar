@@ -1,16 +1,58 @@
 // apps/host/src/pages/ForceChangePassword.tsx
+
+/**
+ * Página de troca obrigatória de senha.
+ *
+ * Propósito
+ * ---------
+ * Fluxo dedicado para quando o backend exige `must_change_password = true`.
+ * Permite informar a senha atual, definir uma nova senha e confirmar.
+ * Em caso de sucesso, atualiza o estado global de autenticação e redireciona
+ * o usuário para a página inicial.
+ *
+ * Acessibilidade/UX
+ * -----------------
+ * - Botões “Mostrar/Ocultar” para campos de senha.
+ * - Mensagens claras de erro (gerais, confirmação e regras do servidor).
+ * - Feedback visual durante submissão e após sucesso.
+ *
+ * Segurança
+ * ---------
+ * - Não expõe senhas em logs.
+ * - Trata respostas estruturadas da API sem alterar a lógica de autenticação.
+ *
+ * Referências
+ * -----------
+ * - Convenções de mensagens de erro e formulários (UX writing).
+ * - Padrões de feedback e estados de carregamento em formulários web.
+ */
+
 import { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { changePassword } from "@/lib/api";
 import { useAuth } from "@/auth/AuthProvider";
 
+/**
+ * Helper de composição de classes (ignora falsy).
+ */
 function cls(...xs: (string | false | null | undefined)[]) {
   return xs.filter(Boolean).join(" ");
 }
 
+/**
+ * Componente principal da página de troca obrigatória de senha.
+ *
+ * Fluxo
+ * -----
+ * 1) Se o usuário não precisa mais trocar a senha, redireciona para /inicio.
+ * 2) Na submissão, chama a API de changePassword.
+ * 3) Em sucesso: informa sucesso, chama `refresh()` para atualizar o usuário
+ *    globalmente e navega para /inicio.
+ * 4) Em erro: apresenta mensagens de acordo com o status/estrutura retornada.
+ */
 export default function ForceChangePassword() {
   const nav = useNavigate();
-  const { user, refresh } = useAuth(); // ⬅️ usamos refresh() em vez de replaceUser
+  const { user, refresh } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -22,7 +64,6 @@ export default function ForceChangePassword() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // debug opcional
   const [rawError, setRawError] = useState<any>(null);
   const debug = typeof window !== "undefined" && localStorage.getItem("AUTH_DEBUG") === "1";
 
@@ -32,7 +73,6 @@ export default function ForceChangePassword() {
     cnf: false,
   });
 
-  // ✅ Sem chamar /api/me aqui. O AuthProvider já cuida dos redirecionamentos globais.
   useEffect(() => {
     if (user && user.must_change_password === false) {
       nav("/inicio", { replace: true });
@@ -54,7 +94,6 @@ export default function ForceChangePassword() {
     setRawError(null);
 
     try {
-      // ⬇️ Chama a API que retorna LoginOut (já com must_change_password=false)
       await changePassword({
         current_password: currentPassword,
         new_password: newPassword,
@@ -62,15 +101,9 @@ export default function ForceChangePassword() {
       });
 
       setSuccess(true);
-
-      // ⬇️ Atualiza estado global via refresh (evita exigir replaceUser no provider)
-      //     Uma única chamada a /api/me, sem loops, pois o flag já veio false.
       await refresh();
-
-      // Guard do AuthProvider também redireciona, mas garantimos navegação aqui.
       nav("/inicio", { replace: true });
     } catch (err: any) {
-      // api.ts agora lança { status, data }
       const status = err?.status ?? err?.response?.status;
       const data = err?.data ?? err?.response?.data ?? {};
       const detail = data?.detail;
@@ -99,7 +132,6 @@ export default function ForceChangePassword() {
   return (
     <div className="min-h-[calc(100vh-56px)] grid place-items-center px-4 bg-gradient-to-b from-slate-50 to-slate-100">
       <div className="relative w-full max-w-md rounded-2xl border bg-white/90 backdrop-blur-sm p-6 shadow-md">
-        {/* Branding (mesmo do Login) */}
         <div className="mb-6 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold shadow-sm">
             A
@@ -110,7 +142,6 @@ export default function ForceChangePassword() {
           </div>
         </div>
 
-        {/* Mensagens */}
         {success && (
           <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
             Senha alterada com sucesso. Redirecionando…
@@ -134,7 +165,6 @@ export default function ForceChangePassword() {
           </div>
         )}
 
-        {/* Formulário */}
         {!success && (
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
@@ -231,7 +261,6 @@ export default function ForceChangePassword() {
           </form>
         )}
 
-        {/* Debug opcional (aparece apenas com AUTH_DEBUG=1) */}
         {debug && rawError && (
           <details className="mt-4 text-xs text-slate-600">
             <summary className="cursor-pointer">DEBUG: erro bruto da API</summary>
@@ -241,7 +270,6 @@ export default function ForceChangePassword() {
           </details>
         )}
 
-        {/* Rodapé discreto (mesmo estilo do Login) */}
         <div className="mt-4 flex items-center justify-between">
           <p className="text-xs text-slate-400">
             Suporte: <span className="tabular-nums">ramal 4895</span>

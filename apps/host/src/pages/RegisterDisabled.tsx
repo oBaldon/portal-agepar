@@ -1,4 +1,26 @@
 // apps/host/src/pages/RegisterDisabled.tsx
+/**
+ * Página: Auto-registro desativado
+ *
+ * Propósito
+ * ---------
+ * Informar ao usuário que o auto-registro está indisponível e orientá-lo
+ * sobre o procedimento oficial de criação de contas.
+ *
+ * UX/Acessibilidade
+ * -----------------
+ * - Layout simples, centrado e responsivo.
+ * - Linguagem direta, com link de retorno ao login.
+ *
+ * Segurança
+ * ---------
+ * - Componente somente de exibição; não realiza chamadas à API.
+ *
+ * Referências
+ * -----------
+ * - Navegação: react-router-dom (Link).
+ */
+
 import { Link } from "react-router-dom";
 
 export default function RegisterDisabled() {

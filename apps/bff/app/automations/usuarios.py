@@ -1,6 +1,37 @@
 # apps/bff/app/automations/usuarios.py
 from __future__ import annotations
 
+"""
+Automação de gestão de usuários para o RH.
+
+Propósito
+---------
+Fornece páginas HTML simples (UI) e endpoints JSON para:
+- consultar metadados de schema organizacional;
+- listar usuários com filtros;
+- obter o detalhe completo de um usuário;
+- criar usuário com vínculo (efetivo, comissionado ou estagiário), formação
+  e registros auxiliares, registrando auditoria e submissão.
+
+Segurança/RBAC
+--------------
+Todos os endpoints deste router exigem autenticação com quaisquer dos papéis
+`rh` ou `admin` (regra ANY-of), aplicados via dependência global
+`require_roles_any(*REQUIRED_ROLES)`.
+
+Efeitos colaterais
+------------------
+- Acesso ao banco PostgreSQL via `_pg()` para leituras/escritas.
+- Auditoria com `add_audit`.
+- Registro de submissões com `insert_submission`.
+- Geração de hash Argon2 para PIN temporário.
+
+Observações
+-----------
+A lógica original foi preservada integralmente; houve apenas remoção de
+comentários e inclusão de docstrings.
+"""
+
 import logging
 import os
 import pathlib
@@ -17,21 +48,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from argon2 import PasswordHasher
 
 from app.auth.rbac import require_roles_any
-from app.db import insert_submission, get_submission, list_submissions_admin, add_audit, _pg  # type: ignore
+from app.db import insert_submission, get_submission, list_submissions_admin, add_audit, _pg
 
 logger = logging.getLogger(__name__)
-# === Config (histórico) ===
-# Máximo de eventos de histórico (somatório paginado) e tamanho do lote por consulta
+
 USUARIOS_HISTORY_MAX = int(os.getenv("USUARIOS_HISTORY_MAX", "20000"))
 USUARIOS_HISTORY_BATCH = int(os.getenv("USUARIOS_HISTORY_BATCH", "1000"))
 
-# ---------------------------------------------------------------------
-# Config & RBAC
-# ---------------------------------------------------------------------
 REQUIRED_ROLES = ("rh", "admin")
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "usuarios"
-
-# UO padrão enquanto a modelagem estiver "desabilitada"
 DEFAULT_ORG_UNIT_CODE = "AGEPAR"
 
 router = APIRouter(
@@ -42,13 +67,35 @@ router = APIRouter(
 
 hasher = PasswordHasher()
 
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
 CPF_RE = re.compile(r"\D+")
 
 
 def norm_cpf(v: Optional[str]) -> Optional[str]:
+    """
+    Normaliza e valida CPF retornando apenas dígitos.
+
+    Parâmetros
+    ----------
+    v : str | None
+        CPF informado, possivelmente com pontuação.
+
+    Retorna
+    -------
+    str | None
+        String com 11 dígitos numéricos, ou `None` se vazio após limpeza.
+
+    Exceções
+    --------
+    HTTPException
+        422 quando o resultado não tiver 11 dígitos numéricos.
+
+    Exemplos
+    --------
+    >>> norm_cpf("123.456.789-01")
+    '12345678901'
+    >>> norm_cpf(None) is None
+    True
+    """
     if v is None:
         return None
     v = CPF_RE.sub("", v or "")
@@ -60,10 +107,40 @@ def norm_cpf(v: Optional[str]) -> Optional[str]:
 
 
 def safe_digits(s: str) -> str:
+    """
+    Remove todos os caracteres não numéricos de uma string.
+
+    Parâmetros
+    ----------
+    s : str
+        Texto de entrada.
+
+    Retorna
+    -------
+    str
+        Texto contendo apenas dígitos.
+    """
     return CPF_RE.sub("", s or "")
 
 
 def clamp(n: int, lo: int, hi: int) -> int:
+    """
+    Limita um inteiro ao intervalo fechado [lo, hi].
+
+    Parâmetros
+    ----------
+    n : int
+        Valor a ser limitado.
+    lo : int
+        Limite inferior.
+    hi : int
+        Limite superior.
+
+    Retorna
+    -------
+    int
+        Valor dentro de [lo, hi].
+    """
     return max(lo, min(hi, n))
 
 
@@ -76,6 +153,33 @@ def err_json(
     hint: Optional[str] = None,
     received: Any = None,
 ):
+    """
+    Cria uma resposta JSON padronizada de erro.
+
+    Parâmetros
+    ----------
+    status : int
+        Código HTTP de retorno.
+    code : str
+        Código abreviado do erro.
+    message : str
+        Mensagem amigável em pt-BR.
+    details : Any, opcional
+        Dados adicionais para diagnóstico.
+    hint : str, opcional
+        Dica para resolução do erro.
+    received : Any, opcional
+        Payload recebido (eco controlado).
+
+    Retorna
+    -------
+    JSONResponse
+        Resposta JSON serializável.
+
+    Observações
+    -----------
+    Não levanta exceção; apenas retorna a resposta apropriada.
+    """
     content: Dict[str, Any] = {"error": code, "message": message}
     if details is not None:
         content["details"] = details
@@ -87,7 +191,25 @@ def err_json(
 
 
 def _json_safe(obj: Any) -> Any:
-    """Converte recursivamente para tipos serializáveis em JSON (psycopg json)."""
+    """
+    Converte recursivamente um objeto para tipos serializáveis em JSON.
+
+    Parâmetros
+    ----------
+    obj : Any
+        Objeto de entrada (inclui tipos psycopg).
+
+    Retorna
+    -------
+    Any
+        Estrutura contendo apenas tipos básicos JSON.
+
+    Observações
+    -----------
+    Converte `date`, `datetime` e `time` com `isoformat()`, `Decimal` em `float`
+    e `UUID` em `str`. Estruturas mapeáveis e iteráveis são processadas
+    recursivamente.
+    """
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
     if isinstance(obj, (date, datetime, time)):
@@ -107,12 +229,33 @@ def _json_safe(obj: Any) -> Any:
 
 
 def _read_html(name: str) -> str:
+    """
+    Lê um arquivo HTML a partir do diretório de templates da automação.
+
+    Parâmetros
+    ----------
+    name : str
+        Nome do arquivo (ex.: 'ui.html').
+
+    Retorna
+    -------
+    str
+        Conteúdo HTML.
+
+    Exceções
+    --------
+    FileNotFoundError
+        Interceptada e tratada com um HTML mínimo de fallback.
+
+    Observações
+    -----------
+    Não altera lógica de negócio; fornece apenas conteúdo de UI simples.
+    """
     path = TPL_DIR / name
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        # fallback mínimo
         return """<!doctype html>
 <html lang="pt-br">
 <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -134,46 +277,77 @@ def _read_html(name: str) -> str:
 </html>"""
 
 
-# PIN temporário numérico de 4 dígitos
 _DIGITS = "0123456789"
 
 
 def gen_temp_pin() -> str:
+    """
+    Gera um PIN numérico temporário de 4 dígitos.
+
+    Retorna
+    -------
+    str
+        PIN com quatro caracteres numéricos.
+
+    Observações
+    -----------
+    Usa `secrets.choice` para reduzir previsibilidade.
+    """
     return "".join(choice(_DIGITS) for _ in range(4))
 
 
 def map_user_status_from_employment(v: Literal["ativo", "inativo"]) -> Literal["active", "blocked"]:
+    """
+    Mapeia status de vínculo (RH) para status de conta (tabela users).
+
+    Parâmetros
+    ----------
+    v : Literal['ativo', 'inativo']
+        Status do vínculo no RH.
+
+    Retorna
+    -------
+    Literal['active', 'blocked']
+        'active' para 'ativo' e 'blocked' para 'inativo'.
+    """
     return "active" if v == "ativo" else "blocked"
 
 
-# ---------------------------------------------------------------------
-# Schemas (núcleo + vínculos, modelo relacional)
-# ---------------------------------------------------------------------
-# Formação comum
 class GraduacaoIn(BaseModel):
+    """
+    Entrada de graduação para compor a formação do usuário.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     curso: str = Field(min_length=2)
     instituicao: Optional[str] = None
-    conclusao_data: Optional[str] = None  # YYYY-MM-DD
+    conclusao_data: Optional[str] = None
 
 
 class PosGraduacaoIn(BaseModel):
+    """
+    Entrada de pós-graduação do usuário.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     curso: str = Field(min_length=2)
     tipo: Optional[Literal["especializacao", "mestrado", "doutorado", "pos"]] = None
     instituicao: Optional[str] = None
-    conclusao_data: Optional[str] = None  # YYYY-MM-DD
+    conclusao_data: Optional[str] = None
 
 
 class FormacaoIn(BaseModel):
+    """
+    Estrutura de formação: ensino médio, graduações e pós-graduações.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     nivel_medio: Optional[bool] = None
     graduacoes: List[GraduacaoIn] = Field(default_factory=list)
     pos_graduacoes: List[PosGraduacaoIn] = Field(default_factory=list)
 
 
-# Efetivo – listas auxiliares
 class EfetivoCapacitacaoIn(BaseModel):
+    """
+    Capacitação para servidores efetivos.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     protocolo: Optional[str] = None
     curso: str = Field(min_length=2)
@@ -184,15 +358,21 @@ class EfetivoCapacitacaoIn(BaseModel):
 
 
 class EfetivoGitiIn(BaseModel):
+    """
+    Registro de GITI (incentivo) para efetivos.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     curso: str = Field(min_length=2)
     conclusao_data: Optional[str] = None
     tipo: Literal["graduacao", "mestrado", "doutorado", "pos"]
-    percentual: int  # 10 | 15 | 20
+    percentual: int
 
     @field_validator("tipo", mode="before")
     @classmethod
     def _lower_tipo(cls, v):
+        """
+        Normaliza o tipo para minúsculas antes da validação.
+        """
         if isinstance(v, str):
             v = v.strip().lower()
         return v
@@ -200,6 +380,9 @@ class EfetivoGitiIn(BaseModel):
     @field_validator("percentual", mode="before")
     @classmethod
     def _coerce_percentual(cls, v):
+        """
+        Converte percentual textual para inteiro e valida valores aceitos.
+        """
         if isinstance(v, str):
             v = v.strip()
             if v.isdigit():
@@ -210,6 +393,9 @@ class EfetivoGitiIn(BaseModel):
 
 
 class EfetivoOutroCargoIn(BaseModel):
+    """
+    Informações sobre exercício de outra função/cargo por efetivo.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     funcao_ou_cc: Optional[str] = None
     decreto_nomeacao_numero: Optional[str] = None
@@ -222,6 +408,9 @@ class EfetivoOutroCargoIn(BaseModel):
 
 
 class EfetivoIn(BaseModel):
+    """
+    Dados específicos do vínculo efetivo, incluindo listas auxiliares.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     decreto_nomeacao_numero: Optional[str] = None
     decreto_nomeacao_data: Optional[str] = None
@@ -241,6 +430,9 @@ class EfetivoIn(BaseModel):
 
 
 class ComissionadoIn(BaseModel):
+    """
+    Dados específicos do vínculo comissionado.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     decreto_nomeacao_numero: Optional[str] = None
     decreto_nomeacao_data: Optional[str] = None
@@ -254,6 +446,9 @@ class ComissionadoIn(BaseModel):
 
 
 class EstagiarioIn(BaseModel):
+    """
+    Dados específicos do vínculo de estagiário.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     tce_numero: Optional[str] = None
     tce_ano: Optional[int] = None
@@ -261,7 +456,6 @@ class EstagiarioIn(BaseModel):
     fim_data: Optional[str] = None
     aditivo_novo_fim_data: Optional[str] = None
     rescisao_data: Optional[str] = None
-    # Controles operacionais
     fluxogramas: Optional[str] = None
     frequencia: Optional[str] = None
     pagamento: Optional[str] = None
@@ -269,19 +463,25 @@ class EstagiarioIn(BaseModel):
 
 
 TipoVinculo = Literal["efetivo", "comissionado", "estagiario"]
-StatusVinculo = Literal["ativo", "inativo"]  # employment.status
+StatusVinculo = Literal["ativo", "inativo"]
 MotivoInatividade = Literal["exoneracao", "aposentadoria"]
 
 
 class UserCreateIn(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    """
+    Payload de criação de usuário com dados nucleares, vínculo e formação.
 
-    # Núcleo comum
+    Observações de segurança
+    ------------------------
+    - Campos são validados por Pydantic.
+    - O status do usuário é derivado do vínculo.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
     nome_completo: str = Field(..., min_length=3, max_length=200)
     cpf: str = Field(..., min_length=11, max_length=14)
     rg: Optional[str] = None
     id_funcional: Optional[int] = None
-    data_nascimento: Optional[str] = None  # YYYY-MM-DD
+    data_nascimento: Optional[str] = None
     email_principal: Optional[str] = None
     email_institucional: Optional[str] = None
     telefone_principal: Optional[str] = None
@@ -289,27 +489,27 @@ class UserCreateIn(BaseModel):
     endereco: Optional[str] = None
     dependentes_qtde: Optional[int] = Field(default=0, ge=0)
     formacao: Optional[FormacaoIn] = None
-
-    # Vínculo
     tipo_vinculo: TipoVinculo
     status: StatusVinculo = "ativo"
     motivo_inatividade: Optional[MotivoInatividade] = None
-
-    # Unidade Organizacional (opcional; se omitir, usa DEFAULT_ORG_UNIT_CODE)
     org_unit_code: Optional[str] = Field(
         default=None,
-        description='code da org unit (ex.: GOV-RH); se omitido, usa default'
+        description="code da org unit (ex.: GOV-RH); se omitido, usa default",
     )
-
-    # Específicos
     efetivo: Optional[EfetivoIn] = None
     comissionado: Optional[ComissionadoIn] = None
     estagiario: Optional[EstagiarioIn] = None
 
 
 class UserUpdateIn(BaseModel):
+    """
+    Payload de atualização parcial do usuário e de seu vínculo.
+
+    Observações
+    -----------
+    Este modelo é usado em outras rotas (não presentes nesta parte).
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    # Núcleo (opcionais)
     nome_completo: Optional[str] = Field(default=None, min_length=3, max_length=200)
     cpf: Optional[str] = Field(default=None, min_length=11, max_length=14)
     rg: Optional[str] = None
@@ -322,22 +522,29 @@ class UserUpdateIn(BaseModel):
     endereco: Optional[str] = None
     dependentes_qtde: Optional[int] = Field(default=None, ge=0)
     formacao: Optional[FormacaoIn] = None
-    # Emprego
     tipo_vinculo: Optional[TipoVinculo] = None
     status: Optional[StatusVinculo] = None
     motivo_inatividade: Optional[MotivoInatividade] = None
     org_unit_code: Optional[str] = None
-    # Especializações
     efetivo: Optional[EfetivoIn] = None
     comissionado: Optional[ComissionadoIn] = None
     estagiario: Optional[EstagiarioIn] = None
 
 
-# ---------------------------------------------------------------------
-# UI
-# ---------------------------------------------------------------------
 @router.get("/ui")
 def ui() -> HTMLResponse:
+    """
+    Página principal da UI da automação de usuários.
+
+    Retorna
+    -------
+    HTMLResponse
+        HTML renderizado do template `ui.html` (ou fallback interno).
+
+    RBAC
+    ----
+    Protegida pela dependência global do router (rh|admin).
+    """
     html = _read_html("ui.html")
     return HTMLResponse(content=html)
 
@@ -346,7 +553,21 @@ def ui() -> HTMLResponse:
 @router.get("/ui/search/")
 def ui_search(request: Request) -> HTMLResponse:
     """
-    UI separada para busca de usuários cadastrados (padrão semelhante ao DFD: /ui/history).
+    UI de busca de usuários cadastrados.
+
+    Parâmetros
+    ----------
+    request : Request
+        Usado apenas para acionar a verificação RBAC.
+
+    Retorna
+    -------
+    HTMLResponse
+        HTML do template `search.html`.
+
+    RBAC
+    ----
+    Requer papéis `rh` ou `admin`.
     """
     checker = require_roles_any(*REQUIRED_ROLES)
     checker(request)
@@ -357,7 +578,19 @@ def ui_search(request: Request) -> HTMLResponse:
 @router.get("/ui/user/{user_id}")
 def ui_user_detail(user_id: str, request: Request) -> HTMLResponse:
     """
-    UI de detalhe do usuário (renderiza tabela 'completíssima').
+    UI de detalhe do usuário.
+
+    Parâmetros
+    ----------
+    user_id : str
+        Identificador do usuário.
+    request : Request
+        Usado para checagem de papéis.
+
+    Retorna
+    -------
+    HTMLResponse
+        HTML do template `detail.html`.
     """
     checker = require_roles_any(*REQUIRED_ROLES)
     checker(request)
@@ -369,6 +602,18 @@ def ui_user_detail(user_id: str, request: Request) -> HTMLResponse:
 def ui_user_edit(user_id: str, request: Request) -> HTMLResponse:
     """
     UI de edição do usuário.
+
+    Parâmetros
+    ----------
+    user_id : str
+        Identificador do usuário.
+    request : Request
+        Usado para checagem de papéis.
+
+    Retorna
+    -------
+    HTMLResponse
+        HTML do template `detail_edit.html`.
     """
     checker = require_roles_any(*REQUIRED_ROLES)
     checker(request)
@@ -376,11 +621,20 @@ def ui_user_edit(user_id: str, request: Request) -> HTMLResponse:
     return HTMLResponse(content=html)
 
 
-# ---------------------------------------------------------------------
-# JSON endpoints
-# ---------------------------------------------------------------------
 @router.get("/schema")
 def schema() -> Dict[str, Any]:
+    """
+    Retorna metadados e enums usados pela UI do RH.
+
+    Retorna
+    -------
+    dict
+        Metadados, enums e lista de unidades organizacionais ativas.
+
+    Efeitos colaterais
+    ------------------
+    Consulta `org_units` no banco.
+    """
     with _pg() as conn, conn.cursor() as cur:
         cur.execute("SELECT code, name FROM org_units WHERE active = TRUE ORDER BY code")
         orgs = [dict(r) for r in (cur.fetchall() or [])]
@@ -409,6 +663,33 @@ def list_users(
     limit: int = 500,
     offset: int = 0,
 ) -> Dict[str, Any]:
+    """
+    Lista usuários com filtros opcionais e paginação.
+
+    Parâmetros
+    ----------
+    q : str, opcional
+        Termo de busca (nome, e-mail ou CPF).
+    tipo_vinculo : TipoVinculo, opcional
+        Filtro pelo tipo de vínculo.
+    status_vinculo : StatusVinculo, opcional
+        Filtro por status do vínculo.
+    org_unit : str, opcional
+        Código da unidade organizacional.
+    limit : int
+        Tamanho da página, limitado a [1, 200].
+    offset : int
+        Deslocamento.
+
+    Retorna
+    -------
+    dict
+        Itens encontrados, totais e paginação.
+
+    Efeitos colaterais
+    ------------------
+    Executa consultas SQL de listagem e totalização.
+    """
     limit = clamp(limit, 1, 200)
     offset = max(0, offset)
 
@@ -470,7 +751,6 @@ def list_users(
             d = dict(r)
             d["org_unit"] = {"code": d.pop("org_code", None), "name": d.pop("org_name", None)} if d.get("org_code") else None
             items.append(d)
-        # total
         cur.execute(
             f"""
             SELECT COUNT(DISTINCT u.id) AS c
@@ -489,33 +769,65 @@ def list_users(
 @router.get("/users/{user_id}")
 def get_user_detail(user_id: str) -> Dict[str, Any]:
     """
-    Detalhe 'completíssimo' do usuário.
-    - Núcleo (users)
-    - Emprego atual (employment + org_units)
-      - Especializações (efetivo/comissionado/estagiario) e listas
-    - Formação (graduações/pos)
+    Retorna o snapshot completo do usuário.
+
+    Parâmetros
+    ----------
+    user_id : str
+        Identificador do usuário.
+
+    Retorna
+    -------
+    dict
+        Estrutura com dados nucleares, vínculo atual e formação.
+
+    Observações
+    -----------
+    Reutiliza a função `_snapshot_full` para compor a resposta.
     """
-    # Reutiliza a mesma lógica de snapshot completo
     return _snapshot_full(user_id)
 
 
 @router.post("/users")
 def create_user(payload: UserCreateIn, request: Request):
-    # normalizações e validações
+    """
+    Cria um usuário com vínculo e formação, gerando PIN temporário.
+
+    Parâmetros
+    ----------
+    payload : UserCreateIn
+        Dados nucleares, vínculo e formação.
+    request : Request
+        Usada para recuperar ator (sessão) para auditoria.
+
+    Retorna
+    -------
+    dict
+        `{ ok, id, temporary_pin }` em caso de sucesso.
+
+    Exceções
+    --------
+    HTTPException
+        422 quando status inativo sem motivo, 500 em erros operacionais.
+
+    Efeitos colaterais
+    ------------------
+    - Escrita em múltiplas tabelas (users, employment, especializações, educação).
+    - Auditoria (`add_audit`) e submissão (`insert_submission`).
+    - Geração de hash Argon2 para a senha temporária.
+    """
     cpf_digits = norm_cpf(payload.cpf)
-    assert cpf_digits is not None  # norm_cpf já valida
+    assert cpf_digits is not None
 
     if payload.status == "inativo" and not payload.motivo_inatividade:
         raise HTTPException(status_code=422, detail="motivo_inatividade é obrigatório quando status = inativo")
 
-    # status do usuário (tabela users) segue padrão do accounts: 'active'|'blocked'|'pending'
     user_status = map_user_status_from_employment(payload.status)
 
     temp_pin = gen_temp_pin()
     pwd_hash = hasher.hash(temp_pin)
 
     with _pg() as conn, conn.cursor() as cur:
-        # unicidade
         cur.execute("SELECT 1 FROM users WHERE cpf = %s", (cpf_digits,))
         if cur.fetchone():
             return err_json(409, code="conflict", message="CPF já cadastrado.")
@@ -524,7 +836,6 @@ def create_user(payload: UserCreateIn, request: Request):
             if cur.fetchone():
                 return err_json(409, code="conflict", message="E-mail já cadastrado.")
 
-        # org unit (opcional) — usa default "AGEPAR" se não vier no payload
         desired_code = payload.org_unit_code or DEFAULT_ORG_UNIT_CODE
         cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (desired_code,))
         row = cur.fetchone()
@@ -532,7 +843,6 @@ def create_user(payload: UserCreateIn, request: Request):
             raise HTTPException(status_code=500, detail=f'Org Unit padrão "{desired_code}" não encontrada. Verifique as seeds.')
         org_unit_id = row["id"]
 
-        # cria usuário
         cur.execute(
             """
             INSERT INTO users (
@@ -567,7 +877,6 @@ def create_user(payload: UserCreateIn, request: Request):
         if not user_id:
             raise HTTPException(status_code=500, detail="Falha ao criar usuário (sem id).")
 
-        # formação (listas)
         if payload.formacao:
             for g in (payload.formacao.graduacoes or []):
                 cur.execute(
@@ -580,7 +889,6 @@ def create_user(payload: UserCreateIn, request: Request):
                     (user_id, p.curso, p.tipo, p.instituicao, p.conclusao_data),
                 )
 
-        # vínculo base
         cur.execute(
             """
             INSERT INTO employment (user_id, type, status, inactivity_reason, org_unit_id, start_date)
@@ -591,7 +899,6 @@ def create_user(payload: UserCreateIn, request: Request):
         )
         emp_id = (cur.fetchone() or {}).get("id")
 
-        # especialização: EFETIVO
         if payload.tipo_vinculo == "efetivo":
             e = (payload.efetivo.model_dump() if payload.efetivo else {})
             cur.execute(
@@ -620,7 +927,6 @@ def create_user(payload: UserCreateIn, request: Request):
                     e.get("estabilidade_publicacao_data"),
                 ),
             )
-            # listas: capacitações
             for cap in (payload.efetivo.capacitacoes if payload.efetivo else []) or []:
                 cur.execute(
                     """
@@ -638,7 +944,6 @@ def create_user(payload: UserCreateIn, request: Request):
                         cap.classe,
                     ),
                 )
-            # listas: GITI
             for g in (payload.efetivo.giti if payload.efetivo else []) or []:
                 cur.execute(
                     """
@@ -648,7 +953,6 @@ def create_user(payload: UserCreateIn, request: Request):
                     """,
                     (emp_id, g.curso, g.conclusao_data, g.tipo, int(g.percentual)),
                 )
-            # outro cargo (opcional)
             oc = payload.efetivo.outro_cargo if payload.efetivo else None
             if oc:
                 cur.execute(
@@ -671,7 +975,6 @@ def create_user(payload: UserCreateIn, request: Request):
                     ),
                 )
 
-        # especialização: COMISSIONADO
         elif payload.tipo_vinculo == "comissionado" and payload.comissionado:
             c = payload.comissionado
             cur.execute(
@@ -696,7 +999,6 @@ def create_user(payload: UserCreateIn, request: Request):
                 ),
             )
 
-        # especialização: ESTAGIÁRIO
         elif payload.tipo_vinculo == "estagiario" and payload.estagiario:
             s = payload.estagiario
             cur.execute(
@@ -722,7 +1024,6 @@ def create_user(payload: UserCreateIn, request: Request):
                 ),
             )
 
-        # auditoria + submission (guardar o code efetivamente usado)
         actor = request.session.get("user") or {}
         add_audit("usuarios", "user.create", actor, {"user_id": user_id, "org_unit": desired_code})
         insert_submission(
@@ -748,28 +1049,54 @@ def create_user(payload: UserCreateIn, request: Request):
             })
         )
 
-    # devolve PIN (RH comunica ao usuário)
     return {"ok": True, "id": user_id, "temporary_pin": temp_pin}
-
 
 @router.put("/users/{user_id}")
 def update_user(user_id: str, payload: UserUpdateIn, request: Request):
     """
-    Atualiza completamente os dados do usuário, emprego atual e especializações.
-    Estratégia para listas: 'replace' (apaga e recria quando fornecidas).
-    Histórico: diff profundo 'antes vs depois', com paths detalhados.
+    Atualiza dados do usuário, emprego atual e especializações.
+
+    Estratégia
+    ----------
+    - Substituição ("replace") das listas quando fornecidas no payload.
+    - Geração de diff profundo entre snapshots "antes" e "depois".
+
+    Parâmetros
+    ----------
+    user_id : str
+        Identificador do usuário a ser atualizado.
+    payload : UserUpdateIn
+        Campos parciais para atualização do usuário e vínculo.
+    request : Request
+        Usada para capturar ator (sessão) para auditoria.
+
+    Retorna
+    -------
+    dict
+        Objeto com `ok`, `id` e quantidade de `changes`.
+
+    Exceções
+    --------
+    HTTPException
+        404 quando o usuário não existe; 422/409 para conflitos/validações.
+
+    Efeitos colaterais
+    ------------------
+    - Atualizações em múltiplas tabelas (`users`, `employment`, especializações, educação).
+    - Auditoria via `add_audit` e registro em `insert_submission`.
+
+    Observações de segurança/RBAC
+    -----------------------------
+    - Rota protegida pelo RBAC do router (papéis `rh` ou `admin`).
     """
-    # snapshot "antes" para diff completo
     before = _snapshot_full(user_id)
     payload_dict = payload.model_dump(exclude_unset=True)
 
     with _pg() as conn, conn.cursor() as cur:
-        # existência
         cur.execute("SELECT id::text FROM users WHERE id::text = %s", (user_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="user not found")
 
-        # validações básicas
         cpf_digits = None
         if "cpf" in payload_dict:
             cpf_digits = norm_cpf(payload.cpf)
@@ -784,7 +1111,6 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
         if payload.status == "inativo" and payload.motivo_inatividade is None:
             raise HTTPException(status_code=422, detail="motivo_inatividade é obrigatório quando status = inativo")
 
-        # update users (parciais)
         sets: List[str] = []
         params: List[Any] = []
 
@@ -792,26 +1118,35 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
             sets.append(f"{col} = %s")
             params.append(val)
 
-        if "nome_completo" in payload_dict: add_set("name", payload.nome_completo)
-        if cpf_digits is not None: add_set("cpf", cpf_digits)
-        if "rg" in payload_dict: add_set("rg", payload.rg)
-        if "id_funcional" in payload_dict: add_set("id_funcional", payload.id_funcional)
-        if "data_nascimento" in payload_dict: add_set("data_nascimento", payload.data_nascimento)
-        if "email_principal" in payload_dict: add_set("email", payload.email_principal)
-        if "email_institucional" in payload_dict: add_set("email_institucional", payload.email_institucional)
-        if "telefone_principal" in payload_dict: add_set("telefone_principal", payload.telefone_principal)
-        if "ramal" in payload_dict: add_set("ramal", payload.ramal)
-        if "endereco" in payload_dict: add_set("endereco", payload.endereco)
-        if "dependentes_qtde" in payload_dict: add_set("dependentes_qtde", payload.dependentes_qtde)
+        if "nome_completo" in payload_dict:
+            add_set("name", payload.nome_completo)
+        if cpf_digits is not None:
+            add_set("cpf", cpf_digits)
+        if "rg" in payload_dict:
+            add_set("rg", payload.rg)
+        if "id_funcional" in payload_dict:
+            add_set("id_funcional", payload.id_funcional)
+        if "data_nascimento" in payload_dict:
+            add_set("data_nascimento", payload.data_nascimento)
+        if "email_principal" in payload_dict:
+            add_set("email", payload.email_principal)
+        if "email_institucional" in payload_dict:
+            add_set("email_institucional", payload.email_institucional)
+        if "telefone_principal" in payload_dict:
+            add_set("telefone_principal", payload.telefone_principal)
+        if "ramal" in payload_dict:
+            add_set("ramal", payload.ramal)
+        if "endereco" in payload_dict:
+            add_set("endereco", payload.endereco)
+        if "dependentes_qtde" in payload_dict:
+            add_set("dependentes_qtde", payload.dependentes_qtde)
         if payload.formacao is not None and payload.formacao.nivel_medio is not None:
             add_set("formacao_nivel_medio", bool(payload.formacao.nivel_medio))
-        # refletir status do employment no users.status se vier
         if "status" in payload_dict and payload.status is not None:
             add_set("status", map_user_status_from_employment(payload.status))
         if sets:
             cur.execute("UPDATE users SET " + ", ".join(sets) + " WHERE id::text = %s", (*params, user_id))
 
-        # emprego atual
         cur.execute(
             "SELECT id::text, type FROM employment WHERE user_id = %s AND end_date IS NULL ORDER BY start_date DESC LIMIT 1",
             (user_id,),
@@ -820,7 +1155,6 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
         employment_id = (erow or {}).get("id")
         current_type = (erow or {}).get("type")
 
-        # criar emprego se não existir e houver dados do emprego
         if not employment_id and any(k in payload_dict for k in ("tipo_vinculo", "status", "org_unit_code", "motivo_inatividade")):
             desired_code = payload.org_unit_code or DEFAULT_ORG_UNIT_CODE
             cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (desired_code,))
@@ -839,25 +1173,28 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
             current_type = payload.tipo_vinculo or "efetivo"
 
         if employment_id:
-            # atualizar campos do emprego
             esets: List[str] = []
             eparams: List[Any] = []
             if "tipo_vinculo" in payload_dict:
-                esets.append("type = %s"); eparams.append(payload.tipo_vinculo); current_type = payload.tipo_vinculo
+                esets.append("type = %s")
+                eparams.append(payload.tipo_vinculo)
+                current_type = payload.tipo_vinculo
             if "status" in payload_dict:
-                esets.append("status = %s"); eparams.append(payload.status)
+                esets.append("status = %s")
+                eparams.append(payload.status)
             if "motivo_inatividade" in payload_dict:
-                esets.append("inactivity_reason = %s"); eparams.append(payload.motivo_inatividade)
+                esets.append("inactivity_reason = %s")
+                eparams.append(payload.motivo_inatividade)
             if "org_unit_code" in payload_dict:
                 cur.execute("SELECT id FROM org_units WHERE code = %s AND active = TRUE", (payload.org_unit_code,))
                 ou = cur.fetchone()
                 if not ou:
                     raise HTTPException(status_code=400, detail="org_unit_code inválido ou inativo")
-                esets.append("org_unit_id = %s"); eparams.append(ou["id"])
+                esets.append("org_unit_id = %s")
+                eparams.append(ou["id"])
             if esets:
                 cur.execute("UPDATE employment SET " + ", ".join(esets) + " WHERE id::text = %s", (*eparams, employment_id))
 
-            # substituir especializações conforme tipo atual (apenas se payload da especialização foi enviado)
             if current_type == "efetivo" and "efetivo" in payload_dict:
                 cur.execute("DELETE FROM employment_efetivo WHERE employment_id = %s", (employment_id,))
                 cur.execute("DELETE FROM efetivo_capacitacoes WHERE employment_id = %s", (employment_id,))
@@ -952,7 +1289,6 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                     ),
                 )
 
-        # formação listas (replace quando fornecidas)
         if "formacao" in payload_dict and payload.formacao is not None:
             cur.execute("DELETE FROM user_education_graduacao WHERE user_id = %s", (user_id,))
             cur.execute("DELETE FROM user_education_posgrad WHERE user_id = %s", (user_id,))
@@ -967,11 +1303,9 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
                     (user_id, p.curso, p.tipo, p.instituicao, p.conclusao_data),
                 )
 
-    # === Snapshots antes/depois e diff profundo (fora do bloco para garantir commit visível)
     after = _snapshot_full(user_id)
     changes = _compute_changes(before, after)
 
-    # auditoria + histórico
     actor = request.session.get("user") or {}
     add_audit("usuarios", "user.update", actor, {"user_id": user_id, "changes_count": len(changes)})
     insert_submission(_json_safe({
@@ -992,9 +1326,22 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
 
     return {"ok": True, "id": user_id, "changes": len(changes)}
 
-# ===== Normalização, snapshots e diff profundo =======================
 
 def _normalize_bool(v: Any) -> Any:
+    """
+    Normaliza valores booleanos comuns provenientes do banco/strings.
+
+    Parâmetros
+    ----------
+    v : Any
+        Valor a normalizar.
+
+    Retorna
+    -------
+    bool | None | Any
+        `True`/`False` quando reconhecido; `None` para vazio; caso contrário,
+        retorna o valor original.
+    """
     if isinstance(v, bool):
         return v
     if v in (None, ""):
@@ -1006,7 +1353,21 @@ def _normalize_bool(v: Any) -> Any:
         return False
     return v
 
+
 def _norm_date(v: Any) -> Any:
+    """
+    Normaliza datas para ISO-8601 (YYYY-MM-DD).
+
+    Parâmetros
+    ----------
+    v : Any
+        Valor possivelmente `datetime`, `date` ou string.
+
+    Retorna
+    -------
+    str | Any
+        Data ISO quando reconhecida; senão, o valor original.
+    """
     if v in (None, ""):
         return None
     if isinstance(v, datetime):
@@ -1015,12 +1376,24 @@ def _norm_date(v: Any) -> Any:
         return v.isoformat()
     if isinstance(v, str):
         s = v.strip()
-        # aceita "YYYY-MM-DD" ou "YYYY-MM-DDTHH:MM:SS..."
         return s[:10] if len(s) >= 10 else s
     return v
 
+
 def _norm_value(v: Any) -> Any:
-    """Normaliza valores para comparação determinística."""
+    """
+    Normaliza valores para comparação determinística no diff.
+
+    Parâmetros
+    ----------
+    v : Any
+        Valor a normalizar.
+
+    Retorna
+    -------
+    Any
+        Valor normalizado (datas, booleanos, coleções).
+    """
     if isinstance(v, (datetime, date, time)):
         return _norm_date(v)
     if isinstance(v, bool):
@@ -1035,13 +1408,36 @@ def _norm_value(v: Any) -> Any:
         return float(v)
     if isinstance(v, UUID):
         return str(v)
-    # fallback
     return v
 
+
 def _snapshot_full(user_id: str) -> Dict[str, Any]:
-    """Snapshot completo do usuário para diff (núcleo, emprego, especializações e listas de educação)."""
+    """
+    Gera snapshot completo do usuário para diff.
+
+    Parâmetros
+    ----------
+    user_id : str
+        Identificador do usuário.
+
+    Retorna
+    -------
+    dict
+        Estrutura contendo:
+        - `user`: dados nucleares
+        - `employment`: vínculo atual com especializações
+        - `educacao`: listas de graduações e pós-graduações
+
+    Exceções
+    --------
+    HTTPException
+        404 quando o usuário não existe.
+
+    Efeitos colaterais
+    ------------------
+    Consultas a múltiplas tabelas do banco via `_pg()`.
+    """
     with _pg() as conn, conn.cursor() as cur:
-        # Núcleo
         cur.execute(
             """
             SELECT
@@ -1071,7 +1467,6 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
         user["data_nascimento"] = _norm_date(user.get("data_nascimento"))
         user["formacao_nivel_medio"] = _normalize_bool(user.get("formacao_nivel_medio"))
 
-        # Emprego atual
         cur.execute(
             """
             SELECT
@@ -1100,7 +1495,6 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
             e["org_unit"] = {"code": e.pop("org_code", None), "name": e.pop("org_name", None)} if e.get("org_code") else None
             employment = e
 
-            # Especializações
             if e["tipo_vinculo"] == "efetivo":
                 cur.execute(
                     """
@@ -1118,13 +1512,10 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
                 )
                 eff = cur.fetchone()
                 efetivo = dict(eff) if eff else {}
-                # normalizações de datas
                 for k in ("decreto_nomeacao_data", "posse_data", "exercicio_data",
                           "estabilidade_data", "estabilidade_publicacao_data"):
                     if k in efetivo:
                         efetivo[k] = _norm_date(efetivo.get(k))
-
-                # Listas
                 cur.execute(
                     """
                     SELECT protocolo, curso, conclusao_data, decreto_numero, resolucao_conjunta, classe
@@ -1214,9 +1605,7 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
                 est["vale_transporte"] = _normalize_bool(est.get("vale_transporte"))
                 employment["estagiario"] = est
 
-        # Formação
         with _pg() as c2, c2.cursor() as cur2:
-            # uso de segunda conexão para garantir consistência de ordering independente de curso principal
             cur2.execute(
                 "SELECT curso, instituicao, conclusao_data FROM user_education_graduacao WHERE user_id = %s ORDER BY id",
                 (user_id,),
@@ -1242,48 +1631,71 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
         },
     }
 
+
 def _path_join(base: str, part: str) -> str:
+    """
+    Junta partes de caminho para chaves aninhadas no diff.
+
+    Parâmetros
+    ----------
+    base : str
+        Prefixo do caminho.
+    part : str
+        Segmento a anexar.
+
+    Retorna
+    -------
+    str
+        Caminho composto.
+    """
     return f"{base}.{part}" if base else part
 
+
 def _compute_changes(before: Dict[str, Any], after: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Diff profundo entre snapshots completos. Gera paths para dicts e listas (com índices)."""
+    """
+    Calcula diff profundo entre dois snapshots completos.
+
+    Parâmetros
+    ----------
+    before : dict
+        Snapshot anterior.
+    after : dict
+        Snapshot posterior.
+
+    Retorna
+    -------
+    list[dict]
+        Lista de mudanças com `path`, `before` e `after`.
+
+    Observações
+    -----------
+    - Trata dicts e listas (com índices).
+    - Normaliza datas e valores para comparação determinística.
+    """
     changes: List[Dict[str, Any]] = []
 
     def _diff(path: str, a: Any, b: Any):
         a = _norm_value(a)
         b = _norm_value(b)
-
-        # igualdade direta
         if a == b:
             return
-
-        # dict
         if isinstance(a, dict) and isinstance(b, dict):
             keys = set(a.keys()) | set(b.keys())
             for k in sorted(keys):
                 _diff(_path_join(path, k), a.get(k), b.get(k))
             return
-
-        # list
         if isinstance(a, list) and isinstance(b, list):
             la, lb = len(a), len(b)
-            # compara elementos comuns
             for i in range(min(la, lb)):
                 _diff(f"{path}[{i}]", a[i], b[i])
-            # removidos
             for i in range(min(la, lb), la):
                 changes.append({"path": f"{path}[{i}]", "before": a[i], "after": None})
-            # adicionados
             for i in range(min(la, lb), lb):
                 changes.append({"path": f"{path}[{i}]", "before": None, "after": b[i]})
             return
-
-        # casos simples (tipos diferentes ou valores diferentes)
         changes.append({"path": path, "before": a, "after": b})
 
     _diff("", before, after)
-
-    # opcional: remover paths raiz vazios ("")
     filtered = [c for c in changes if c.get("path") not in ("",)]
     return filtered
 
@@ -1291,28 +1703,40 @@ def _compute_changes(before: Dict[str, Any], after: Dict[str, Any]) -> List[Dict
 @router.get("/users/{user_id}/history")
 def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[str, Any]:
     """
-    Retorna histórico de eventos (criação/atualizações) do usuário,
-    baseado em submissions com kind="usuarios".
+    Retorna histórico de eventos relevantes do usuário (create/update).
 
-    - Busca em lotes para não ficar preso ao limite interno (ex.: 50) do list_submissions_admin.
-    - Aplica paginação (limit/offset) apenas após filtrar os eventos do usuário alvo.
+    Parâmetros
+    ----------
+    user_id : str
+        Identificador do usuário.
+    limit : int
+        Tamanho da janela de retorno (1..500).
+    offset : int
+        Deslocamento inicial.
+
+    Retorna
+    -------
+    dict
+        Lista paginada de eventos com `changes` quando houver.
+
+    Observações
+    -----------
+    - Busca eventos em lotes amplos via `list_submissions_admin(kind="usuarios")`.
+    - Filtra pelo `payload.user_id`.
+    - Ordena por timestamp ascendente.
     """
-    # Limites de resposta desta rota
     limit = clamp(limit, 1, 500)
     offset = max(0, offset)
 
-    # Parâmetros de coleta paginada (teto amplo e lote generoso)
-    HISTORY_MAX = 20000   # total máximo de eventos a vasculhar (somados)
-    BATCH_SIZE = 1000     # tamanho do lote por consulta
+    HISTORY_MAX = 20000
+    BATCH_SIZE = 1000
 
     items_all: List[Dict[str, Any]] = []
     fetched = 0
     ofs = 0
 
     while fetched < HISTORY_MAX:
-        # tamanho solicitado neste passo
         req = min(BATCH_SIZE, HISTORY_MAX - fetched)
-
         batch = list_submissions_admin(kind="usuarios", limit=req, offset=ofs)
         if not batch:
             break
@@ -1336,14 +1760,12 @@ def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[st
                     "nome": s.get("actor_nome"),
                     "email": s.get("actor_email"),
                 },
-                "changes": p.get("changes") or [],  # lista [{path,before,after}] em updates
+                "changes": p.get("changes") or [],
             })
 
-        # Se o lote veio menor que o requisitado, não há mais páginas
         if len(batch) < req:
             break
 
-    # Ordena (antigos primeiro) e aplica paginação final
     items_all.sort(key=lambda x: (x.get("at") or ""))
 
     window = items_all[offset: offset + limit]
@@ -1356,12 +1778,23 @@ def get_user_history(user_id: str, limit: int = 200, offset: int = 0) -> Dict[st
     }
 
 
-# ---------------------------------------------------------------------
-# Compat "automations" (submissions)
-# ---------------------------------------------------------------------
 @router.get("/submissions")
 def submissions(limit: int = 500, offset: int = 0) -> Dict[str, Any]:
-    # aumenta o teto para consultas administrativas
+    """
+    Lista submissions administrativas da automação "usuarios".
+
+    Parâmetros
+    ----------
+    limit : int
+        Número máximo de itens a retornar (clamp com teto configurado).
+    offset : int
+        Deslocamento inicial.
+
+    Retorna
+    -------
+    dict
+        Itens, semântica compatível com outras automações.
+    """
     limit = clamp(limit, 1, max(500, USUARIOS_HISTORY_BATCH))
     offset = max(0, offset)
     return {"items": list_submissions_admin(kind="usuarios", limit=limit, offset=offset)}
@@ -1369,6 +1802,24 @@ def submissions(limit: int = 500, offset: int = 0) -> Dict[str, Any]:
 
 @router.get("/submissions/{submission_id}")
 def get_sub(submission_id: str) -> Dict[str, Any]:
+    """
+    Obtém uma submission específica da automação "usuarios".
+
+    Parâmetros
+    ----------
+    submission_id : str
+        Identificador da submissão.
+
+    Retorna
+    -------
+    dict
+        A submissão encontrada.
+
+    Exceções
+    --------
+    HTTPException
+        404 quando não encontrada ou de outro tipo de automação.
+    """
     sub = get_submission(submission_id)
     if not sub or sub.get("kind") != "usuarios":
         raise HTTPException(status_code=404, detail="submission not found")
@@ -1377,4 +1828,17 @@ def get_sub(submission_id: str) -> Dict[str, Any]:
 
 @router.post("/submissions/{_submission_id}/download")
 def download(_submission_id: str):
+    """
+    Download de artefatos não suportado nesta automação.
+
+    Parâmetros
+    ----------
+    _submission_id : str
+        Identificador (ignorado).
+
+    Exceções
+    --------
+    HTTPException
+        404 sempre, pois não há artefatos para baixar.
+    """
     raise HTTPException(status_code=404, detail="sem artefatos para download nesta automação")

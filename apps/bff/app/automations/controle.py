@@ -1,3 +1,46 @@
+# apps/bff/app/automations/controle.py
+"""
+Painel de Controle (somente leitura) — Portal AGEPAR
+
+Propósito
+---------
+Fornece uma UI simples e endpoints para consulta e exportação de:
+- Eventos de auditoria de automações (automation_audits).
+- Submissões realizadas (submissions).
+
+Segurança
+---------
+- Todos os endpoints são protegidos por RBAC e exigem **qualquer um** dos papéis:
+  `coordenador` **ou** `admin`.
+
+Compatibilidade
+---------------
+- Integra com a camada `app.db` e tolera variações de assinatura mais antigas
+  (ex.: `list_audits()` sem parâmetros), mantendo *fallbacks* quando necessário.
+
+Endpoints
+---------
+UI
+- GET /api/automations/controle/ui
+
+Metadados
+- GET /api/automations/controle/schema
+
+Auditoria
+- GET /api/automations/controle/actions           (listar ações distintas)
+- GET /api/automations/controle/kinds             (listar alvos/kinds distintos)
+- GET /api/automations/controle/audits            (lista paginada)
+- GET /api/automations/controle/audits.csv        (exportação CSV)
+
+Submissões
+- GET /api/automations/controle/submissions       (lista paginada)
+- GET /api/automations/controle/submissions/{id}  (detalhe)
+
+Não suportado (somente leitura)
+- POST /api/automations/controle/submit
+- POST /api/automations/controle/submissions/{id}/download
+"""
+
 from __future__ import annotations
 
 import csv
@@ -21,17 +64,50 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/automations/controle",
     tags=["automations", "controle"],
-    # exige qualquer um dos papéis: coordenador OU admin
     dependencies=[Depends(require_roles_any("coordenador", "admin"))],
 )
 
-# Templates (usa pasta local: apps/bff/app/automations/templates)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-# --------------------------
-# Pydantic Models (v2)
-# --------------------------
+
 class AuditOut(BaseModel):
+    """
+    Modelo de saída para eventos de auditoria exibidos na UI.
+
+    Campos
+    ------
+    id : Optional[int]
+    ts : Optional[datetime]
+        Timestamp do evento (campo `at` ou `ts` da origem).
+    user_id : Optional[str]
+    username : Optional[str]
+        Nome/identificador amigável do ator.
+    action : Optional[str]
+        Ação realizada (ex.: completed, running, submitted, failed, download).
+    target_kind : Optional[str]
+        Automação de origem (kind) ou alvo do evento.
+    target_id : Optional[str]
+        Identificador do alvo (ex.: submission id).
+    ip : Optional[str]
+    user_agent : Optional[str]
+    extra : Optional[Dict[str, Any]]
+        Metadados variados (normalizados como dict).
+
+    Campos derivados para a UI
+    --------------------------
+    protocolo : Optional[str]
+        Número padrão do processo, quando detectável.
+    alvo : Optional[str]
+        Kind normalizado (ex.: dfd, ferias).
+    filename : Optional[str]
+        Nome de arquivo inferido quando aplicável.
+    status : Optional[str]
+        Status normalizado para apresentação.
+    download_url : Optional[str]
+        URL de download na automação de origem (quando inferível).
+    submission_url : Optional[str]
+        URL de detalhes da submissão na automação de origem (quando inferível).
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     id: Optional[int] = None
     ts: Optional[datetime] = Field(default=None, description="Timestamp do evento")
@@ -43,9 +119,8 @@ class AuditOut(BaseModel):
     ip: Optional[str] = None
     user_agent: Optional[str] = None
     extra: Optional[Dict[str, Any]] = None
-    # ---- Campos para a UI enxuta ----
-    protocolo: Optional[str] = None   # número padrão do processo
-    alvo: Optional[str] = None        # automação/processo (ex.: dfd, ferias, ...)
+    protocolo: Optional[str] = None
+    alvo: Optional[str] = None
     filename: Optional[str] = None
     status: Optional[str] = None
     download_url: Optional[str] = None
@@ -53,6 +128,13 @@ class AuditOut(BaseModel):
 
 
 class SubmissionOut(BaseModel):
+    """
+    Modelo de saída para submissões listadas/visualizadas no painel.
+
+    Campos
+    ------
+    id, kind, status, user_id, username, created_at, updated_at, payload, result, error
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     id: Optional[str] = None
     kind: Optional[str] = None
@@ -63,34 +145,41 @@ class SubmissionOut(BaseModel):
     updated_at: Optional[datetime] = None
     payload: Optional[Dict[str, Any]] = None
     result: Optional[Dict[str, Any]] = None
-    error: Optional[Any] = None  # TEXT no banco; pode ser string ou json
+    error: Optional[Any] = None
 
 
 T = TypeVar("T")
 
 
 class Page(BaseModel, Generic[T]):
+    """
+    Envelope de paginação genérico.
+
+    Campos
+    ------
+    count : int
+        Total de itens após filtro/paginação no servidor.
+    items : List[T]
+        Página de resultados.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     count: int
     items: List[T]
 
 
-# --------------------------
-# UI
-# --------------------------
 @router.get("/ui", response_class=HTMLResponse)
 def get_ui(request: Request):
     """
-    UI HTML servida por template (iframe).
+    Renderiza a UI HTML principal do painel (carregada via iframe pelo host).
     """
     return templates.TemplateResponse("controle/ui.html", {"request": request})
 
 
-# --------------------------
-# Schema (informativo)
-# --------------------------
 @router.get("/schema")
 def get_schema():
+    """
+    Retorna metadados informativos sobre filtros/limites aceitos pelos endpoints.
+    """
     return {
         "filters": {
             "kind": {"type": "string", "description": "Opcional: filtra por automação de origem (alvo)"},
@@ -105,21 +194,25 @@ def get_schema():
     }
 
 
-# --------------------------
-# Helpers
-# --------------------------
 def _filter_dates(
     items: List[Dict[str, Any]],
     since: Optional[datetime],
     until: Optional[datetime],
     key_candidates=("ts", "created_at", "updated_at"),
 ):
+    """
+    Filtra uma lista de registros por intervalo temporal, tentando múltiplas chaves de data.
+
+    Regras
+    ------
+    - Aceita valores `datetime` ou strings ISO (com suporte a 'Z').
+    - Inclui apenas itens com datas entre `since` e `until` (se informados).
+    """
     def pick_dt(row):
         for k in key_candidates:
             v = row.get(k)
             if isinstance(v, str):
                 try:
-                    # aceita ISO com 'Z'
                     return datetime.fromisoformat(v.replace("Z", "+00:00"))
                 except Exception:
                     continue
@@ -129,7 +222,7 @@ def _filter_dates(
 
     out = []
     for it in items:
-        dt = pick_dt(it)  # pode ser None
+        dt = pick_dt(it)
         if since and dt and dt < since:
             continue
         if until and dt and dt > until:
@@ -139,6 +232,10 @@ def _filter_dates(
 
 
 def _to_obj(x: Any) -> Dict[str, Any]:
+    """
+    Converte `x` em `dict`, aceitando `bytes`, `str` (JSON) ou já `dict`.
+    Retorna `{}` quando não for possível converter.
+    """
     if x is None:
         return {}
     if isinstance(x, dict):
@@ -157,14 +254,21 @@ def _to_obj(x: Any) -> Dict[str, Any]:
 
 
 def _digits(s: Optional[str]) -> str:
+    """
+    Mantém apenas dígitos de uma string (útil para busca por CPF).
+    """
     return "".join(ch for ch in str(s or "") if ch.isdigit())
 
 
 def _status_label(action: Optional[str], status: Optional[str]) -> str:
     """
-    Normaliza o status exibido na UI.
-    - Prioriza 'action' do audit quando existir (completed, running, submitted, failed, download)
-    - Mapeia status da submission para os rótulos antigos.
+    Normaliza o status exibido na UI a partir de `action` (preferencial) e `status`.
+
+    Mapeamentos
+    -----------
+    - Ações conhecidas: {completed,running,submitted,failed,download}
+    - Status → rótulos: done/ok/success→completed; processing/in_progress→running;
+      queued/pending→submitted; error/failed/timeout→failed.
     """
     def norm(x: Optional[str]) -> str:
         return str(x or "").strip().lower()
@@ -195,6 +299,9 @@ def _status_label(action: Optional[str], status: Optional[str]) -> str:
 
 
 def _sid_from_audit_row(row: Dict[str, Any]) -> Optional[str]:
+    """
+    Tenta extrair o submission id (sid) de diferentes campos usuais do audit.
+    """
     extra = row.get("extra") or {}
     return (
         (extra.get("sid") if isinstance(extra, dict) else None)
@@ -207,18 +314,17 @@ def _sid_from_audit_row(row: Dict[str, Any]) -> Optional[str]:
 
 def _guess_filename(payload: Dict[str, Any], result: Dict[str, Any], extra: Dict[str, Any]) -> str:
     """
-    Tenta descobrir um nome de arquivo de forma genérica.
-    Procura por chaves filename*, ou strings terminando em extensões comuns.
+    Heurística para descobrir um nome de arquivo:
+    - Procura chaves `filename*`.
+    - Procura strings com extensões comuns (.pdf, .docx, .xlsx, .zip).
     """
     def first_filename(d: Dict[str, Any]) -> Optional[str]:
         if not isinstance(d, dict):
             return None
-        # chaves filename* mais comuns
         for k, v in d.items():
             ks = str(k).lower()
             if ks.startswith("filename") and isinstance(v, str) and v.strip():
                 return v.strip()
-        # scan simples por extensões
         for _, v in d.items():
             if isinstance(v, str) and any(v.lower().endswith(ext) for ext in [".pdf", ".docx", ".xlsx", ".zip"]):
                 return v.strip()
@@ -229,8 +335,7 @@ def _guess_filename(payload: Dict[str, Any], result: Dict[str, Any], extra: Dict
 
 def _guess_protocolo(payload: Dict[str, Any], result: Dict[str, Any], extra: Dict[str, Any]) -> str:
     """
-    Descobre o número padrão de processo (protocolo) salvo nas telas.
-    Heurística: checa chaves usuais em result/payload/extra.
+    Heurística para descobrir o número de protocolo/processo a partir de chaves comuns.
     """
     def first_proto(d: Dict[str, Any]) -> Optional[str]:
         if not isinstance(d, dict):
@@ -244,7 +349,6 @@ def _guess_protocolo(payload: Dict[str, Any], result: Dict[str, Any], extra: Dic
             v = d.get(k)
             if isinstance(v, str) and v.strip():
                 return v.strip()
-        # às vezes vem dentro de extra.target_id mas é um protocolo
         v = d.get("target_id")
         if isinstance(v, str) and v.strip():
             return v.strip()
@@ -254,6 +358,9 @@ def _guess_protocolo(payload: Dict[str, Any], result: Dict[str, Any], extra: Dic
 
 
 def _normalize_kind(kind: Optional[str]) -> Optional[str]:
+    """
+    Normaliza um `kind` removendo o prefixo `automations/` quando presente.
+    """
     if not kind:
         return None
     k = str(kind).strip().lower()
@@ -264,11 +371,9 @@ def _normalize_kind(kind: Optional[str]) -> Optional[str]:
 
 def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
     """
-    Enriquecer in-place de forma genérica:
-    - alvo: kind normalizado (dfd, ferias, ...)
-    - protocolo: número de processo armazenado
-    - filename/status
-    - URLs de ação (download/submission) quando (kind,sid) forem conhecidos
+    Enriquecimento *in-place* dos registros de auditoria com dados da submissão:
+    - `alvo` (kind normalizado), `protocolo`, `filename`, `status`
+    - `download_url` e `submission_url` quando (alvo, sid) puderem ser inferidos.
     """
     for it in rows:
         extra = it.get("extra") or {}
@@ -284,24 +389,18 @@ def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
         result = _to_obj(sub.get("result")) if sub else {}
         extra_obj = extra if isinstance(extra, dict) else {}
 
-        # alvo (kind)
         kind = (
             it.get("target_kind")
             or extra_obj.get("kind")
             or (sub.get("kind") if sub else None)
         )
         alvo = _normalize_kind(kind)
-
-        # protocolo
         protocolo = _guess_protocolo(payload, result, extra_obj)
-
-        # filename e status
         filename = it.get("filename") or extra_obj.get("filename") or _guess_filename(payload, result, extra_obj)
         raw_action = it.get("action")
         raw_status = (sub.get("status") if sub else None) or it.get("status")
         status = _status_label(raw_action, raw_status)
 
-        # URLs de apoio
         download_url = None
         submission_url = None
         if alvo and sid:
@@ -317,22 +416,20 @@ def _enrich_with_submission(rows: List[Dict[str, Any]]) -> None:
         it["extra"] = extra_obj
 
 
-# --------------------------
-# Endpoints auxiliares (ações distintas)
-# --------------------------
 @router.get("/actions")
 def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
     """
-    Retorna a lista de ações distintas registradas em automation_audits.
-    Opcionalmente filtra por kind.
+    Lista ações distintas registradas em auditoria, com filtro opcional por `kind`.
+
+    Observação
+    ----------
+    Aceita `kind` com ou sem prefixo `automations/`; a comparação é feita após normalização.
     """
     try:
         kind_norm = _normalize_kind(kind)
         try:
-            # Busca ampla (limit maior para cobrir variedade); filtro por kind será aplicado abaixo com normalização.
             rows = db.list_audits(limit=2000, offset=0)
         except TypeError:
-            # assinatura antiga (sem params) — faz fallback
             rows = db.list_audits()
 
         seen = set()
@@ -341,7 +438,6 @@ def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
             if not a:
                 continue
             if kind_norm:
-                # normaliza origem do kind do registro: r.kind, r.target_kind, meta.kind
                 meta = r.get("meta") or r.get("extra") or {}
                 rk_raw = r.get("kind") or r.get("target_kind") or (meta.get("kind") if isinstance(meta, dict) else None)
                 rk = _normalize_kind(rk_raw)
@@ -358,7 +454,7 @@ def list_actions(kind: Optional[str] = Query(default=None)) -> Dict[str, Any]:
 @router.get("/kinds")
 def list_kinds() -> Dict[str, Any]:
     """
-    Retorna a lista de kinds/alvos distintos (normalizados) presentes nos audits.
+    Lista os kinds/alvos distintos (normalizados) presentes nos registros de auditoria.
     """
     try:
         try:
@@ -378,9 +474,6 @@ def list_kinds() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"erro ao listar kinds: {e}")
 
 
-# --------------------------
-# Endpoints de auditoria
-# --------------------------
 @router.get("/audits", response_model=Page[AuditOut])
 def list_audits_api(
     kind: Optional[str] = Query(default=None),
@@ -392,24 +485,25 @@ def list_audits_api(
     offset: int = Query(default=0, ge=0),
 ):
     """
-    Lista eventos de auditoria com filtros simples e paginação.
+    Lista eventos de auditoria com filtros e paginação.
+
+    Filtros
+    -------
+    - `kind` (normalizado), `username` (substring ou CPF apenas dígitos), `action` (substring),
+      intervalo temporal (`since`, `until`).
     """
     try:
-        # Carrega eventos crus do DB (automation_audits)
         try:
             raw = db.list_audits(kind=kind, limit=limit + offset) if kind is not None else db.list_audits(limit=limit + offset)
         except TypeError:
-            # assinatura sem limit/kind
             raw = db.list_audits()
 
-        # Normaliza para o contrato AuditOut / UI
         items: List[Dict[str, Any]] = []
         for r in raw:
             items.append({
                 "id": r.get("id"),
                 "ts": r.get("at") or r.get("ts"),
                 "username": r.get("actor_nome") or r.get("actor_cpf") or r.get("actor_email") or r.get("username"),
-                # ↓↓↓ PRESERVAR CAMPOS ORIGINAIS PARA FILTRO
                 "actor_nome": r.get("actor_nome"),
                 "actor_cpf": r.get("actor_cpf"),
                 "actor_email": r.get("actor_email"),
@@ -421,7 +515,6 @@ def list_audits_api(
                 "extra": r.get("meta") or r.get("extra") or {},
             })
 
-        # Filtros adicionais (username/action) + datas
         def match(it: Dict[str, Any]) -> bool:
             if username:
                 term = (username or "").strip().lower()
@@ -434,7 +527,6 @@ def list_audits_api(
                 ]).lower()
 
                 if term_digits:
-                    # tenta bater por CPF (apenas dígitos)
                     cpf_digits = _digits(it.get("actor_cpf"))
                     if term_digits not in cpf_digits and term not in hay:
                         return False
@@ -458,10 +550,7 @@ def list_audits_api(
         filtered = [it for it in items if match(it)]
         filtered = _filter_dates(filtered, since, until)
 
-        # paginação antes do enriquecimento para evitar N consultas desnecessárias
         sliced = filtered[offset: offset + limit]
-
-        # Enriquecer com dados da submission (protocolo/alvo/filename/status/URLs)
         _enrich_with_submission(sliced)
 
         return {"count": len(filtered), "items": sliced}
@@ -483,7 +572,7 @@ def list_audits_csv(
     offset: int = Query(default=0, ge=0),
 ):
     """
-    Exporta os eventos de auditoria em CSV respeitando os filtros.
+    Exporta eventos de auditoria em CSV respeitando os mesmos filtros do endpoint JSON.
     """
     page = list_audits_api(
         kind=kind,
@@ -499,7 +588,6 @@ def list_audits_csv(
     writer.writerow(
         ["id", "ts", "username", "action", "target_kind", "target_id", "ip", "user_agent", "extra"]
     )
-    # page aqui é um dict {"count": int, "items": [...]}
     for r in page["items"]:
         writer.writerow(
             [
@@ -521,9 +609,6 @@ def list_audits_csv(
     )
 
 
-# --------------------------
-# Endpoints de submissões (consulta)
-# --------------------------
 @router.get("/submissions", response_model=Page[SubmissionOut])
 def list_submissions_api(
     kind: Optional[str] = Query(default=None),
@@ -535,22 +620,19 @@ def list_submissions_api(
     offset: int = Query(default=0, ge=0),
 ):
     """
-    Lista submissões (genérico) com filtros.
+    Lista submissões com filtros por `kind`, `username`, `status` e intervalo temporal.
     """
     try:
-        # Usa o método admin (não exige actor_*), aplicando filtros server-side
         try:
             items = db.list_submissions_admin(
                 kind=kind, username=username, status=status, limit=limit + offset, offset=0
             )
         except AttributeError:
-            # Se a função ainda não existir, sinaliza claramente
             raise HTTPException(
                 status_code=500,
                 detail="list_submissions_admin() não disponível na camada de banco de dados; implemente no módulo de DB do BFF para habilitar o painel de controle.",
             )
 
-        # Normaliza campos para o contrato SubmissionOut/UI
         norm: List[Dict[str, Any]] = []
         for r in items:
             norm.append({
@@ -565,7 +647,6 @@ def list_submissions_api(
                 "result": r.get("result"),
                 "error": r.get("error"),
             })
-        # Filtro de datas + paginação
         norm = _filter_dates(norm, since, until, key_candidates=("created_at", "updated_at", "ts"))
         sliced = norm[offset: offset + limit]
         return {"count": len(norm), "items": sliced}
@@ -579,13 +660,12 @@ def list_submissions_api(
 @router.get("/submissions/{sid}", response_model=SubmissionOut)
 def get_submission_api(sid: str):
     """
-    Busca uma submissão específica.
+    Recupera os detalhes de uma submissão específica pelo seu identificador.
     """
     try:
         sub = db.get_submission(sid)
         if not sub:
             raise HTTPException(status_code=404, detail=f"submission {sid} não encontrada")
-        # Normaliza retorno pontual
         return {
             "id": sub.get("id"),
             "kind": sub.get("kind"),
@@ -605,11 +685,11 @@ def get_submission_api(sid: str):
         raise HTTPException(status_code=500, detail=f"erro ao buscar submission: {e}")
 
 
-# --------------------------
-# Endpoints não suportados (somente leitura)
-# --------------------------
 @router.post("/submit")
 def submit_not_supported():
+    """
+    Endpoint sentinela: o painel é somente leitura.
+    """
     raise HTTPException(
         status_code=409,
         detail="controle é somente leitura; use a automação de origem para submeter.",
@@ -618,6 +698,9 @@ def submit_not_supported():
 
 @router.post("/submissions/{sid}/download")
 def download_not_supported(sid: str):
+    """
+    Endpoint sentinela: downloads devem ser feitos na automação de origem.
+    """
     raise HTTPException(
         status_code=409,
         detail=(

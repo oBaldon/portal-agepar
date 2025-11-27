@@ -1,13 +1,28 @@
 // src/types.ts
 
-/* =============================================================================
-   Tipos centrais do Portal (Catálogo, Blocos, Categorias, Usuário)
-   =============================================================================
-   - Retrocompatível: se "categories" não vier no catálogo, tudo segue funcionando.
-   - As categorias servem para organizar a navbar e os cards da Home por grupos.
-   - "categoryId" no Block referencia Category.id (ex.: "compras").
-   - Autenticação: mock é legado; manter apenas para ambientes com AUTH_MODE=mock.
-   ============================================================================= */
+/**
+ * Tipos centrais do Portal (Catálogo, Blocos, Categorias, Usuário).
+ *
+ * Propósito
+ * ---------
+ * Padronizar as estruturas compartilhadas entre o Host (frontend) e o BFF,
+ * mantendo retrocompatibilidade quando possível (ex.: `categories` opcional).
+ *
+ * Segurança
+ * ---------
+ * Somente declarações de tipos e helpers puros; não há efeitos colaterais
+ * nem manipulação de dados sensíveis.
+ *
+ * Referências
+ * -----------
+ * - Design de catálogo do Host (blocos/categorias e RBAC simples).
+ * - Integração com BFF: campos esperados em `/api/automations` e `/catalog/*`.
+ *
+ * Observações
+ * -----------
+ * A lógica foi preservada integralmente; foram removidos comentários dispersos
+ * e adicionadas docstrings JSDoc sem alterar comportamento.
+ */
 
 export type AuthMode = "local" | "oidc" | "mock";
 
@@ -17,7 +32,7 @@ export type NavigationLink = {
   label: string;
   /** Caminho SPA (ex.: "/form2json"). */
   path: string;
-  /** Nome de ícone (ex.: "Home", "FileJson") – opcional. */
+  /** Nome de ícone (ex.: "Home", "FileJson"). */
   icon?: string;
 };
 
@@ -26,73 +41,70 @@ export type BlockRoute =
   | { path: string; kind: "iframe" }
   | { path: string; kind: "react" };
 
-/** UI do bloco: se "iframe", embutimos a URL; se "react", renderizamos componente local. */
+/** UI do bloco: iframe externo ou componente React hospedado. */
 export type BlockUI =
   | { type: "iframe"; url: string }
   | { type: "react"; component?: string };
 
-/** Categoria para agrupar blocos (aparece na navbar e em /categoria/:id). */
+/** Categoria para agrupar blocos (navbar e /categoria/:id). */
 export type Category = {
-  /** Identificador estável (slug). ex.: "compras", "fiscalizacao", "lab". */
+  /** Identificador estável (slug), ex.: "compras". */
   id: string;
-  /** Rótulo exibido para o usuário. ex.: "Compras". */
+  /** Rótulo exibido, ex.: "Compras". */
   label: string;
-  /** Nome de ícone (opcional). ex.: "ShoppingCart". */
+  /** Nome de ícone (opcional), ex.: "ShoppingCart". */
   icon?: string;
-  /** Ordenação da categoria (menor = aparece primeiro). */
+  /** Ordenação (menor = primeiro). */
   order?: number;
-  /** Esconde totalmente a categoria da navbar/menu. */
+  /** Esconde a categoria na navegação. */
   hidden?: boolean;
-  /** RBAC ANY-of para a categoria inteira (opcional, além do RBAC por bloco). */
+  /** RBAC ANY-of para a categoria (além do RBAC por bloco). */
   requiredRoles?: string[];
-  
 };
 
 /** Metadados e definição de um bloco/automação. */
 export type Block = {
-  /** Nome técnico único. ex.: "form2json". */
+  /** Nome técnico único, ex.: "form2json". */
   name: string;
-  /** Nome amigável. ex.: "Formulário para JSON". */
-  displayName?: string; // opcional p/ retrocompat
-  /** Versão do bloco (para exibição/auditoria). */
+  /** Nome amigável (retrocompat). */
+  displayName?: string;
+  /** Versão do bloco. */
   version: string;
 
-  /** Como o bloco será exibido. */
+  /** Modo de exibição. */
   ui: BlockUI;
-  /** Links gerados pelo bloco (usados para roteamento SPA). */
-  navigation?: NavigationLink[]; // opcional p/ retrocompat
-  /** Rotas reais do bloco (precisam existir no Router). */
-  routes?: BlockRoute[]; // opcional p/ retrocompat
+  /** Links de navegação (retrocompat). */
+  navigation?: NavigationLink[];
+  /** Rotas reais do bloco (retrocompat). */
+  routes?: BlockRoute[];
 
-  // ---- Metadados opcionais (retrocompatíveis) ----
-  /** Categoria à qual o bloco pertence (Category.id). */
+  /** Categoria (Category.id). */
   categoryId?: string;
-  /** Rótulos livres para busca/filtragem. */
+  /** Rótulos livres. */
   tags?: string[];
-  /** Descrição curta (aparece no card da Home/Categoria). */
+  /** Descrição curta para cards. */
   description?: string;
-  /** Se true, esconder na lista/menus (mas rotas continuam válidas). */
+  /** Se true, esconde da lista/menus (rotas continuam válidas). */
   hidden?: boolean;
-  /** Ordenação dentro da categoria (menor = aparece primeiro). */
+  /** Ordenação dentro da categoria (menor = primeiro). */
   order?: number;
 
   /**
-   * RBAC simples: se definido, só exibir o bloco para usuários que tenham
-   * AO MENOS um dos roles listados (ex.: ["compras.editor"]).
-   * A checagem é responsabilidade da UI (helpers abaixo podem ajudar).
+   * RBAC ANY-of: se definido, o usuário precisa ter pelo menos um dos roles.
+   * A checagem é feita na UI.
    */
   requiredRoles?: string[];
-  /** Se true, apenas superusers visualizam (admin NÃO basta). */
+  /** Se true, apenas superusers visualizam (admin não basta). */
   superuserOnly?: boolean;
 };
 
 /** Catálogo entregue pelo BFF e consumido pelo host. */
 export type Catalog = {
-  /** ISO string de quando o catálogo foi gerado. */
-  generatedAt?: string; // opcional p/ retrocompat
+  /** ISO de geração do catálogo (retrocompat). */
+  generatedAt?: string;
   /** Metadados do host. */
   host: { version: string; minBlockEngine: string };
-  /** Categorias disponíveis (opcional para manter retrocompatibilidade). */
+  /** Categorias disponíveis (opcional para retrocompatibilidade). */
   categories?: Category[];
   /** Lista de blocos/automações registradas. */
   blocks: Block[];
@@ -105,11 +117,11 @@ export type User = {
   email: string | null;
   roles: string[];
   unidades: string[];
-  /** Mecanismo de auth atual. "mock" é legado e só deve aparecer em DEV. */
+  /** Mecanismo de auth atual ("mock" apenas em DEV). */
   auth_mode?: AuthMode;
   is_superuser?: boolean;
   /**
-   * Quando true, o servidor exige troca de senha antes de permitir navegação normal.
+   * Quando true, o servidor exige troca de senha antes de permitir navegação.
    * Retornado por /api/auth/login e /api/me.
    */
   must_change_password?: boolean;
@@ -119,15 +131,18 @@ export type User = {
    Helpers (agrupamento, ordenação e RBAC simples)
    ============================================================================= */
 
-/** Categoria padrão usada quando o bloco não define categoryId. */
+/** Categoria padrão usada quando o bloco não define `categoryId`. */
 export const DEFAULT_CATEGORY: Category = {
   id: "uncategorized",
   label: "Outros",
 };
 
 /**
- * Resolve a categoria de um bloco. Se categoryId não bater com nenhuma categoria
- * do catálogo, cai em DEFAULT_CATEGORY.
+ * Resolve a categoria de um bloco.
+ *
+ * @param block Bloco de origem.
+ * @param categories Lista de categorias conhecidas.
+ * @returns Categoria correspondente ou `DEFAULT_CATEGORY`.
  */
 export function resolveCategoryForBlock(
   block: Block,
@@ -141,25 +156,25 @@ export function resolveCategoryForBlock(
 /**
  * Agrupa blocos por categoria, ignorando os com `hidden === true`.
  *
- * Regras de ordenação:
- *  - Categorias: seguem a ordem de escrita em `catalog.categories`.
- *    * Categorias não listadas em `catalog.categories` aparecem no final,
- *      na ordem em que forem encontradas ao percorrer os blocos.
- *  - Blocos: preservam a ordem de escrita em `catalog.blocks` (sem sort),
- *    garantindo que o que está no JSON é o que aparece na UI.
+ * Ordenação:
+ * - Categorias seguem a ordem de escrita em `catalog.categories`.
+ * - Categorias não listadas aparecem ao final na ordem de descoberta.
+ * - Blocos preservam a ordem original em `catalog.blocks`.
+ *
+ * @param blocks Blocos a agrupar.
+ * @param categories Categorias conhecidas (opcional).
+ * @returns Array de buckets { category, blocks } na ordem calculada.
  */
 export function groupBlocksByCategory(
   blocks: Block[],
   categories?: Category[]
 ): Array<{ category: Category; blocks: Block[] }> {
-  // Mapa: categoria -> índice conforme escrita em catalog.categories
   const catIndex: Record<string, number> = {};
   categories?.forEach((c, i) => {
     catIndex[c.id] = i;
   });
-  let nextIdx = categories ? categories.length : 0; // para categorias não listadas
+  let nextIdx = categories ? categories.length : 0;
 
-  // buckets com índice de ordenação de categorias
   const buckets: Record<
     string,
     { category: Category; blocks: Block[]; idx: number }
@@ -170,51 +185,57 @@ export function groupBlocksByCategory(
     if (!buckets[cat.id]) {
       const idx = Object.prototype.hasOwnProperty.call(catIndex, cat.id)
         ? catIndex[cat.id]
-        : nextIdx++; // categoria fora da lista → vai para o final, na ordem encontrada
+        : nextIdx++;
       buckets[cat.id] = { category: cat, blocks: [], idx };
     }
     return buckets[cat.id];
   };
 
-  // Preserva a ordem dos blocos como escrita no catálogo (sem sort)
   for (const b of blocks) {
     if (b.hidden) continue;
     getBucket(b).blocks.push(b);
   }
 
-  // Ordena apenas as categorias pela ordem de escrita
   return Object.values(buckets)
     .sort((a, b) => a.idx - b.idx)
     .map(({ category, blocks }) => ({ category, blocks }));
 }
 
 /**
- * RBAC simples (ANY-of):
- * - Se o bloco estiver `hidden` => false.
- * - Se não exige roles => público.
- * - Caso contrário, o usuário precisa ter pelo menos um dos roles exigidos
- *   (com normalização para lower-case e trim).
+ * RBAC simples (ANY-of).
+ *
+ * Regras:
+ * - `hidden` → false.
+ * - `superuserOnly` → exige `is_superuser === true`.
+ * - `requiredRoles` vazio/ausente → público.
+ * - Caso contrário, usuário precisa ter ao menos um dos roles.
+ * - Bypass para `is_superuser` ou role `admin`.
+ *
+ * @param user Usuário atual (ou null).
+ * @param block Bloco alvo.
+ * @returns `true` se o usuário pode ver o bloco.
  */
 export function userCanSeeBlock(user: User | null, block: Block): boolean {
   if (block.hidden) return false;
-  // Regra prioritária: somente superuser
   if (block.superuserOnly) {
     return !!(user && user.is_superuser === true);
-  }
-
+    }
   const required = block.requiredRoles ?? [];
   if (required.length === 0) return true;
-
   if (!user) return false;
-  const userRoles = new Set((user.roles || []).map(r => r.trim().toLowerCase()));
 
-  // bypass para admin/superuser
+  const userRoles = new Set((user.roles || []).map((r) => r.trim().toLowerCase()));
   if (user.is_superuser || userRoles.has("admin")) return true;
 
-  return required.some(r => userRoles.has(r.trim().toLowerCase()));
+  return required.some((r) => userRoles.has(r.trim().toLowerCase()));
 }
 
-/** Helper para identificar sessão mock (legado), útil para banners/avisos em DEV. */
+/**
+ * Indica se a sessão atual é do modo mock (legado).
+ *
+ * @param user Usuário atual (ou null).
+ * @returns `true` para sessões mock (ambientes de DEV).
+ */
 export function isMockSession(user: User | null): boolean {
   return !!user && user.auth_mode === "mock";
 }

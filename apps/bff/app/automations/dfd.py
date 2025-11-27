@@ -1,4 +1,23 @@
+# apps/bff/app/automations/dfd.py
 from __future__ import annotations
+
+"""
+Automação DFD — Documento de Formalização da Demanda.
+
+Visão geral
+-----------
+- Recebe submissões de DFD, valida regras de negócio com Pydantic e gera
+  artefatos (DOCX e, se possível, PDF) a partir de modelos parametrizados.
+- Expõe endpoints para schema, listagem/consulta de submissões do autor,
+  download de resultados e páginas de UI.
+- Aplica RBAC: criação/listagem exigem o papel "compras"; downloads permitem
+  também "coordenador" e "admin".
+
+Integrações
+-----------
+- `app.db`: persistência de submissões e auditorias.
+- `app.utils.docx_tools`: renderização DOCX e conversão para PDF.
+"""
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from starlette.responses import StreamingResponse, HTMLResponse
@@ -21,10 +40,9 @@ from app.db import (
     list_submissions,
     add_audit,
     list_audits,
-    # NOVO: helper para detectar duplicidades no payload
     exists_submission_payload_value,
 )
-from app.auth.rbac import require_roles_any  # RBAC
+from app.auth.rbac import require_roles_any
 from app.utils.docx_tools import (
     render_docx_template,
     convert_docx_to_pdf,
@@ -34,20 +52,29 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "2.4.0"  # validação de unicidade: 'numero' e 'protocolo'
+DFD_VERSION = "2.4.0"
 REQUIRED_ROLES = ("compras",)
-# Papéis elevados que devem poder baixar qualquer arquivo via Controle
 ELEVATED_ROLES = ("admin", "coordenador")
-
-# Diretório com os modelos DOCX por diretoria (timbre)
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
-
-# Diretório com os HTMLs desta automação
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "dfd"
 
 
-# ---------------------- Helpers ----------------------
 def err_json(status: int, **payload):
+    """
+    Retorna uma resposta JSON com encoding/controlado, preservando mensagens em pt-BR.
+
+    Parâmetros
+    ----------
+    status : int
+        Código HTTP a retornar.
+    **payload : dict
+        Estrutura serializável em JSON, como `{"code": "...", "message": "..."}`.
+
+    Retorna
+    -------
+    StreamingResponse
+        Resposta com `application/json; charset=utf-8`.
+    """
     return StreamingResponse(
         BytesIO(json.dumps(payload, ensure_ascii=False).encode("utf-8")),
         status_code=status,
@@ -56,7 +83,14 @@ def err_json(status: int, **payload):
 
 
 def _to_obj(x, default=None):
-    """Aceita dict/list/str/bytes; retorna dict/list (robusto a string/bytes/JSON, independente do backend)."""
+    """
+    Converte entradas variadas (dict/list/bytes/str JSON) para objeto Python.
+
+    Retorna
+    -------
+    dict | list
+        Estrutura decodificada; caso falhe, retorna `default` ou `{}`.
+    """
     if x is None:
         return {} if default is None else default
     if isinstance(x, (dict, list)):
@@ -75,6 +109,9 @@ def _to_obj(x, default=None):
 
 
 def none_if_empty(v: Optional[str]) -> Optional[str]:
+    """
+    Converte strings vazias em `None` para facilitar validações de obrigatoriedade.
+    """
     if v is None:
         return None
     if isinstance(v, str) and v.strip() == "":
@@ -83,12 +120,21 @@ def none_if_empty(v: Optional[str]) -> Optional[str]:
 
 
 def _safe_comp(txt: str) -> str:
-    """Sanitiza componente de filename (sem espaços e sem separadores perigosos)."""
+    """
+    Normaliza componentes de filename removendo caracteres perigosos.
+    """
     return re.sub(r"[^A-Za-z0-9._-]+", "_", str(txt)).strip("_")
 
 
 def _list_models() -> List[Dict[str, Any]]:
-    """Lista pastas válidas (com model.docx) em MODELS_DIR."""
+    """
+    Lista subpastas de `MODELS_DIR` que contenham `model.docx`.
+
+    Retorna
+    -------
+    List[dict]
+        Itens `{ "slug": <nome_da_pasta>, "file": "model.docx" }`.
+    """
     items: List[Dict[str, Any]] = []
     base = pathlib.Path(MODELS_DIR)
     if not base.exists() or not base.is_dir():
@@ -100,7 +146,9 @@ def _list_models() -> List[Dict[str, Any]]:
 
 
 def _get_model_path(slug: str) -> Optional[str]:
-    """Retorna caminho absoluto de <slug>/model.docx, se existir."""
+    """
+    Retorna o caminho absoluto de `<slug>/model.docx` quando existir.
+    """
     d = pathlib.Path(MODELS_DIR) / slug
     docx = d / "model.docx"
     if docx.exists():
@@ -109,12 +157,22 @@ def _get_model_path(slug: str) -> Optional[str]:
 
 
 def _has_any_role(user: Dict[str, Any], *roles: str) -> bool:
+    """
+    Verifica se o usuário possui ao menos um dos papéis informados.
+    """
     user_roles = set((user or {}).get("roles") or [])
     return any(r in user_roles for r in roles)
 
 
 def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
-    """Permite acesso se CPF bater, ou se não houver CPF mas o e-mail bater."""
+    """
+    Verifica se a submissão pertence ao usuário autenticado.
+
+    Regras
+    ------
+    - Preferência por correspondência de CPF.
+    - Caso não haja CPF no registro, usa correspondência por e-mail.
+    """
     u_cpf = (user.get("cpf") or "").strip() or None
     u_email = (user.get("email") or "").strip() or None
     owner_cpf = (row.get("actor_cpf") or "").strip() or None
@@ -127,8 +185,12 @@ def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
 
 def _can_access_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
     """
-    Dono pode acessar. Além disso, papéis elevados ('admin'/'coordenador')
-    podem acessar independentemente do autor.
+    Determina se um usuário pode acessar uma submissão.
+
+    Regras
+    ------
+    - Dono da submissão sempre pode acessar.
+    - Papéis elevados (`admin` ou `coordenador`) podem acessar independentemente do autor.
     """
     if _owns_submission(row, user):
         return True
@@ -138,13 +200,14 @@ def _can_access_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
 
 
 def _read_html(name: str) -> str:
-    """Carrega um arquivo HTML de TPL_DIR."""
+    """
+    Lê um arquivo HTML de `TPL_DIR` e retorna seu conteúdo.
+    """
     path = TPL_DIR / name
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
-# ---------------------- Models & Validation ----------------------
 MAX_ASSUNTO_LEN = 200
 MAX_TEXTO_LONGO = 8000
 MAX_PROTOCOLO_LEN = 100
@@ -162,18 +225,18 @@ ALLOWED_PRIORIDADE = {
 }
 ALLOWED_SIMNAO = {"Sim", "Não"}
 MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
-REGEX_DATA_PRETENDIDA = re.compile(
-    r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$"
-)
+REGEX_DATA_PRETENDIDA = re.compile(r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$")
 
 
 class Item(BaseModel):
+    """
+    Item de aquisição do DFD, com validação de regras de negócio e cálculo de total.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    # Itens (por UI atual)
     descricao: str = Field("", max_length=MAX_TEXTO_LONGO)
-    haDependencia: str  # "Sim" | "Não"
+    haDependencia: str
     dependenciaQual: Optional[str] = Field(default=None, max_length=MAX_TEXTO_LONGO)
-    renovacaoContrato: str  # "Sim" | "Não"
+    renovacaoContrato: str
     quantidade: int = Field(0, ge=0)
     unidadeMedida: str
     valorUnitario: float = Field(0.0, ge=0.0)
@@ -182,6 +245,9 @@ class Item(BaseModel):
     @field_validator("unidadeMedida")
     @classmethod
     def _valid_um(cls, v: str) -> str:
+        """
+        Garante que a unidade de medida esteja na lista permitida.
+        """
         if v and v in ALLOWED_UNIDADES:
             return v
         raise ValueError("Unidade de medida inválida.")
@@ -189,16 +255,20 @@ class Item(BaseModel):
     @field_validator("haDependencia", "renovacaoContrato")
     @classmethod
     def _valid_simnao(cls, v: str) -> str:
+        """
+        Garante valores estritos 'Sim' ou 'Não' para campos booleanos textuais.
+        """
         if v and v in ALLOWED_SIMNAO:
             return v
         raise ValueError("Valor deve ser 'Sim' ou 'Não'.")
 
     @model_validator(mode="after")
     def _normalize_compute(self):
-        # Dependência: se Sim, exige 'dependenciaQual'
+        """
+        Exige descrição de vínculo quando houver dependência e calcula `valorTotal`.
+        """
         if self.haDependencia == "Sim" and not (self.dependenciaQual or "").strip():
             raise ValueError("Campo 'Se Sim, descreva o vínculo' é obrigatório quando há vínculo.")
-        # Valor total sempre recalculado
         try:
             qt = int(self.quantidade or 0)
             vu = float(self.valorUnitario or 0.0)
@@ -209,33 +279,30 @@ class Item(BaseModel):
 
 
 class DfdIn(BaseModel):
-    """Modelo de entrada do DFD (alinhado à nova UI)."""
+    """
+    Modelo de entrada do DFD, alinhado à UI atual e validado por Pydantic.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
-    # Cabeçalho
-    modelo_slug: str = Field(..., alias="modeloSlug")  # pasta do timbre
+    modelo_slug: str = Field(..., alias="modeloSlug")
     numero: str
-    assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)  # compõe o assunto final
+    assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
     pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")
     protocolo: str = Field(..., min_length=1, max_length=MAX_PROTOCOLO_LEN)
-
-    # Bloco geral (unificado)
     diretoria_demandante: str = Field(..., alias="diretoriaDemandante")
     alinhamento_pe: Optional[str] = Field("", alias="alinhamentoPE", max_length=MAX_TEXTO_LONGO)
     justificativa_necessidade: Optional[str] = Field("", alias="justificativaNecessidade", max_length=MAX_TEXTO_LONGO)
     objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
-
-    # Campos gerais finais (após itens na UI)
     prazos_envolvidos: Optional[str] = Field("", alias="prazosEnvolvidos")
     consequencia_nao_aquisicao: Optional[str] = Field("", alias="consequenciaNaoAquisicao", max_length=MAX_TEXTO_LONGO)
     grau_prioridade: Optional[str] = Field(None, alias="grauPrioridade")
-
-    # Itens
     items: List[Item] = Field(..., min_length=1)
 
     @field_validator("grau_prioridade")
     @classmethod
     def _valid_prioridade_geral(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Aceita vazio ou um valor da lista de prioridades permitidas.
+        """
         if v in (None, ""):
             return ""
         if v in ALLOWED_PRIORIDADE:
@@ -245,6 +312,9 @@ class DfdIn(BaseModel):
     @field_validator("prazos_envolvidos")
     @classmethod
     def _valid_prazos_fmt(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Exige o formato 'mês de AAAA' em minúsculas, quando informado.
+        """
         if not v:
             return ""
         if not REGEX_DATA_PRETENDIDA.match(v.strip()):
@@ -253,7 +323,9 @@ class DfdIn(BaseModel):
 
     @model_validator(mode="after")
     def _valid_relacoes(self):
-        # Se prazos_envolvidos vier preenchido, o ano deve bater com pca_ano
+        """
+        Garante coerência entre `prazos_envolvidos` e `pca_ano` quando houver prazos.
+        """
         if self.prazos_envolvidos:
             m = REGEX_DATA_PRETENDIDA.match(self.prazos_envolvidos.strip())
             if not m:
@@ -276,11 +348,7 @@ SCHEMA = {
         {"name": "alinhamentoPE", "type": "textarea", "label": "Alinhamento com o Planejamento Estratégico"},
         {"name": "justificativaNecessidade", "type": "textarea", "label": "Justificativa da necessidade"},
         {"name": "objeto", "type": "textarea", "label": "Objeto"},
-
-        # === Itens agora vêm antes dos campos gerais finais ===
         {"name": "items", "type": "array", "label": "Itens"},
-
-        # Campos gerais finais (após Itens)
         {"name": "prazosEnvolvidos", "type": "select", "label": "Prazos envolvidos"},
         {"name": "consequenciaNaoAquisicao", "type": "textarea", "label": "Consequência da não aquisição"},
         {"name": "grauPrioridade", "type": "select", "label": "Grau de prioridade"},
@@ -288,7 +356,6 @@ SCHEMA = {
     ],
 }
 
-# Mapeamento amigável de campos → rótulos (para mensagens de validação)
 FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "modeloSlug": {"label": "Timbre"},
     "modelo_slug": {"label": "Timbre"},
@@ -310,7 +377,6 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "grauPrioridade": {"label": "Grau de prioridade"},
     "grau_prioridade": {"label": "Grau de prioridade"},
     "protocolo": {"label": "Protocolo", "min_length": 1, "max_length": MAX_PROTOCOLO_LEN},
-    # Itens
     "descricao": {"label": "Descrição sucinta do objeto"},
     "haDependencia": {"label": "Há vinculação ou dependência com a contratação de outro item?"},
     "dependenciaQual": {"label": "Se 'Sim', descreva o vínculo"},
@@ -323,7 +389,9 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
 
 
 def _format_validation_errors(ve: ValidationError) -> List[str]:
-    """Gera mensagens legíveis por campo a partir dos erros do Pydantic v2."""
+    """
+    Traduz erros do Pydantic v2 em mensagens amigáveis por campo para a UI.
+    """
     msgs: List[str] = []
     for err in ve.errors():
         loc = err.get("loc") or ()
@@ -352,7 +420,6 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
         elif typ == "missing":
             msgs.append(f"Campo '{label}' é obrigatório.")
         else:
-            # Para erros de model_validator/field_validator:
             msgs.append(f"Campo '{label}': {msg}")
     return msgs
 
@@ -362,11 +429,17 @@ router = APIRouter(prefix=f"/api/automations/{KIND}", tags=[f"automation:{KIND}"
 
 @router.get("/schema")
 async def get_schema():
+    """
+    Expõe metadados de schema consumidos pela UI do DFD.
+    """
     return {"kind": KIND, "schema": SCHEMA}
 
 
 @router.get("/models")
 async def get_models(user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES))):
+    """
+    Lista modelos DOCX disponíveis (por timbre), protegido por RBAC de compras.
+    """
     try:
         return {"items": _list_models()}
     except Exception as e:
@@ -381,20 +454,18 @@ async def list_my_submissions(
     limit: int = 50,
     offset: int = 0,
 ):
-    # 1) Identidade do usuário: prioriza CPF; se não houver, usa e-mail.
+    """
+    Lista submissões do próprio usuário, filtrando por CPF (preferencial) ou e-mail.
+    """
     cpf = (user.get("cpf") or "").strip() or None
     email = (user.get("email") or "").strip() or None
-
-    # 2) Se não houver CPF nem e-mail, não prossegue (evita listar tudo por engano).
     if not cpf and not email:
         return err_json(
             422,
             code="identity_missing",
             message="Não foi possível identificar o usuário para filtrar as submissões (sem CPF e e-mail). Faça login novamente."
         )
-
     try:
-        # 3) Busca filtrando por CPF; se não houver CPF, cai para e-mail.
         rows = list_submissions(
             kind=KIND,
             actor_cpf=cpf,
@@ -413,23 +484,29 @@ async def get_my_submission(
     sid: str,
     user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
 ):
+    """
+    Retorna uma submissão específica do usuário, aplicando checagem de ownership.
+    """
     try:
         row = get_submission(sid)
     except Exception as e:
         logger.exception("get_submission storage error")
         return err_json(500, code="storage_error", message="Falha ao consultar submissão.", details=str(e))
-
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
-
     if not _owns_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
-
     return row
 
 
 def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
-    """Processa a submissão: preenche o DOCX, tenta converter para PDF, salva e audita."""
+    """
+    Pipeline assíncrono de processamento:
+    1) Marca a submissão como `running` e audita.
+    2) Renderiza o DOCX e tenta converter para PDF.
+    3) Atualiza submissão com os caminhos/nome dos arquivos e audita `completed`.
+    4) Em caso de erro, marca `error` e audita `failed`.
+    """
     try:
         update_submission(sid, status="running")
         add_audit(KIND, "running", actor, {"sid": sid})
@@ -447,7 +524,6 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
 
     try:
         raw = body.model_dump(by_alias=True)
-
         tpl_path = _get_model_path(raw["modeloSlug"])
         if not tpl_path:
             raise RuntimeError(
@@ -462,51 +538,42 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         base = f"dfd_{raw['modeloSlug'].lower()}_{numero_safe}"
         today_iso = datetime.utcnow().date().isoformat()
 
-        # Monta ASSUNTO final: "DFD - PCA <ano> - <assunto>"
         assunto_bruto = (raw.get("assunto") or "").strip()
         pca_ano = (raw.get("pcaAno") or "").strip()
         assunto_final = f"DFD - PCA {pca_ano} - {assunto_bruto}"
 
-        # Normaliza itens e total geral (confere total no backend)
         itens_in = list(raw.get("items") or [])
         itens_out: List[Dict[str, Any]] = []
         total_geral = 0.0
         for i, it in enumerate(itens_in, start=1):
             try:
-                item = Item(**it)  # revalida item com regras de negócio
+                item = Item(**it)
                 item_dict = item.model_dump()
             except ValidationError as ve:
-                # Erro amigável por item
                 update_submission(sid, status="error", error=f"Item {i}: {ve.errors()}")
                 add_audit(KIND, "failed", actor, {"sid": sid, "error": f"item {i} invalid"})
                 return
             total_geral += float(item_dict.get("valorTotal") or 0.0)
             itens_out.append(item_dict)
 
-        ctx = (
-            {
-                "diretoria": raw["modeloSlug"],
-                "numero": raw["numero"],
-                "assunto": assunto_final,  # usado no cabeçalho/timbre
-                "pca_ano": pca_ano,        # usado no texto introdutório do corpo
-                "data": today_iso,
-                "protocolo": raw.get("protocolo") or "",
-                # campos gerais
-                "diretoria_demandante": raw.get("diretoriaDemandante") or "",
-                "alinhamento_pe": raw.get("alinhamentoPE") or "",
-                "justificativa_necessidade": raw.get("justificativaNecessidade") or "",
-                "objeto": raw.get("objeto") or "",
-                # campos gerais finais
-                "prazos_envolvidos": raw.get("prazosEnvolvidos") or "",
-                "consequencia_nao_aquisicao": raw.get("consequenciaNaoAquisicao") or "",
-                "grau_prioridade": raw.get("grauPrioridade") or "",
-                # itens e totais
-                "itens": itens_out,
-                "total_geral": round(total_geral, 2),
-            }
-        )
+        ctx = {
+            "diretoria": raw["modeloSlug"],
+            "numero": raw["numero"],
+            "assunto": assunto_final,
+            "pca_ano": pca_ano,
+            "data": today_iso,
+            "protocolo": raw.get("protocolo") or "",
+            "diretoria_demandante": raw.get("diretoriaDemandante") or "",
+            "alinhamento_pe": raw.get("alinhamentoPE") or "",
+            "justificativa_necessidade": raw.get("justificativaNecessidade") or "",
+            "objeto": raw.get("objeto") or "",
+            "prazos_envolvidos": raw.get("prazosEnvolvidos") or "",
+            "consequencia_nao_aquisicao": raw.get("consequenciaNaoAquisicao") or "",
+            "grau_prioridade": raw.get("grauPrioridade") or "",
+            "itens": itens_out,
+            "total_geral": round(total_geral, 2),
+        }
 
-        # Log de placeholders (apenas informativo)
         try:
             placeholders = get_docx_placeholders(tpl_path)
             logger.info("[DFD] Placeholders detectados (%d): %s", len(placeholders), placeholders)
@@ -514,7 +581,6 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             pass
         logger.info("[DFD] Assunto final: %s", assunto_final)
 
-        # Gera DOCX
         docx_out = f"{out_dir}/{sid}.docx"
         render_docx_template(tpl_path, ctx, docx_out)
         try:
@@ -523,30 +589,23 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             size_docx = -1
         logger.info("[DFD] DOCX gerado | path=%s | size=%d", docx_out, size_docx)
 
-        # Tenta PDF
         pdf_out = f"{out_dir}/{sid}.pdf"
         filename_docx = f"{base}_{today_iso}.docx"
         filename_pdf = f"{base}_{today_iso}.pdf"
 
         pdf_ok = convert_docx_to_pdf(docx_out, pdf_out)
-
-        # Compat primário (mantém rota antiga funcionando)
         file_path = pdf_out if pdf_ok else docx_out
         filename = filename_pdf if pdf_ok else filename_docx
 
         result = {
-            # primários (retrocompat)
             "file_path": file_path,
             "filename": filename,
-            # novos campos explícitos
             "file_path_docx": docx_out,
             "filename_docx": filename_docx,
             "file_path_pdf": pdf_out if pdf_ok else None,
             "filename_pdf": filename_pdf if pdf_ok else None,
-            # meta
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "engine": f"{KIND}@{DFD_VERSION}",
-            # opcional: assunto final para histórico
             "assunto": assunto_final,
         }
         update_submission(sid, status="done", result=result, error=None)
@@ -587,6 +646,15 @@ async def submit_dfd(
     background: BackgroundTasks,
     user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
 ):
+    """
+    Recebe uma submissão de DFD, valida dados e agenda o processamento em background.
+
+    Fluxo
+    -----
+    - Normaliza payload bruto e valida com `DfdIn`.
+    - Checa duplicidade por `numero` e `protocolo`.
+    - Cria submissão `queued`, audita `submitted` e agenda `_process_submission`.
+    """
     raw = {
         "modeloSlug": none_if_empty(body.get("modeloSlug")),
         "numero": (body.get("numero") or "").strip(),
@@ -619,13 +687,11 @@ async def submit_dfd(
         logger.exception("validation error on submit")
         return err_json(422, code="validation_error", message="Erro de validação.", details=str(ve))
 
-    # === NOVO: checagem de duplicidade no banco ===
     try:
         numero_val = (payload.numero or "").strip()
         protocolo_val = (payload.protocolo or "").strip()
         if numero_val:
             if exists_submission_payload_value(KIND, "numero", numero_val):
-                # audita e retorna 409
                 try:
                     add_audit(KIND, "duplicate_rejected", user, {"field": "numero", "numero": numero_val})
                 except Exception:
@@ -681,17 +747,21 @@ async def submit_dfd(
     return {"submissionId": sid, "status": "queued"}
 
 
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# DOWNLOADS: agora permitem automations.dfd OU coordenador/admin e ignoram ownership
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.post("/submissions/{sid}/download")
 async def download_result(
     sid: str,
     request: Request,
-    # permite também coordenador/admin
     user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "coordenador", "admin")),
 ):
-    """Rota antiga: baixa o arquivo “primário” (PDF se existir, senão DOCX)."""
+    """
+    Download primário do resultado: retorna PDF quando disponível; caso contrário, DOCX.
+
+    Permissões
+    ----------
+    - Dono da submissão, ou
+    - Papéis elevados (`admin`/`coordenador`), ou
+    - Papel específico da automação (`automations.dfd`).
+    """
     try:
         row = get_submission(sid)
     except Exception as e:
@@ -701,7 +771,6 @@ async def download_result(
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
 
-    # Bypass de ownership para papéis elevados
     if not _can_access_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
 
@@ -718,7 +787,6 @@ async def download_result(
         with open(file_path, "rb") as f:
             data = f.read()
 
-        # AUDIT: download primário (formato inferido pela extensão)
         try:
             ext = (os.path.splitext(filename)[1] or "").lstrip(".").lower() or "auto"
             add_audit(KIND, "download", user, {
@@ -748,10 +816,16 @@ async def download_result_fmt(
     sid: str,
     fmt: str,
     request: Request,
-    # permite também coordenador/admin
     user: Dict[str, Any] = Depends(require_roles_any("automations.dfd", "coordenador", "admin")),
 ):
-    """Novo: baixa especificamente PDF ou DOCX."""
+    """
+    Download explícito por formato.
+
+    Parâmetros
+    ----------
+    fmt : str
+        "pdf" para o PDF gerado (quando disponível) ou "docx" para o documento fonte.
+    """
     if fmt not in ("pdf", "docx"):
         return err_json(400, code="bad_request", message="Formato inválido. Use 'pdf' ou 'docx'.")
 
@@ -764,7 +838,6 @@ async def download_result_fmt(
     if not row:
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
 
-    # Bypass de ownership para papéis elevados
     if not _can_access_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
 
@@ -779,7 +852,7 @@ async def download_result_fmt(
             if not file_path or not filename:
                 return err_json(409, code="not_available", message="PDF não disponível para esta submissão.")
         else:
-            file_path = result.get("file_path_docx") or result.get("file_path")  # fallback
+            file_path = result.get("file_path_docx") or result.get("file_path")
             filename = result.get("filename_docx") or (result.get("filename") or f"dfd_{sid}.docx")
 
         if not file_path or not os.path.exists(file_path):
@@ -788,7 +861,6 @@ async def download_result_fmt(
         with open(file_path, "rb") as f:
             data = f.read()
 
-        # AUDIT: download com formato explícito
         try:
             add_audit(KIND, "download", user, {
                 "sid": sid,
@@ -818,6 +890,9 @@ async def list_audits_admin(
     limit: int = 50,
     offset: int = 0,
 ):
+    """
+    Lista auditorias da automação DFD (somente administradores).
+    """
     try:
         rows = list_audits(kind=KIND, limit=limit, offset=offset)
         return {"items": rows, "limit": limit, "offset": offset}
@@ -827,9 +902,11 @@ async def list_audits_admin(
 
 
 @router.get("/ui")
-@router.get("/ui/")  # aceita com ou sem barra final
+@router.get("/ui/")
 async def dfd_ui(request: Request):
-    # Checagem manual para retornar HTML amigável em 401/403
+    """
+    Página principal da UI do DFD. Em caso de 401/403, retorna HTML simples informativo.
+    """
     checker = require_roles_any(*REQUIRED_ROLES)
     try:
         checker(request)
@@ -842,7 +919,6 @@ async def dfd_ui(request: Request):
           <p style="color:#334155">{msg}</p>
         </div>"""
         return HTMLResponse(html_err, status_code=status)
-
     html = _read_html("ui.html")
     return HTMLResponse(html)
 
@@ -850,7 +926,9 @@ async def dfd_ui(request: Request):
 @router.get("/ui/history")
 @router.get("/ui/history/")
 async def dfd_history_ui(request: Request):
-    # Reaproveita o guard de RBAC para esta página também
+    """
+    Página de histórico do DFD com a mesma proteção de acesso da UI principal.
+    """
     checker = require_roles_any(*REQUIRED_ROLES)
     try:
         checker(request)
@@ -863,6 +941,5 @@ async def dfd_history_ui(request: Request):
           <p style="color:#334155">{msg}</p>
         </div>"""
         return HTMLResponse(html_err, status_code=status)
-
     html = _read_html("history.html")
     return HTMLResponse(html)

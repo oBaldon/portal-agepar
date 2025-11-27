@@ -1,4 +1,40 @@
 # apps/bff/app/automations/support.py
+"""
+Módulo da automação "support" (Suporte & Feedback).
+
+Propósito
+---------
+Registrar relatos de suporte/feedback dos usuários, expor UIs de envio,
+persistir as submissões no repositório do BFF, permitir consulta segura
+pelo próprio autor e disponibilizar, para perfis de Auditoria/Controle,
+o download do JSON "bonito" e a geração de um documento PDF do relato.
+
+RBAC / Segurança
+----------------
+- O `router` exige autenticação e, por padrão, qualquer papel listado em
+  `require_roles_any("user", "compras", "ferias", "coordenador", "admin", "controle", "auditor")`.
+- Endpoints sensíveis (download de JSON e geração de documento) são
+  restritos aos papéis em `ALLOWED_AUDIT_ROLES` e ainda validam via `_has_audit_role`.
+- As consultas de submissões por ID garantem ownership comparando CPF/e-mail.
+
+Efeitos colaterais
+------------------
+- Acesso ao módulo `app.db` para inserir/atualizar/consultar submissões
+  e registrar auditoria (`insert_submission`, `update_submission`,
+  `get_submission`, `list_submissions`, `add_audit`).
+- Leitura de arquivo de catálogo para montar sugestões de módulos.
+- Geração de PDF (opcional) via ReportLab, quando instalado.
+
+Exemplos
+--------
+- Envio (POST /api/automations/support/submit):
+    Corpo JSON compatível com `SupportPayload`.
+- Download JSON (POST /api/automations/support/submissions/{id}/download):
+    Requer papel em Auditoria/Controle.
+- Documento PDF (POST /api/automations/support/submissions/{id}/document?fmt=pdf):
+    Requer papel em Auditoria/Controle e ReportLab instalado.
+"""
+
 from __future__ import annotations
 
 import json
@@ -18,7 +54,6 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.auth.rbac import require_roles_any
 from app.db import add_audit, get_submission, insert_submission, list_submissions, update_submission
 
-# --- PDF (opcional / guardado) ---
 HAS_REPORTLAB = True
 try:
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -26,16 +61,28 @@ try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
-except Exception:  # pragma: no cover
+except Exception:
     HAS_REPORTLAB = False
 
 logger = logging.getLogger(__name__)
 
-# Perfis que podem baixar resultados/documentos (somente na página de Auditoria/Controle)
 ALLOWED_AUDIT_ROLES = {"auditor", "admin", "controle"}
 
 
 def _has_audit_role(user: Optional[Dict[str, Any]]) -> bool:
+    """
+    Verifica se o usuário possui um dos papéis autorizados para auditoria.
+
+    Parâmetros
+    ----------
+    user : Optional[Dict[str, Any]]
+        Objeto de usuário (tipicamente oriundo da sessão).
+
+    Retorna
+    -------
+    bool
+        True se contiver algum papel em `ALLOWED_AUDIT_ROLES`.
+    """
     roles = set((user or {}).get("roles") or [])
     return bool(roles & ALLOWED_AUDIT_ROLES)
 
@@ -43,7 +90,6 @@ def _has_audit_role(user: Optional[Dict[str, Any]]) -> bool:
 router = APIRouter(
     prefix="/api/automations/support",
     tags=["automations", "support"],
-    # Qualquer usuário autenticado pode abrir chamados; incluímos "controle"/"auditor" para permitir acesso ao módulo
     dependencies=[Depends(require_roles_any("user", "compras", "ferias", "coordenador", "admin", "controle", "auditor"))],
 )
 
@@ -70,11 +116,30 @@ REPRO = [
 
 
 def _utcnow() -> datetime:
+    """
+    Obtém o timestamp atual em UTC.
+
+    Retorna
+    -------
+    datetime
+        Data/hora com timezone UTC.
+    """
     return datetime.now(timezone.utc)
 
 
 def _safe_load_catalog_blocks() -> List[Dict[str, str]]:
-    """Lê o catálogo e retorna blocos visíveis {name, displayName, categoryId}."""
+    """
+    Lê o catálogo de módulos e retorna blocos visíveis.
+
+    Retorna
+    -------
+    List[Dict[str, str]]
+        Lista de objetos com chaves: name, displayName, categoryId.
+
+    Observações
+    -----------
+    Em caso de erro de leitura/parse, retorna lista vazia e loga o problema.
+    """
     try:
         data = json.loads(CATALOG_FILE.read_text(encoding="utf-8"))
         blocks = data.get("blocks") or []
@@ -96,6 +161,38 @@ def _safe_load_catalog_blocks() -> List[Dict[str, str]]:
 
 
 class SupportPayload(BaseModel):
+    """
+    Modelo de entrada para relatos de suporte/feedback.
+
+    Atributos
+    ---------
+    module : str
+        Slug do módulo/bloco (ex.: 'dfd', 'ferias', 'fileshare').
+    summary : str
+        Resumo breve do problema.
+    description : str
+        Descrição detalhada do problema.
+    severity : str
+        Gravidade: none|low|medium|high|blocker.
+    reproducibility : str
+        Frequência: always|often|sometimes|rarely|once|untested.
+    steps_to_reproduce : Optional[str]
+        Passos para reproduzir.
+    expected_result : Optional[str]
+        Resultado esperado.
+    actual_result : Optional[str]
+        Resultado obtido.
+    environment : Optional[str]
+        Informações de ambiente (navegador/SO/dispositivo/VPN).
+    attachments : Optional[List[str]]
+        URLs ou tokens de anexos (ex.: Fileshare).
+    contact_email : Optional[EmailStr]
+        E-mail para contato.
+    contact_phone : Optional[str]
+        Telefone para contato.
+    consent_contact : bool
+        Indica consentimento para contato de retorno.
+    """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     module: str = Field(..., min_length=2, description="Slug do módulo/bloco (ex.: dfd, ferias, fileshare)")
@@ -113,8 +210,15 @@ class SupportPayload(BaseModel):
     consent_contact: bool = Field(default=True)
 
     def normalized(self) -> Dict[str, Any]:
+        """
+        Retorna um dicionário normalizado para persistência.
+
+        Retorna
+        -------
+        Dict[str, Any]
+            Campos sanitizados (lowercase para enums, trimming, anexos filtrados).
+        """
         d = self.model_dump()
-        # Normalizações simples
         d["module"] = (d["module"] or "").strip().lower()
         d["summary"] = (d["summary"] or "").strip()
         d["severity"] = (d["severity"] or "").lower()
@@ -125,6 +229,18 @@ class SupportPayload(BaseModel):
 
 
 class SubmissionResponse(BaseModel):
+    """
+    Resposta curta de submissão.
+
+    Atributos
+    ---------
+    id : str
+        Identificador da submissão.
+    status : str
+        Status atual da submissão.
+    created_at : datetime
+        Data/hora de criação.
+    """
     id: str
     status: str
     created_at: datetime
@@ -132,15 +248,31 @@ class SubmissionResponse(BaseModel):
 
 def _current_user(request: Request) -> Optional[Dict[str, Any]]:
     """
-    Compat: algumas rotas/middlewares usam request.session["user"] (login real),
-    e outras podem povoar request.state.user. Aceitamos ambos.
+    Obtém o usuário autenticado da requisição.
+
+    Parâmetros
+    ----------
+    request : Request
+        Requisição corrente.
+
+    Retorna
+    -------
+    Optional[Dict[str, Any]]
+        Usuário da sessão (state.user ou session['user']), se presente.
     """
     return getattr(request.state, "user", None) or request.session.get("user")
 
 
 @router.get("/schema")
 def get_schema() -> JSONResponse:
-    """Schema de UI (opções de módulo, severidades e reprodutibilidade)."""
+    """
+    Retorna o schema informativo para a UI de suporte.
+
+    Retorna
+    -------
+    JSONResponse
+        Objeto com: kind, version, modules, severities, reproducibility, capabilities.
+    """
     modules = _safe_load_catalog_blocks()
     return JSONResponse(
         {
@@ -149,22 +281,25 @@ def get_schema() -> JSONResponse:
             "modules": modules,
             "severities": SEVERITIES,
             "reproducibility": REPRO,
-            # dica opcional para UIs
             "capabilities": {"download_json": True, "document_pdf": True},
         }
     )
 
 
-# --------------------------------------------------------------------
-# UIs
-#  - /ui           → UI técnica (já existente)
-#  - /ui.html      → alias (para compatibilidade com botão/link)
-#  - /padrao.html  → UI padrão para usuários comuns
-# --------------------------------------------------------------------
-
 @router.get("/ui")
 def support_ui(request: Request) -> HTMLResponse:
-    """Página HTML técnica (iframe) com formulário detalhado."""
+    """
+    UI técnica (iframe) com formulário detalhado.
+
+    Parâmetros
+    ----------
+    request : Request
+
+    Retorna
+    -------
+    HTMLResponse
+        Template 'support/ui.html'.
+    """
     modules = _safe_load_catalog_blocks()
     return templates.TemplateResponse(
         "support/ui.html",
@@ -173,7 +308,6 @@ def support_ui(request: Request) -> HTMLResponse:
             "modules": modules,
             "severities": SEVERITIES,
             "repro": REPRO,
-            # a UI técnica não exibe botões de download nesta tela
             "show_downloads": False,
         },
     )
@@ -182,8 +316,16 @@ def support_ui(request: Request) -> HTMLResponse:
 @router.get("/ui.html")
 def support_ui_html_alias(request: Request) -> HTMLResponse:
     """
-    Alias com sufixo .html da UI técnica.
-    Útil para navegação a partir do botão no canto superior direito da UI padrão.
+    Alias da UI técnica com sufixo '.html'.
+
+    Parâmetros
+    ----------
+    request : Request
+
+    Retorna
+    -------
+    HTMLResponse
+        Template da UI técnica.
     """
     return support_ui(request)
 
@@ -191,11 +333,17 @@ def support_ui_html_alias(request: Request) -> HTMLResponse:
 @router.get("/padrao.html")
 def support_ui_padrao(request: Request) -> HTMLResponse:
     """
-    UI padrão (usuários comuns) — formulário simplificado.
-    O template deve exibir um botão no canto superior direito que redireciona para /ui.html.
+    UI padrão para usuários (formulário mais simples).
+
+    Parâmetros
+    ----------
+    request : Request
+
+    Retorna
+    -------
+    HTMLResponse
+        Template 'support/padrao.html'.
     """
-    # A UI padrão normalmente não precisa de 'modules/severities/repro',
-    # mas deixamos disponível caso o template queira sugerir módulo ou metadados.
     modules = _safe_load_catalog_blocks()
     return templates.TemplateResponse(
         "support/padrao.html",
@@ -205,17 +353,24 @@ def support_ui_padrao(request: Request) -> HTMLResponse:
             "severities": SEVERITIES,
             "repro": REPRO,
             "show_downloads": False,
-            # Hints para o template controlar navegação entre UIs
             "go_tech_href": "/api/automations/support/ui.html",
         },
     )
 
 
-# ------------------------- Utils de serialização segura -------------------------
 def _coerce_jsonable(obj: Any) -> Any:
     """
-    Converte recursivamente valores não-serializáveis (datetime, bytes, etc.)
-    para representações JSON-friendly.
+    Converte recursivamente valores não serializáveis para estruturas JSON-amigáveis.
+
+    Parâmetros
+    ----------
+    obj : Any
+        Valor de entrada potencialmente não-serializável.
+
+    Retorna
+    -------
+    Any
+        Estrutura equivalente serializável (datetime → ISO, bytes → UTF-8/hex, etc.).
     """
     if isinstance(obj, dict):
         return {k: _coerce_jsonable(v) for k, v in obj.items()}
@@ -233,18 +388,39 @@ def _coerce_jsonable(obj: Any) -> Any:
 
 @router.post("/submit")
 def submit_bug(request: Request, payload: SupportPayload, bg: BackgroundTasks) -> JSONResponse:
-    """Cria uma submissão 'support' e já marca como 'done' (não há processamento assíncrono)."""
+    """
+    Cria uma submissão de suporte e finaliza imediatamente (sem processamento assíncrono).
+
+    Parâmetros
+    ----------
+    request : Request
+        Usada para extrair o usuário autenticado.
+    payload : SupportPayload
+        Relato de suporte/feedback.
+    bg : BackgroundTasks
+        Tarefas de fundo (reservado para notificações futuras).
+
+    Retorna
+    -------
+    JSONResponse
+        {'id': str, 'status': 'done'}
+
+    Exceções
+    --------
+    401 Unauthorized
+        Usuário não autenticado.
+    500 Internal Server Error
+        Falha ao inserir/atualizar a submissão.
+    """
     user = _current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
 
-    # Validação/normalização extra: módulo deve existir no catálogo atual (não bloqueante)
     modules = {m["name"] for m in _safe_load_catalog_blocks()}
     p = payload.normalized()
     if p["module"] not in modules:
         logger.warning("Módulo informado não existe no catálogo: %s", p["module"])
 
-    # Gere o ID aqui para não depender do retorno do insert_submission()
     sub_id = str(uuid4())
     sub = {
         "id": sub_id,
@@ -254,23 +430,18 @@ def submit_bug(request: Request, payload: SupportPayload, bg: BackgroundTasks) -
         "actor_nome": user.get("nome") or user.get("name"),
         "actor_email": user.get("email"),
         "payload": p,
-        "status": "queued",  # será atualizado para 'done' abaixo
+        "status": "queued",
         "result": None,
         "error": None,
     }
     try:
         insert_submission(sub)
-        # Auditoria compatível com o Controle (usa 'sid')
         add_audit("support", "submitted", user, {"sid": sub_id, "summary": p.get("summary"), "module": p.get("module")})
-        # Como não há processamento, marca como 'done' e audita 'completed'
         update_submission(sub_id, status="done", error=None)
         add_audit("support", "completed", user, {"sid": sub_id})
     except Exception as e:
         logger.exception("Falha ao inserir/atualizar submission support: %s", e)
         raise HTTPException(status_code=500, detail="failed to create submission")
-
-    # Futuro: enviar notificação (e-mail/Teams) em tarefa de fundo
-    # bg.add_task(...)
 
     return JSONResponse({"id": sub_id, "status": "done"})
 
@@ -281,7 +452,25 @@ def my_submissions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> List[Dict[str, Any]]:
-    """Lista submissões do próprio usuário (seguras por CPF/e-mail)."""
+    """
+    Lista submissões do próprio usuário (por CPF/e-mail).
+
+    Parâmetros
+    ----------
+    request : Request
+    limit : int
+    offset : int
+
+    Retorna
+    -------
+    List[Dict[str, Any]]
+        Submissões visíveis ao autor.
+
+    Exceções
+    --------
+    401 Unauthorized
+        Usuário não autenticado.
+    """
     user = _current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
@@ -297,26 +486,40 @@ def my_submissions(
 
 @router.get("/submissions/{id}")
 def get_my_submission(id: str, request: Request) -> Dict[str, Any]:
-    """Detalhe de uma submissão do próprio usuário."""
+    """
+    Detalha uma submissão do próprio usuário.
+
+    Parâmetros
+    ----------
+    id : str
+        Identificador da submissão.
+    request : Request
+
+    Retorna
+    -------
+    Dict[str, Any]
+        Registro completo da submissão.
+
+    Exceções
+    --------
+    401 Unauthorized
+        Usuário não autenticado.
+    404 Not Found
+        Submissão inexistente.
+    403 Forbidden
+        Submissão não pertence ao usuário.
+    """
     user = _current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
     sub = get_submission(id)
     if not sub:
         raise HTTPException(status_code=404, detail="submission not found")
-    # Segurança: só permite acessar o próprio (basta 1 divergência para bloquear)
     if ((sub.get("actor_cpf") and user.get("cpf") and sub["actor_cpf"] != user["cpf"]) or
         (sub.get("actor_email") and user.get("email") and sub["actor_email"] != user["email"])):
         raise HTTPException(status_code=403, detail="forbidden")
     return sub
 
-
-# -------------------------
-# Download da submissão (JSON "bonito")
-#   - Somente via POST
-#   - Restrito a perfis de Auditoria/Controle
-#   - GET -> 405 com mensagem clara
-# -------------------------
 
 @router.post(
     "/submissions/{id}/download",
@@ -324,18 +527,34 @@ def get_my_submission(id: str, request: Request) -> Dict[str, Any]:
 )
 def download_submission(id: str, request: Request) -> StreamingResponse:
     """
-    Baixa o JSON 'bonito' da submissão.
-    Política: apenas papéis de Auditoria/Controle podem baixar (independente do autor).
+    Download do JSON "bonito" da submissão (somente Auditoria/Controle).
+
+    Parâmetros
+    ----------
+    id : str
+        Identificador da submissão.
+    request : Request
+
+    Retorna
+    -------
+    StreamingResponse
+        Conteúdo JSON com indentação para auditoria.
+
+    Exceções
+    --------
+    401 Unauthorized
+        Usuário não autenticado.
+    403 Forbidden
+        Usuário sem papel de Auditoria/Controle.
+    404 Not Found
+        Submissão inexistente.
     """
     user = _current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
 
     if not _has_audit_role(user):
-        raise HTTPException(
-            status_code=403,
-            detail="Download permitido apenas para Auditoria/Controle.",
-        )
+        raise HTTPException(status_code=403, detail="Download permitido apenas para Auditoria/Controle.")
 
     sub = get_submission(id)
     if not sub:
@@ -353,17 +572,34 @@ def download_submission(id: str, request: Request) -> StreamingResponse:
 
 @router.get("/submissions/{id}/download")
 def download_submission_get_not_allowed() -> None:
-    # GET propositalmente não permitido (evita clique em link na aba Suporte)
+    """
+    Método não permitido para download.
+
+    Exceções
+    --------
+    405 Method Not Allowed
+        Instrui o cliente a utilizar POST.
+    """
     raise HTTPException(
         status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
         detail="Use POST para download e apenas a partir da página de Auditoria/Controle.",
     )
 
 
-# ------------------------------------------------------------
-# Documento do relato (PDF via ReportLab) — também restrito
-# ------------------------------------------------------------
 def _severity_label(sev_id: str) -> str:
+    """
+    Resolve o rótulo legível de severidade.
+
+    Parâmetros
+    ----------
+    sev_id : str
+        Identificador (none|low|medium|high|blocker).
+
+    Retorna
+    -------
+    str
+        Rótulo em português ou o próprio identificador.
+    """
     for s in SEVERITIES:
         if s["id"] == (sev_id or "").lower():
             return s["label"]
@@ -371,6 +607,19 @@ def _severity_label(sev_id: str) -> str:
 
 
 def _repro_label(rep_id: str) -> str:
+    """
+    Resolve o rótulo legível de reprodutibilidade.
+
+    Parâmetros
+    ----------
+    rep_id : str
+        Identificador (always|often|sometimes|rarely|once|untested).
+
+    Retorna
+    -------
+    str
+        Rótulo em português ou o próprio identificador.
+    """
     for r in REPRO:
         if r["id"] == (rep_id or "").lower():
             return r["label"]
@@ -378,7 +627,25 @@ def _repro_label(rep_id: str) -> str:
 
 
 def _build_support_pdf(sub: Dict[str, Any]) -> bytes:
-    if not HAS_REPORTLAB:  # pragma: no cover
+    """
+    Gera o PDF do relato usando ReportLab.
+
+    Parâmetros
+    ----------
+    sub : Dict[str, Any]
+        Submissão completa (payload + metadados).
+
+    Retorna
+    -------
+    bytes
+        Conteúdo do PDF.
+
+    Exceções
+    --------
+    RuntimeError
+        Quando o ReportLab não está instalado.
+    """
+    if not HAS_REPORTLAB:
         raise RuntimeError("reportlab not installed")
 
     payload = sub.get("payload") or {}
@@ -431,7 +698,7 @@ def _build_support_pdf(sub: Dict[str, Any]) -> bytes:
     story.append(Spacer(1, 6))
     story.append(Paragraph("Este documento resume as informações fornecidas no relato e pode ser anexado à auditoria do processo.", small))
 
-    def section(title: str, value: str):
+    def section(title: str, value: str) -> None:
         if not value:
             return
         story.append(Paragraph(title, label))
@@ -469,8 +736,33 @@ def download_submission_document(
     fmt: str = Query("pdf", pattern="^(pdf)$"),
 ) -> StreamingResponse:
     """
-    Gera um documento do relato (apenas Auditoria/Controle):
-      - fmt=pdf → PDF (ReportLab)
+    Gera e baixa o documento do relato (somente Auditoria/Controle).
+
+    Parâmetros
+    ----------
+    id : str
+        Identificador da submissão.
+    request : Request
+    fmt : str
+        Formato solicitado (atualmente apenas 'pdf').
+
+    Retorna
+    -------
+    StreamingResponse
+        PDF com o conteúdo do relato.
+
+    Exceções
+    --------
+    401 Unauthorized
+        Usuário não autenticado.
+    403 Forbidden
+        Usuário sem papel de Auditoria/Controle.
+    404 Not Found
+        Submissão inexistente.
+    501 Not Implemented
+        ReportLab ausente para geração de PDF.
+    500 Internal Server Error
+        Falha ao gerar o documento.
     """
     user = _current_user(request)
     if not user:
@@ -487,14 +779,13 @@ def download_submission_document(
         raise HTTPException(status_code=404, detail="submission not found")
 
     if fmt == "pdf":
-        if not HAS_REPORTLAB:  # pragma: no cover
+        if not HAS_REPORTLAB:
             raise HTTPException(status_code=501, detail="pdf generation not available (install reportlab)")
         try:
             pdf_bytes = _build_support_pdf(sub)
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             logger.exception("Falha ao gerar PDF do suporte %s: %s", id, e)
             raise HTTPException(status_code=500, detail="failed to generate pdf")
-        # audita a geração do documento
         add_audit("support", "document_pdf", user, {"sid": id})
         return StreamingResponse(
             content=iter([pdf_bytes]),
@@ -507,6 +798,14 @@ def download_submission_document(
 
 @router.get("/submissions/{id}/document")
 def document_get_not_allowed() -> None:
+    """
+    Método não permitido para geração de documento.
+
+    Exceções
+    --------
+    405 Method Not Allowed
+        Instrui o cliente a utilizar POST.
+    """
     raise HTTPException(
         status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
         detail="Use POST para gerar/baixar documentos e apenas a partir da página de Auditoria/Controle.",

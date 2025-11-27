@@ -1,4 +1,35 @@
 // src/App.tsx
+/**
+ * App principal do Host (SPA)
+ *
+ * Propósito
+ * ---------
+ * Orquestra as rotas públicas e autenticadas, aplica guardas de navegação
+ * (401/403), carrega o catálogo de automações após login e renderiza blocos
+ * do catálogo (iframe ou placeholder React).
+ *
+ * Regras/Comportamentos
+ * ---------------------
+ * - Redireciona 401 para /login (com motivo) e 403 para /403.
+ * - Páginas públicas com gate: /login e /registrar não montam se já autenticado.
+ * - Rota de troca de senha obrigatória: /auth/force-change-password.
+ * - Carregamento do catálogo acontece somente quando há usuário logado.
+ * - RBAC por bloco utilizando userCanSeeBlock; categorias exibidas apenas se
+ *   houver ao menos um bloco visível.
+ *
+ * Segurança
+ * ---------
+ * - Handlers globais de API encerram a sessão no cliente quando necessário.
+ * - Rotas privadas exigem sessão válida; caso contrário, redirecionam ao /login.
+ *
+ * Referências
+ * -----------
+ * - React Router v6 (Routes, Route, Navigate, NavLink).
+ * - API do BFF: configureApiHandlers, pingEProtocolo.
+ * - Catálogo: loadCatalog(), tipos Catalog/Block/BlockRoute.
+ * - RBAC: userCanSeeBlock.
+ */
+
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Link,
@@ -25,18 +56,6 @@ import { useAuth } from "@/auth/AuthProvider";
 
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
 
-/* ---------------------------------------------------------------------------
- * Ícones de categorias
- * -------------------------------------------------------------------------*/
-// import * as Icons from "lucide-react";
-// function CatIcon({ name, className }: { name?: string; className?: string }) {
-//   const Ico = name ? (Icons as any)[name] : null;
-//   return Ico ? <Ico className={className} aria-hidden="true" /> : null;
-// }
-
-/* ============================================================================
- * Guard RBAC de rotas dos blocos
- * ==========================================================================*/
 function RequireRoles({
   user,
   block,
@@ -51,17 +70,11 @@ function RequireRoles({
   return <>{children}</>;
 }
 
-/* ============================================================================
- * Gate para páginas públicas (login/registrar) quando já autenticado
- * ==========================================================================*/
 function AuthPageGate({ user, children }: { user: User | null; children: ReactNode }) {
   if (user) return <Navigate to="/inicio" replace />;
   return <>{children}</>;
 }
 
-/* ============================================================================
- * IframeBlock — altura compensando o header
- * ==========================================================================*/
 function IframeBlock({ src }: { src: string }) {
   return (
     <iframe
@@ -72,34 +85,24 @@ function IframeBlock({ src }: { src: string }) {
   );
 }
 
-/* ============================================================================
- * Redireciona a raiz (/) para a Home após auth + catálogo carregados
- * ==========================================================================*/
 function RootRedirect({ user, catalog }: { user: User | null; catalog: Catalog | null }) {
   if (!user) return <Navigate to="/login" replace />;
   if (!catalog) return <div className="p-6">Carregando catálogo…</div>;
   return <Navigate to="/inicio" replace />;
 }
 
-/* ============================================================================
- * App principal
- * ==========================================================================*/
 export default function App() {
   const { user, loading, logout: doLogout } = useAuth();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
 
   const nav = useNavigate();
   const loc = useLocation();
-  // Rotas públicas (não devem redirecionar em 401)
   const isPublicPath = (p: string) => p === "/login" || p === "/registrar" || p === "/403";
 
-  // Interceptadores globais: 401/403
   useEffect(() => {
     configureApiHandlers({
       onUnauthorized: () => {
-        // Só tenta encerrar sessão se havia usuário autenticado
         if (user) void doLogout();
-        // Não redireciona se já estiver em rota pública (ex.: /registrar)
         if (!isPublicPath(loc.pathname)) {
           nav("/login?reason=session_expired", { replace: true });
         }
@@ -108,9 +111,8 @@ export default function App() {
         nav("/403", { replace: true });
       },
     });
-  }, [doLogout,  nav, loc.pathname, user]);
+  }, [doLogout, nav, loc.pathname, user]);
 
-  // Carrega catálogo após autenticação
   useEffect(() => {
     if (!user) {
       setCatalog(null);
@@ -126,7 +128,6 @@ export default function App() {
     })();
   }, [user]);
 
-  // Resolve elemento de rota por bloco
   const routeElementFor = (block: Block, r: BlockRoute) => {
     if (r.kind === "iframe" && block.ui.type === "iframe") {
       return <IframeBlock src={block.ui.url} />;
@@ -146,20 +147,17 @@ export default function App() {
     return <NotFound />;
   };
 
-  // Logout (via AuthProvider)
   const onLogout = async () => {
     await doLogout();
     setCatalog(null);
     nav("/login");
   };
 
-  // Proteção de rota: permite /login, /registrar e /403 sem auth
   const publicPaths = new Set<string>(["/login", "/registrar", "/403"]);
   if (!loading && !user && !publicPaths.has(loc.pathname)) {
     return <Navigate to="/login" replace />;
   }
 
-  // Helpers de UI (Navbar)
   const activeCls = ({ isActive }: { isActive: boolean }) =>
     [
       "px-3 py-1.5 rounded-md text-sm transition",
@@ -169,10 +167,6 @@ export default function App() {
   const initials =
     user?.nome?.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AG";
 
-  // Mostra apenas categorias visíveis:
-  // - categoria NÃO hidden
-  // - RBAC ANY-of em category.requiredRoles (se houver)
-  // - pelo menos 1 bloco visível (não hidden + userCanSeeBlock)
   const visibleCategories = useMemo(() => {
     const cats = catalog?.categories ?? [];
     const blocks = catalog?.blocks ?? [];
@@ -198,13 +192,11 @@ export default function App() {
 
   return (
     <div className="min-h-full">
-      {/* Header */}
       <header
         className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur"
         style={{ ["--header-h" as any]: "56px" }}
       >
         <div className="mx-auto max-w-6xl px-4 h-[var(--header-h)] flex items-center gap-4">
-          {/* Logo + link para a Home (se logado) ou raiz */}
           <Link to={user ? "/inicio" : "/"} className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold">
               A
@@ -214,7 +206,6 @@ export default function App() {
             </div>
           </Link>
 
-          {/* “Início” + categorias: apenas quando logado */}
           {user && (
             <>
               <NavLink to="/inicio" className={activeCls}>
@@ -222,19 +213,12 @@ export default function App() {
               </NavLink>
               {visibleCategories.map((cat) => (
                 <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
-                  {/* Quando icon com lucide-react, descomente o bloco abaixo
-                  <span className="inline-flex items-center gap-1.5">
-                    <CatIcon name={cat.icon} className="h-4 w-4" />
-                    {cat.label}
-                  </span>
-                  */}
                   {cat.label}
                 </NavLink>
               ))}
             </>
           )}
 
-          {/* Ações e usuário */}
           <div className="ml-auto flex items-center gap-3">
             {user ? (
               <>
@@ -275,9 +259,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Rotas */}
       <Routes>
-        {/* Públicas com gate: não monta se já estiver logado */}
         <Route
           path="/login"
           element={
@@ -296,24 +278,17 @@ export default function App() {
         />
         <Route path="/403" element={<Forbidden />} />
 
-        {/* <<< NOVA ROTA: troca de senha obrigatória >>> */}
         <Route path="/auth/force-change-password" element={<LazyForceChangePassword />} />
 
-        {/* Home com cards agrupados por categorias */}
         <Route path="/inicio" element={<HomeDashboard catalog={catalog} user={user} />} />
 
-        {/* Página de listagem por categoria */}
         <Route path="/categoria/:id" element={<CategoryView catalog={catalog} />} />
 
-        {/* Raiz decide com base em auth + catálogo */}
         <Route path="/" element={<RootRedirect user={user} catalog={catalog} />} />
 
-        {/* Página de sessões da conta */}
         <Route path="/conta/sessoes" element={<AccountSessions />} />
 
-        {/* Rotas dos blocos do catálogo (com guard RBAC) */}
         {(catalog?.blocks ?? [])
-          // não monta rotas de blocos explicitamente escondidos
           .filter((b: any) => !b?.hidden)
           .map((b) =>
             b.routes?.map((r) => (
@@ -329,19 +304,14 @@ export default function App() {
             ))
           )}
 
-        {/* Ping (smoke) — opcional visualizar em /__ping */}
         <Route path="/__ping" element={<PingView />} />
 
-        {/* Fallback */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
   );
 }
 
-/* ============================================================================
- * Lazy loader do Login (mantém o bundle inicial pequeno)
- * ==========================================================================*/
 function LazyLogin() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
@@ -350,9 +320,6 @@ function LazyLogin() {
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }
 
-/* ============================================================================
- * Lazy loader do Register
- * ==========================================================================*/
 function LazyRegister() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
@@ -361,9 +328,6 @@ function LazyRegister() {
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }
 
-/* ============================================================================
- * Lazy loader do RegisterDisabled (aviso quando auto-registro está desativado)
- * ==========================================================================*/
 function LazyRegisterDisabled() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
@@ -372,9 +336,6 @@ function LazyRegisterDisabled() {
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }
 
-/* ============================================================================
- * Lazy loader da página de troca forçada de senha
- * ==========================================================================*/
 function LazyForceChangePassword() {
   const [Comp, setComp] = useState<null | React.ComponentType>(null);
   useEffect(() => {
@@ -383,9 +344,6 @@ function LazyForceChangePassword() {
   return Comp ? <Comp /> : <div className="p-6">Carregando…</div>;
 }
 
-/* ============================================================================
- * PingView — utilitário para testar conectividade com o BFF
- * ==========================================================================*/
 function PingView() {
   const [resp, setResp] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);

@@ -3,70 +3,115 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 
+/**
+ * Página de Login
+ *
+ * Propósito
+ * ---------
+ * Autenticar usuários via credenciais (e-mail/usuário/CPF + senha) e
+ * redirecionar conforme a flag `must_change_password`.
+ *
+ * UX/Acessibilidade
+ * -----------------
+ * - Sugere domínio padrão quando o identificador não contém "@"
+ * - Indica Caps Lock ativo durante a digitação da senha
+ * - Botão para mostrar/ocultar senha com `aria-label`
+ *
+ * Segurança
+ * ---------
+ * - Integra com `AuthProvider` para gestão de sessão
+ * - Mensagens de erro padronizadas a partir do `HttpError` de `api.ts`
+ *
+ * Referências
+ * -----------
+ * - AuthProvider (fluxo de login e guarda de navegação)
+ * - API de autenticação real (`/api/auth/login`, `/api/me`)
+ */
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
-// Domínio padrão para completar e-mails sem "@"
+
+/**
+ * Domínio padrão utilizado para completar identificadores sem "@",
+ * permitindo tentar automaticamente `usuario@dominio`.
+ */
 const DEFAULT_DOMAIN = import.meta.env.VITE_DEFAULT_LOGIN_DOMAIN || "agepar.pr.gov.br";
+
+/**
+ * Rota para fluxo de troca obrigatória de senha.
+ */
 const FORCE_PATH = "/auth/force-change-password";
 
+/**
+ * Mantém apenas dígitos (útil para CPF/IDs).
+ */
 function onlyDigits(s: string) {
   return (s || "").replace(/\D+/g, "");
 }
 
-// Considera "numérico-like" entradas só com dígitos e pontuações comuns (., -, /, espaço).
-// Ex.: "043.429.199-40" => true | "12345" => true | "joao.silva" => false | "maria@x" => false
+/**
+ * Detecta entradas “numéricas” com pontuações comuns.
+ * Exemplos:
+ *  - "043.429.199-40" → true
+ *  - "12345" → true
+ *  - "joao.silva" → false
+ *  - "maria@x" → false
+ */
 function isNumericLike(s: string) {
   const t = (s || "").trim();
   if (!t) return false;
   if (/[a-zA-Z@]/.test(t)) return false;
-  return /^[\d.\-\/\s]+$/.test(t);
+  return /^[[\d.\-\/\s]+$/.test(t);
 }
 
+/**
+ * Gera candidatos de login:
+ * - Se contém "@": usa exatamente o informado;
+ * - Se for numérico-like: retorna apenas os dígitos (CPF/ID);
+ * - Caso contrário: tenta a forma crua e também com o domínio padrão.
+ */
 function buildLoginCandidates(raw: string): string[] {
   const id = (raw || "").trim();
   if (!id) return [];
-  // Se já tem "@", usa exatamente o que foi digitado
   if (id.includes("@")) return [id];
-  // Se é numérico (mesmo com máscara/pontuação), tratar como CPF/ID → usa só dígitos
   if (isNumericLike(id)) return [onlyDigits(id)];
-  // Caso contrário, tenta como digitado e também com o domínio padrão
   const canon = `${id}@${String(DEFAULT_DOMAIN).trim().toLowerCase()}`;
-  return Array.from(new Set([id, canon])); // dedupe
+  return Array.from(new Set([id, canon]));
 }
 
-/** Extrai mensagem amigável do nosso HttpError `{ status, data }` (definido em api.ts). */
+/**
+ * Extrai mensagem amigável do `HttpError` padronizado de `api.ts`.
+ * Prioriza `detail` textual e trata 401, arrays de validação e fallback.
+ */
 function messageFromHttpError(err: any, fallback = "Falha no login"): string {
   const status = err?.status ?? err?.response?.status;
   const data = err?.data ?? err?.response?.data;
   const detail = data?.detail;
 
   if (status === 401) {
-    // Login inválido
-    if (typeof detail === "string") return detail; // ex.: "Credenciais inválidas."
+    if (typeof detail === "string") return detail;
     return "Credenciais inválidas.";
   }
 
   if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) {
-    // Pydantic/FastAPI validation array
-    return detail[0]?.msg || fallback;
-  }
-
+  if (Array.isArray(detail)) return detail[0]?.msg || fallback;
   if (typeof data?.error === "string") return data.error;
-
   if (typeof err?.message === "string") return err.message;
 
   return fallback;
 }
 
+/**
+ * Componente de Login:
+ * - Tenta autenticar com candidatos derivados do identificador;
+ * - Respeita a flag `must_change_password`, redirecionando para `FORCE_PATH`;
+ * - Exibe estados de carregamento e erros amigáveis.
+ */
 export default function Login() {
   const nav = useNavigate();
   const { user, login } = useAuth();
 
-  // Se já autenticado, decide destino conforme a flag must_change_password
   const mustChange = (user as any)?.must_change_password === true;
   if (user) return <Navigate to={mustChange ? FORCE_PATH : "/inicio"} replace />;
 
-  // Login real (POST /api/auth/login)
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -80,7 +125,9 @@ export default function Login() {
     [identifier, password, submitting]
   );
 
-  // Atalho discreto: Alt + D abre /devdocs/
+  /**
+   * Atalho: Alt + D abre a documentação técnica (rota /devdocs/).
+   */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === "d" || e.key === "D")) {
@@ -92,13 +139,20 @@ export default function Login() {
     return () => window.removeEventListener("keydown", onKey);
   }, [nav]);
 
-  // Dica só aparece quando NÃO é numérico-like e NÃO tem "@"
+  /**
+   * Sugestão de e-mail quando o identificador não contém "@"
+   * e não é numérico-like.
+   */
   const derivedEmailHint = useMemo(() => {
     const id = identifier.trim();
     if (!id || id.includes("@") || isNumericLike(id)) return null;
     return `${id}@${String(DEFAULT_DOMAIN).trim().toLowerCase()}`;
   }, [identifier]);
 
+  /**
+   * Submete o formulário: tenta autenticar com a lista de candidatos.
+   * Em caso de erro, exibe mensagem amigável derivada do `HttpError`.
+   */
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
@@ -115,14 +169,12 @@ export default function Login() {
         try {
           await login(id, password, remember);
           lastErr = null;
-          break; // sucesso
+          break;
         } catch (e: any) {
-          lastErr = e; // guarda para tentar o próximo candidato
+          lastErr = e;
         }
       }
       if (lastErr) throw lastErr;
-
-      // Deixa o AuthProvider/guard global decidir (se precisar força troca, ele redireciona)
       nav("/inicio", { replace: true });
     } catch (e: any) {
       setErr(messageFromHttpError(e, "Falha no login"));
@@ -137,7 +189,6 @@ export default function Login() {
   return (
     <div className="min-h-[calc(100vh-56px)] grid place-items-center px-4 bg-gradient-to-b from-slate-50 to-slate-100">
       <div className="relative w-full max-w-md rounded-2xl border bg-white/90 backdrop-blur-sm p-6 shadow-md">
-        {/* Branding */}
         <div className="mb-6 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold shadow-sm">
             A
@@ -148,14 +199,12 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Erro */}
         {err && (
           <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {err}
           </div>
         )}
 
-        {/* Formulário */}
         <form id="login-form" onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700">
@@ -180,10 +229,7 @@ export default function Login() {
 
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-700">
-                Senha
-              </label>
-              {/* Indicador de CapsLock (quando ativo) */}
+              <label className="block text-sm font-medium text-slate-700">Senha</label>
               {capsOn && (
                 <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
                   Caps Lock ativo
@@ -199,7 +245,6 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyUp={(e) => {
-                  // Blindagem para navegadores/eventos onde key pode vir undefined
                   const ke = (e as unknown as React.KeyboardEvent<HTMLInputElement>)
                     .nativeEvent as KeyboardEvent;
                   const k = (ke as any)?.key ?? "";
@@ -268,7 +313,6 @@ export default function Login() {
           </button>
         </form>
 
-        {/* Rodapé discreto: link para docs de devs (não chama atenção) */}
         <div className="mt-4 flex items-center justify-between">
           <p className="text-xs text-slate-400">
             Suporte: <span className="tabular-nums">ramal 4895</span>
@@ -285,7 +329,6 @@ export default function Login() {
           </Link>
         </div>
 
-        {/* Dica “invisível” para devs (apenas para leitores de tela) */}
         <span className="sr-only">Atalho: Alt + D abre a documentação técnica.</span>
       </div>
     </div>

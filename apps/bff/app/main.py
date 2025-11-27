@@ -1,6 +1,23 @@
 # apps/bff/app/main.py
 from __future__ import annotations
 
+"""
+BFF (Backend for Frontend) da Plataforma AGEPAR.
+
+Propósito
+---------
+- Centralizar middlewares, autenticação de sessão e CORS.
+- Expor rotas de infraestrutura (/health, /version, /api/me, /catalog/dev).
+- Agregar e publicar os routers de automações sob /api/automations/*.
+- Inicializar o schema Postgres utilizado pelas automações (submissions/audits/fileshare).
+
+Referências
+-----------
+- FastAPI: https://fastapi.tiangolo.com/
+- Starlette Sessions: https://www.starlette.io/middleware/#sessionsmiddleware
+- CORS (FastAPI/Starlette): https://fastapi.tiangolo.com/tutorial/cors/
+"""
+
 import json
 import logging
 import os
@@ -14,12 +31,11 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.automations.dfd import DFD_VERSION as DFD_VER
 from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
-# ---- Automations infra / routers ----
 from app.db import init_db
 from app.automations.form2json import router as form2json_router
 from app.automations.dfd import router as dfd_router
 from app.automations.controle import router as controle_router
-from app.automations.controle_ferias import router as controle_ferias_router  # calendário de férias (aba do controle)
+from app.automations.controle_ferias import router as controle_ferias_router
 from app.automations.accounts import router as accounts_router
 from app.automations.fileshare import router as fileshare_router
 from app.automations.whoisonline import router as whoisonline_router
@@ -31,33 +47,29 @@ from app.auth.middleware import DbSessionMiddleware
 from app.auth.sessions import router as auth_sessions_router
 from app.auth.rbac import require_password_changed
 
-# ------------------------------------------------------------------------------
-# Configuração (envs)
-# ------------------------------------------------------------------------------
 ENV = os.getenv("ENV", "dev")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-
-# Agora o padrão é "local" (login real). O mock vira legado e fica desativado.
-AUTH_MODE = os.getenv("AUTH_MODE", "local")  # valores: "local" (real), futuramente "oidc"
+AUTH_MODE = os.getenv("AUTH_MODE", "local")
 AUTH_LEGACY_MOCK = os.getenv("AUTH_LEGACY_MOCK", "0").lower() in ("1", "true", "yes")
-
 EP_MODE = os.getenv("EP_MODE", "mock")
 SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 CATALOG_FILE = Path(os.getenv("CATALOG_FILE", "/catalog/catalog.dev.json"))
-
-# Placeholders para OIDC (não usados por enquanto)
 OIDC_ISSUER = os.getenv("OIDC_ISSUER", "")
 OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID", "")
 OIDC_JWKS_URL = os.getenv("OIDC_JWKS_URL", "")
 
-# Roles padrão para sessão mock (mantém consistência com rotas reais)
 def _auth_default_roles() -> list[str]:
+    """
+    Lê roles padrão para sessões mock a partir de AUTH_DEFAULT_ROLES.
+
+    Retorna
+    -------
+    list[str]
+        Lista de roles não vazias (limpas por strip()).
+    """
     return [r.strip() for r in os.getenv("AUTH_DEFAULT_ROLES", "").split(",") if r.strip()]
 
-# ------------------------------------------------------------------------------
-# Logging básico (respeita LOG_LEVEL)
-# ------------------------------------------------------------------------------
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
 logger.info(
@@ -66,14 +78,8 @@ logger.info(
 )
 logger.info("CORS_ORIGINS=%s | CATALOG_FILE=%s", ",".join(CORS_ORIGINS), str(CATALOG_FILE))
 
-# ------------------------------------------------------------------------------
-# App
-# ------------------------------------------------------------------------------
-# Importante: expurgamos o MkDocs do host. Para evitar colisão com /docs do host,
-# movemos a UI do FastAPI para o prefixo /api, que já é proxied pelo Vite.
 APP = FastAPI(title="Portal AGEPAR BFF", version="0.3.0", docs_url="/api/docs", redoc_url="/api/redoc")
 
-# CORS primeiro (fica mais interno após os próximos add_middleware)
 APP.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -82,59 +88,95 @@ APP.add_middleware(
     allow_headers=["*"],
 )
 
-# IMPORTANTE (ordem dos middlewares):
-# Em Starlette, o ÚLTIMO add_middleware é o mais externo (executa primeiro).
-# Para que DbSessionMiddleware tenha acesso a request.session, o SessionMiddleware
-# precisa executar ANTES (ser o mais externo). Portanto: adicionamos DbSessionMiddleware
-# ANTES e SessionMiddleware DEPOIS.
 APP.add_middleware(DbSessionMiddleware)
 APP.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
-    same_site="lax",           # dev
-    https_only=False,          # dev
+    same_site="lax",
+    https_only=False,
     session_cookie="portal_agepar_session",
 )
 
-# ------------------------------------------------------------------------------
-# Routers básicos de infra/autenticação (sem enforcement)
-# ------------------------------------------------------------------------------
-APP.include_router(snake_router)             # health / ping e mini-jogo
-APP.include_router(auth_router)              # /api/auth/* (login, change-password, logout, register...)
-APP.include_router(auth_sessions_router)     # /api/auth/sessions[...]
+APP.include_router(snake_router)
+APP.include_router(auth_router)
+APP.include_router(auth_sessions_router)
 
-# ------------------------------------------------------------------------------
-# Startup
-# ------------------------------------------------------------------------------
 @APP.on_event("startup")
 def _startup() -> None:
-    # Inicializa o banco (Postgres) usado pelas automações (submissions/audits/fileshare)
+    """
+    Hook de inicialização do aplicativo.
+
+    Efeitos colaterais
+    ------------------
+    - Executa `init_db()` para garantir o schema Postgres.
+    - Loga versões dos motores DFD e FÉRIAS.
+    """
     init_db()
     logger.info("DB initialized (Postgres)")
     logger.info("DFD engine version: %s", DFD_VER)
     logger.info("FERIAS engine version: %s", FERIAS_VER)
 
-# ------------------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------------------
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
+    """
+    Recupera o usuário (dict) da sessão HTTP.
+
+    Parâmetros
+    ----------
+    req : Request
+        Requisição atual.
+
+    Retorna
+    -------
+    dict | None
+        Usuário em sessão ou None se não autenticado.
+    """
     return req.session.get("user")
 
 def _require_user(req: Request) -> Dict[str, Any]:
+    """
+    Exige usuário autenticado na sessão.
+
+    Parâmetros
+    ----------
+    req : Request
+
+    Retorna
+    -------
+    dict
+        Usuário autenticado.
+
+    Exceções
+    --------
+    HTTPException
+        401 se não autenticado.
+    """
     u = _get_user_from_session(req)
     if not u:
         raise HTTPException(status_code=401, detail="not authenticated")
     return u
 
-# ------------------------------------------------------------------------------
-# Rotas base
-# ------------------------------------------------------------------------------
 @APP.get("/health")
 def health() -> Dict[str, str]:
+    """
+    Endpoint de saúde do serviço.
+
+    Retorna
+    -------
+    dict
+        {"status": "ok"}
+    """
     return {"status": "ok"}
 
 @APP.get("/version")
 def version() -> Dict[str, Any]:
+    """
+    Versões e parâmetros relevantes do runtime.
+
+    Retorna
+    -------
+    dict
+        Metadados de versão, ambiente e configurações principais.
+    """
     return {
         "app": APP.version,
         "env": ENV,
@@ -147,10 +189,6 @@ def version() -> Dict[str, Any]:
         "catalog_file": str(CATALOG_FILE),
     }
 
-# ------------------------------------------------------------------------------
-# MOCK legado (opcional): habilite somente em DEV e quando realmente precisar
-# Sete AUTH_LEGACY_MOCK=1 para expor o GET /api/auth/login com params.
-# ------------------------------------------------------------------------------
 if AUTH_LEGACY_MOCK:
     @APP.get("/api/auth/login")
     def legacy_mock_login(
@@ -158,14 +196,23 @@ if AUTH_LEGACY_MOCK:
         cpf: Optional[str] = Query(None),
         nome: Optional[str] = Query(None),
         email: Optional[str] = Query(None),
-        roles: Optional[str] = Query(None),      # csv
-        unidades: Optional[str] = Query(None),   # csv
+        roles: Optional[str] = Query(None),
+        unidades: Optional[str] = Query(None),
         superuser: Optional[bool] = Query(False),
     ) -> Dict[str, Any]:
         """
         [LEGADO/DEV] Cria sessão mock a partir de query params.
-        Só é exposto quando AUTH_LEGACY_MOCK=1.
-        Mescla roles com AUTH_DEFAULT_ROLES para ficar consistente com o login real.
+        Exposto somente quando AUTH_LEGACY_MOCK=1.
+
+        Regras
+        ------
+        - Mescla `roles` com `AUTH_DEFAULT_ROLES`.
+        - Se `superuser` verdadeiro, inclui 'admin' quando ausente.
+
+        Retorna
+        -------
+        dict
+            Usuário criado e persistido em `request.session["user"]`.
         """
         roles_csv = [r.strip() for r in (roles or "user").split(",") if r.strip()]
         roles_merged = sorted(set(roles_csv + _auth_default_roles()))
@@ -187,6 +234,14 @@ if AUTH_LEGACY_MOCK:
 
 @APP.get("/api/me")
 def get_me(request: Request) -> Dict[str, Any]:
+    """
+    Retorna o usuário autenticado na sessão.
+
+    Exceções
+    --------
+    HTTPException
+        401 se não autenticado.
+    """
     user = _get_user_from_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
@@ -194,6 +249,19 @@ def get_me(request: Request) -> Dict[str, Any]:
 
 @APP.get("/catalog/dev")
 def catalog_dev() -> Any:
+    """
+    Carrega o catálogo JSON de automações utilizado em DEV.
+
+    Retorna
+    -------
+    Any
+        Conteúdo do arquivo JSON definido por `CATALOG_FILE`.
+
+    Exceções
+    --------
+    HTTPException
+        404 se arquivo não existir; 500 em falha de leitura/parse.
+    """
     if not CATALOG_FILE.exists():
         raise HTTPException(status_code=404, detail="catalog file not found")
     try:
@@ -204,13 +272,27 @@ def catalog_dev() -> Any:
 
 @APP.get("/api/eprotocolo/ping")
 def ep_ping(request: Request) -> Dict[str, Any]:
+    """
+    Ping do eProtocolo (mock/real, conforme EP_MODE).
+
+    Retorna
+    -------
+    dict
+        { actor, ep_mode, ok }
+    """
     user = _get_user_from_session(request)
     actor = (user or {}).get("cpf") or "anonymous"
     return {"actor": actor, "ep_mode": EP_MODE, "ok": True}
 
-# Página demo que pode ser embutida num iframe
 @APP.get("/demo")
 def demo_home() -> HTMLResponse:
+    """
+    Página HTML de demonstração servida pelo BFF (pode ser embutida via iframe).
+
+    Retorna
+    -------
+    HTMLResponse
+    """
     html = """
 <!doctype html>
 <html>
@@ -237,19 +319,26 @@ def demo_home() -> HTMLResponse:
 """
     return HTMLResponse(html)
 
-# ADD: alias sob /api (passa pelo proxy do Vite)
 @APP.get("/api/demo")
 def demo_home_api() -> HTMLResponse:
+    """
+    Alias de /demo sob /api (facilita proxy do Vite).
+
+    Retorna
+    -------
+    HTMLResponse
+    """
     return demo_home()
 
-# ------------------------------------------------------------------------------
-# Catálogo de automações (índice)
-# ------------------------------------------------------------------------------
 @APP.get("/api/automations")
 def automations_index() -> Dict[str, Any]:
     """
-    Lista de automações disponibilizadas pelo BFF.
-    Cada automação expõe seu próprio router sob /api/automations/{kind}/...
+    Índice das automações publicadas pelo BFF.
+
+    Retorna
+    -------
+    dict
+        Lista com {kind, version, title} por automação.
     """
     return {
         "items": [
@@ -265,25 +354,21 @@ def automations_index() -> Dict[str, Any]:
         ]
     }
 
-# ------------------------------------------------------------------------------
-# Routers de automações — protegidos por troca de senha obrigatória
-# ------------------------------------------------------------------------------
 APP.include_router(fileshare_router,       dependencies=[Depends(require_password_changed)])
 APP.include_router(form2json_router,       dependencies=[Depends(require_password_changed)])
 APP.include_router(dfd_router,             dependencies=[Depends(require_password_changed)])
 APP.include_router(ferias_router,          dependencies=[Depends(require_password_changed)])
 APP.include_router(controle_router,        dependencies=[Depends(require_password_changed)])
-APP.include_router(controle_ferias_router, dependencies=[Depends(require_password_changed)])  # calendário de férias (aba dentro do controle)
+APP.include_router(controle_ferias_router, dependencies=[Depends(require_password_changed)])
 APP.include_router(support_router,         dependencies=[Depends(require_password_changed)])
 APP.include_router(accounts_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])
 
-# ------------------------------------------------------------------------------
-# Nota de segurança (prod)
-# ------------------------------------------------------------------------------
-# Em produção, trocar AUTH_MODE para "oidc" quando implementado e:
-#   * /api/auth/login → fluxo Authorization Code + PKCE
-#   * callback → validar ID Token via JWKS (OIDC_ISSUER / JWKS_URL) e criar sessão
-# Cookie de sessão: marcar como Secure e SameSite=None sob HTTPS.
-# ------------------------------------------------------------------------------
+"""
+Nota de segurança (produção)
+---------------------------
+- Ao migrar para OIDC, configurar AUTH_MODE="oidc" e implementar fluxo Authorization Code + PKCE.
+- Validar ID Token via JWKS (OIDC_ISSUER / OIDC_JWKS_URL) e emitir sessão segura.
+- Em produção sob HTTPS, marcar o cookie de sessão como Secure e SameSite=None.
+"""

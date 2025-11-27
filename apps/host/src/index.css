@@ -1,3 +1,26 @@
+/*-----------------------------------------------------------------------------
+  index.css (Host)
+
+  Propósito
+  ---------
+  - Importa utilitários e resets do Tailwind CSS.
+  - Define variáveis e estilos globais do host (altura do header, fundo, texto).
+  - Garante que html/body/#root ocupem 100% da altura da viewport.
+
+  Segurança
+  ---------
+  - Apenas estilos; não há lógica ou manipulação de dados sensíveis.
+
+  Referências
+  -----------
+  - Tailwind CSS (@import "tailwindcss")
+  - Design token local: --header-h
+
+  Observação
+  ----------
+  Conteúdo original preservado (nenhuma alteração funcional).
+-----------------------------------------------------------------------------*/
+
 @import "tailwindcss";
 
 :root {

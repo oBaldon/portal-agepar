@@ -1,11 +1,39 @@
 // src/pages/HomeDashboard.tsx
+
+/**
+ * Página inicial (Dashboard)
+ *
+ * Propósito
+ * ---------
+ * Exibe um resumo das automações disponíveis ao usuário, agrupadas por categoria,
+ * respeitando regras de visibilidade (RBAC/hidden) e preservando a ordem do catálogo.
+ * Cada card abre o caminho principal do bloco (prioriza `navigation[0].path`, senão `routes[0].path`).
+ *
+ * UX/Acessibilidade
+ * -----------------
+ * - Cards responsivos em grid, com feedback visual no hover.
+ * - Botão desabilitado quando o bloco não possui rota principal.
+ * - Links “Ver todos” para navegar até a página da categoria.
+ * - Textos auxiliares quando não há dados.
+ *
+ * Segurança
+ * ---------
+ * - A filtragem de conteúdo é feita no cliente usando as regras do catálogo,
+ *   porém o backend também deve aplicar RBAC nas rotas sensíveis.
+ *
+ * Referências
+ * -----------
+ * - Design de dashboards e navegação por cartões.
+ * - Diretrizes de acessibilidade para foco e estados desabilitados (WAI-ARIA).
+ */
+
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Catalog, Block, User } from "@/types";
 import { groupBlocksByCategory } from "@/types";
 import { visibleBlocks, visibleCategories } from "@/lib/catalog";
 
-/** Escolhe um path “principal” do bloco: prioriza navigation[0].path e cai para routes[0].path */
+/** Escolhe um path “principal” do bloco: prioriza navigation[0].path e cai para routes[0].path. */
 function primaryPathOf(block: Block): string | null {
   const nav0 = block.navigation?.[0]?.path;
   const rt0 = block.routes?.[0]?.path;
@@ -19,10 +47,8 @@ export default function HomeDashboard({
   catalog: Catalog | null;
   user: User | null;
 }) {
-  // ⚠️ Hooks devem ser chamados sempre, em todas as renders
   const nav = useNavigate();
 
-  // Catálogo filtrado (RBAC + hidden) preservando ordem declarada
   const blocksVisiveis = useMemo(
     () => (catalog ? visibleBlocks(catalog, user ?? undefined) : []),
     [catalog, user]
@@ -32,18 +58,15 @@ export default function HomeDashboard({
     [catalog, user]
   );
 
-  // Agrupamento por categoria usando apenas itens visíveis
   const grouped = useMemo(
     () => groupBlocksByCategory(blocksVisiveis, categoriasVisiveis),
     [blocksVisiveis, categoriasVisiveis]
   );
 
-  // 🔁 Só decide o que mostrar depois (sem interromper a chamada dos hooks)
   if (!catalog) {
     return <div className="p-6">Carregando catálogo…</div>;
   }
 
-  // quantos cards mostrar por categoria na Home
   const MAX_PER_CATEGORY = 6;
 
   return (

@@ -1,4 +1,29 @@
 // apps/host/src/pages/Register.tsx
+/**
+ * Página de Auto-Registro
+ *
+ * Propósito
+ * ---------
+ * Permitir que novos usuários criem conta informando nome, e-mail e/ou CPF,
+ * definam uma senha e, em caso de sucesso, realizem login automático.
+ *
+ * UX/Acessibilidade
+ * -----------------
+ * - Validações básicas de front com mensagens claras.
+ * - Campos com autocomplete adequado.
+ * - Layout responsivo com tipografia consistente.
+ *
+ * Segurança
+ * ---------
+ * - Sem chamada ao backend quando `canSubmit` é falso.
+ * - Backend valida entradas novamente; erros são exibidos de forma amigável.
+ *
+ * Referências
+ * -----------
+ * - API: `registerUser` e `login` (AuthProvider).
+ * - Variáveis de ambiente: `VITE_ENABLE_SELF_REGISTER` (lado do servidor controla disponibilidade).
+ */
+
 import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -8,7 +33,6 @@ export default function Register() {
   const nav = useNavigate();
   const { user, login } = useAuth();
 
-  // Se já autenticado, manda pra Home
   if (user) return <Navigate to="/inicio" replace />;
 
   const [name, setName] = useState("");
@@ -22,7 +46,6 @@ export default function Register() {
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  // helpers
   const digits = (s: string) => s.replace(/\D/g, "");
   const formatCpf = (v: string) => {
     const only = digits(v).slice(0, 11);
@@ -38,10 +61,8 @@ export default function Register() {
     return out;
   };
 
-  // validações de front básicas (back-end valida de novo)
   const emailOk = useMemo(() => {
     if (!email) return false;
-    // validação simples
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   }, [email]);
 
@@ -51,8 +72,6 @@ export default function Register() {
   }, [cpf]);
 
   const passOk = password.length >= 8 && password === password2;
-
-  // precisa de ao menos email OU cpf
   const idProvided = email.trim().length > 0 || digits(cpf).length === 11;
 
   const canSubmit = useMemo(
@@ -61,7 +80,6 @@ export default function Register() {
       name.trim().length >= 2 &&
       passOk &&
       idProvided &&
-      // se informou email, checa formato; se informou cpf, checa comprimento
       ((!email && cpfOk) || (!cpf && emailOk) || (emailOk && cpfOk)),
     [submitting, name, passOk, idProvided, emailOk, cpfOk, email, cpf]
   );
@@ -83,11 +101,8 @@ export default function Register() {
         password,
       };
       await registerUser(payload);
-
-      // login automático usando o identificador preferencial
       const identifier = payload.email ?? payload.cpf!;
       await login(identifier, password, remember);
-
       setOkMsg("Conta criada com sucesso!");
       nav("/inicio", { replace: true });
     } catch (e: any) {
@@ -100,7 +115,6 @@ export default function Register() {
   return (
     <div className="min-h-[calc(100vh-56px)] grid place-items-center px-4">
       <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-sm">
-        {/* Branding */}
         <div className="mb-6 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold">
             A
@@ -149,9 +163,7 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="voce@agepar.pr.gov.br"
             />
-            {email && !emailOk && (
-              <p className="mt-1 text-xs text-red-600">E-mail inválido.</p>
-            )}
+            {email && !emailOk && <p className="mt-1 text-xs text-red-600">E-mail inválido.</p>}
           </div>
 
           <div>
@@ -166,9 +178,7 @@ export default function Register() {
               onChange={(e) => setCpf(formatCpf(e.target.value))}
               placeholder="000.000.000-00"
             />
-            {cpf && !cpfOk && (
-              <p className="mt-1 text-xs text-red-600">CPF deve ter 11 dígitos.</p>
-            )}
+            {cpf && !cpfOk && <p className="mt-1 text-xs text-red-600">CPF deve ter 11 dígitos.</p>}
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -227,9 +237,7 @@ export default function Register() {
             disabled={!canSubmit}
             className={[
               "w-full rounded-md px-4 py-2 text-sm font-medium transition",
-              canSubmit
-                ? "bg-sky-600 text-white hover:bg-sky-700"
-                : "bg-slate-200 text-slate-500 cursor-not-allowed",
+              canSubmit ? "bg-sky-600 text-white hover:bg-sky-700" : "bg-slate-200 text-slate-500 cursor-not-allowed",
             ].join(" ")}
           >
             {submitting ? "Criando conta…" : "Criar conta"}

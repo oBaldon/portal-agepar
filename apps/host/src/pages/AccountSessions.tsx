@@ -4,6 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { listSessions, revokeSession, type SessionItem } from "@/lib/api";
 import { useAuth } from "@/auth/AuthProvider";
 
+/**
+ * Selo visual com variações semânticas (ok/aviso/mutado).
+ *
+ * @param kind Variação visual do selo.
+ * @param children Conteúdo textual do selo.
+ */
 function Badge({ kind, children }: { kind: "ok" | "warn" | "muted"; children: React.ReactNode }) {
   const cls =
     kind === "ok"
@@ -18,6 +24,12 @@ function Badge({ kind, children }: { kind: "ok" | "warn" | "muted"; children: Re
   );
 }
 
+/**
+ * Formata datas ISO em string local amigável.
+ *
+ * @param s Data em ISO-8601 ou `null/undefined`.
+ * @returns String formatada ou traço quando ausente.
+ */
 function fmtDate(s?: string | null) {
   if (!s) return "—";
   try {
@@ -28,12 +40,27 @@ function fmtDate(s?: string | null) {
   }
 }
 
+/**
+ * Determina o status computado da sessão.
+ *
+ * @param s Item de sessão.
+ * @returns "active" | "revoked" | "expired".
+ */
 function statusOf(s: SessionItem): "active" | "revoked" | "expired" {
   if (s.revoked_at) return "revoked";
   if (new Date(s.expires_at).getTime() <= Date.now()) return "expired";
   return "active";
 }
 
+/**
+ * Página de gerenciamento de sessões da conta.
+ *
+ * Funcionalidades
+ * ---------------
+ * - Lista sessões do usuário autenticado.
+ * - Permite revogar sessões (incluindo a atual).
+ * - Filtro para exibir todas ou apenas ativas.
+ */
 export default function AccountSessions() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
@@ -43,6 +70,9 @@ export default function AccountSessions() {
   const [showAll, setShowAll] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
+  /**
+   * Recarrega a lista de sessões a partir da API.
+   */
   const reload = async () => {
     setLoading(true);
     setErr(null);
@@ -60,13 +90,24 @@ export default function AccountSessions() {
     void reload();
   }, []);
 
+  /**
+   * Conjunto filtrado conforme o toggle "mostrar todas".
+   */
   const filtered = useMemo(() => {
     if (showAll) return items;
     return items.filter((x) => statusOf(x) === "active");
   }, [items, showAll]);
 
+  /**
+   * Sessão marcada como atual pelo backend.
+   */
   const current = useMemo(() => items.find((x) => x.current), [items]);
 
+  /**
+   * Revoga uma sessão pelo id. Se for a sessão atual, o usuário é deslogado.
+   *
+   * @param id Identificador da sessão a revogar.
+   */
   const onRevoke = async (id: string) => {
     const isCurrent = current?.id === id;
     const label = isCurrent ? "sua sessão atual" : "esta sessão";
@@ -74,10 +115,7 @@ export default function AccountSessions() {
     try {
       setRevokingId(id);
       await revokeSession(id);
-      // Se revogou a atual, o backend pode limpar cookie imediatamente.
-      // De qualquer forma, garantimos estado consistente no front:
       if (isCurrent) {
-        // Sai para /login (logout() já lida com cookie limpo/204)
         await logout();
         nav("/login", { replace: true });
         return;
@@ -156,7 +194,7 @@ export default function AccountSessions() {
                 <tr key={s.id} className="border-t">
                   <td className="px-4 py-2">
                     <div className="font-mono text-xs break-all">{s.id}</div>
-                    {s.current && <div className="text-[11px] text-sky-700 mt-0.5">Sessão atual</div>}
+                    {s.current && <div className="mt-0.5 text-[11px] text-sky-700">Sessão atual</div>}
                   </td>
                   <td className="px-4 py-2">{fmtDate(s.created_at)}</td>
                   <td className="px-4 py-2">{fmtDate(s.last_seen_at)}</td>
@@ -178,9 +216,7 @@ export default function AccountSessions() {
                       disabled={revokingId === s.id || st !== "active"}
                       className={[
                         "rounded-md border px-3 py-1.5 text-xs",
-                        st === "active"
-                          ? "hover:bg-slate-50"
-                          : "opacity-40 cursor-not-allowed",
+                        st === "active" ? "hover:bg-slate-50" : "cursor-not-allowed opacity-40",
                       ].join(" ")}
                     >
                       {revokingId === s.id ? "Revogando…" : "Revogar"}
@@ -193,9 +229,7 @@ export default function AccountSessions() {
         </table>
       </div>
 
-      <div className="mt-4 text-xs text-slate-500">
-        * Revogar a sessão atual pode encerrar seu acesso imediatamente.
-      </div>
+      <div className="mt-4 text-xs text-slate-500">* Revogar a sessão atual pode encerrar seu acesso imediatamente.</div>
     </div>
   );
 }
