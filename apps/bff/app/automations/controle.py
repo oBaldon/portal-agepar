@@ -292,7 +292,7 @@ def _status_label(action: Optional[str], status: Optional[str]) -> str:
     a = norm(action)
     s = norm(status)
 
-    known = {"completed", "running", "submitted", "failed", "download"}
+    known = {"completed", "running", "submitted", "failed", "download", "deleted"}
     if a in known:
         return a
 
@@ -654,18 +654,30 @@ def list_submissions_api(
 
         norm: List[Dict[str, Any]] = []
         for r in items:
+            result_obj = _to_obj(r.get("result"))
+            logical_status = r.get("status")
+            if isinstance(result_obj, dict):
+                soft_meta = result_obj.get("_soft_delete") or {}
+                if isinstance(soft_meta, dict) and soft_meta.get("deleted"):
+                    logical_status = "deleted"
+                else:
+                    result_status = (result_obj.get("status") or "").strip()
+                    if result_status:
+                        logical_status = result_status
+
             norm.append({
                 "id": r.get("id"),
                 "kind": r.get("kind"),
-                "status": r.get("status"),
+                "status": logical_status,
                 "username": r.get("actor_nome") or r.get("actor_cpf") or r.get("actor_email") or r.get("username"),
                 "user_id": r.get("actor_cpf") or r.get("user_id"),
                 "created_at": r.get("created_at"),
                 "updated_at": r.get("updated_at"),
                 "payload": r.get("payload") or {},
-                "result": r.get("result"),
+                "result": result_obj,
                 "error": r.get("error"),
             })
+
         norm = _filter_dates(norm, since, until, key_candidates=("created_at", "updated_at", "ts"))
         sliced = norm[offset: offset + limit]
         return {"count": len(norm), "items": sliced}
@@ -685,16 +697,28 @@ def get_submission_api(sid: str):
         sub = db.get_submission(sid)
         if not sub:
             raise HTTPException(status_code=404, detail=f"submission {sid} não encontrada")
+
+        result_obj = _to_obj(sub.get("result"))
+        logical_status = sub.get("status")
+        if isinstance(result_obj, dict):
+            soft_meta = result_obj.get("_soft_delete") or {}
+            if isinstance(soft_meta, dict) and soft_meta.get("deleted"):
+                logical_status = "deleted"
+            else:
+                result_status = (result_obj.get("status") or "").strip()
+                if result_status:
+                    logical_status = result_status
+
         return {
             "id": sub.get("id"),
             "kind": sub.get("kind"),
-            "status": sub.get("status"),
+            "status": logical_status,
             "username": sub.get("actor_nome") or sub.get("actor_cpf") or sub.get("actor_email") or sub.get("username"),
             "user_id": sub.get("actor_cpf") or sub.get("user_id"),
             "created_at": sub.get("created_at"),
             "updated_at": sub.get("updated_at"),
             "payload": sub.get("payload") or {},
-            "result": sub.get("result"),
+            "result": result_obj,
             "error": sub.get("error"),
         }
     except HTTPException:

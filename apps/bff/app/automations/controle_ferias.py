@@ -22,6 +22,8 @@ Detalhes de implementação
   `periodos[]`. Ambas as formas são suportadas.
 - Datas de término nos eventos são tratadas como inclusivas. Para iCal (padrão
   end-exclusive), o término é convertido para o dia seguinte.
+- Submissões marcadas como soft delete na automação `ferias` não são consideradas
+  aqui (nem na UI, nem nos exports).
 """
 
 import csv
@@ -137,6 +139,21 @@ def _to_obj(x: Any) -> Dict[str, Any]:
         except Exception:
             return {}
     return {}
+
+
+def _is_soft_deleted(sub: Dict[str, Any]) -> bool:
+    """
+    Indica se uma submissão de férias foi marcada como soft delete
+    pela automação `ferias`.
+
+    Critério
+    --------
+    - result._soft_delete.deleted == True
+    """
+    result = _to_obj(sub.get("result"))
+    soft_meta = (result.get("_soft_delete") or {}) if isinstance(result, dict) else {}
+    return bool(isinstance(soft_meta, dict) and soft_meta.get("deleted"))
+
 
 
 def _norm_date(v: Any) -> Optional[date]:
@@ -313,6 +330,11 @@ def list_events(
     """
     Lista eventos normalizados de férias com filtros opcionais.
 
+    Regras adicionais
+    -----------------
+    - Submissões marcadas como soft delete (via automação `ferias`) são ignoradas
+      completamente e não geram eventos, mesmo para admin/coordenador.
+
     Retorna
     -------
     dict
@@ -332,6 +354,9 @@ def list_events(
 
         eventos: List[EventoFerias] = []
         for sub in subs:
+            # Não considera registros soft-deleted no painel de controle do RH
+            if _is_soft_deleted(sub):
+                continue
             eventos.extend(_build_eventos(sub))
 
         f = Filtro(since=since, until=until, servidor=servidor, setor=setor, status=status, limit=limit)

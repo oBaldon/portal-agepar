@@ -77,6 +77,9 @@ from app.db import (
     list_submissions,
     add_audit,
     list_audits,
+    _pg,
+    add_audit,
+    list_audits,   
 )
 from app.auth.rbac import require_roles_any
 
@@ -560,6 +563,19 @@ class FeriasIn(BaseModel):
         return self
 
 
+class DeleteFeriasIn(BaseModel):
+    """
+    Payload de confirmação para exclusão de uma submissão de férias.
+
+    Atributos
+    ---------
+    confirm : bool
+        Deve ser True para confirmar a exclusão (soft delete) do registro no painel do servidor.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    confirm: bool = Field(..., description="Confirma a exclusão deste registro no painel do servidor (soft delete).")
+
+
 SCHEMA = {
     "title": "Férias — Requerimento + Substituição (UI custom, multi-períodos)",
     "version": FERIAS_VERSION,
@@ -633,6 +649,7 @@ async def list_my_submissions(
     Regras
     ------
     - Filtra por CPF quando disponível; caso contrário, por e-mail.
+    - Não exibe submissões marcadas como soft delete.
 
     Parâmetros
     ----------
@@ -661,7 +678,16 @@ async def list_my_submissions(
         return err_json(422, code="identity_missing", message="Sem CPF/e-mail para filtrar submissões. Faça login novamente.")
     try:
         rows = list_submissions(kind=KIND, actor_cpf=cpf, actor_email=None if cpf else email, limit=limit, offset=offset)
-        return {"items": rows, "limit": limit, "offset": offset}
+
+        visible: List[Dict[str, Any]] = []
+        for row in rows:
+            res = _to_obj(row.get("result"), {})
+            soft_meta = (res.get("_soft_delete") or {}) if isinstance(res, dict) else {}
+            if isinstance(soft_meta, dict) and soft_meta.get("deleted"):
+                continue
+            visible.append(row)
+
+        return {"items": visible, "limit": limit, "offset": offset}
     except Exception as e:
         logger.exception("list_submissions storage error")
         return err_json(500, code="storage_error", message="Falha ao consultar submissões.", details=str(e))
@@ -707,8 +733,160 @@ async def get_my_submission(
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
     if not _owns_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+
+    res = _to_obj(row.get("result"), {})
+    soft_meta = (res.get("_soft_delete") or {}) if isinstance(res, dict) else {}
+    if isinstance(soft_meta, dict) and soft_meta.get("deleted"):
+        return err_json(
+            404,
+            code="not_found",
+            message="Submissão não encontrada.",
+            details={"sid": sid},
+        )
+
     return row
 
+
+@router.post("/submissions/{sid}/delete")
+async def delete_my_submission(
+    sid: str,
+    body: DeleteFeriasIn,
+    user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
+):
+    """
+    Marca uma submissão de férias como excluída (soft delete) para o usuário.
+
+    Regras
+    ------
+    - Exige ownership da submissão (não permite exclusão por papéis elevados).
+    - Bloqueia exclusão quando a submissão está em processamento (`status="running"`).
+    - Não remove o registro do banco nem os arquivos: apenas marca como deletado
+      no result, para que deixe de aparecer na UI do servidor e no painel de
+      controle, preservando o conteúdo para RH/admin
+
+    Parâmetros
+    ----------
+    sid : str
+        Identificador da submissão.
+    body : DeleteFeriasIn
+        Payload com confirmação explícita de exclusão.
+    user : Dict[str, Any]
+        Usuário autenticado (RBAC: papel "ferias").
+
+    Retorna
+    -------
+    dict
+       {"ok": True, "sid": <sid>} em caso de sucesso.
+
+    Erros
+    -----
+    400
+        Quando a confirmação não é verdadeira.
+    403
+        Quando o usuário não é dono da submissão.
+    404
+        Quando a submissão não existe.
+    409
+        Quando a submissão está em processamento.
+    500
+        Falhas de armazenamento.
+    """
+    if not body.confirm:
+        return err_json(
+            400,
+            code="confirmation_required",
+            message="Confirmação obrigatória para exclusão do registro.",
+        )
+
+    try:
+        row = get_submission(sid)
+    except Exception as e:
+        logger.exception("[FERIAS][DELETE] get_submission storage error")
+        return err_json(
+            500,
+            code="storage_error",
+            message="Falha ao consultar submissão.",
+            details=str(e),
+        )
+
+    if not row:
+        return err_json(
+            404,
+            code="not_found",
+            message="Submissão não encontrada.",
+            details={"sid": sid},
+        )
+
+    if not _owns_submission(row, user):
+        return err_json(
+            403,
+            code="forbidden",
+            message="Você não tem permissão para excluir esta submissão.",
+        )
+
+    status = (row.get("status") or "").lower()
+    if status == "running":
+        return err_json(
+            409,
+            code="submission_in_progress",
+            message="Submissão em processamento; aguarde a conclusão para tentar excluir novamente.",
+            details={"sid": sid, "status": row.get("status")},
+        )
+
+
+    result = _to_obj(row.get("result"), {}) or {}
+    soft_meta = (result.get("_soft_delete") or {}) if isinstance(result, dict) else {}
+
+    if isinstance(soft_meta, dict) and soft_meta.get("deleted"):
+        return {"ok": True, "sid": sid, "alreadyDeleted": True}
+
+    soft_meta = {
+        "deleted": True,
+        "deleted_at": datetime.utcnow().isoformat() + "Z",
+        "deleted_by": {
+            "cpf": (user.get("cpf") or None),
+            "nome": (user.get("nome") or None),
+            "email": (user.get("email") or None),
+        },
+    }
+    result["_soft_delete"] = soft_meta
+    result["status"] = "deleted"
+
+    try:
+        update_submission(sid, result=result)
+
+    except Exception as e:
+        logger.exception("[FERIAS][DELETE] update storage error")
+        return err_json(
+            500,
+            code="storage_error",
+            message="Falha ao marcar submissão como excluída.",
+            details=str(e),
+        )
+
+    try:
+        add_audit(
+            KIND,
+            "deleted",
+            user,
+            {
+                "sid": sid,
+                "status": row.get("status"),
+                "protocolo": (_to_obj(row.get("payload"), {}) or {}).get("protocolo") or None,
+                "soft_delete": True,
+            },
+        )
+    except Exception:
+        logger.exception("[FERIAS][DELETE] audit failed (non-blocking)")
+
+    logger.info(
+        "[FERIAS][DELETE] Submissão %s marcada como excluída (soft) por %s (%s)",
+        sid,
+        user.get("nome"),
+        user.get("cpf"),
+    )
+
+    return {"ok": True, "sid": sid}
 
 def _format_br(iso_date: str) -> str:
     """
@@ -890,6 +1068,7 @@ def _process_submission(sid: str, body: FeriasIn, actor: Dict[str, Any]) -> None
             "periodos": periods,
             "dias_total": dias_total,
             "exercicio": raw.get("exercicio"),
+            "status": "done",
             "arquivos": [
                 {"kind": "requerimento", "file_path": req_out, "filename": f"requerimento_{sid}.pdf"},
                 {"kind": "substituicao", "file_path": sub_out, "filename": f"substituicao_{sid}.pdf"},

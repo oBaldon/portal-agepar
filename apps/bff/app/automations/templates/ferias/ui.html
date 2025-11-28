@@ -69,6 +69,12 @@
   .wrap-any { overflow-wrap:anywhere; word-break:break-word; white-space:normal; }
   td.downloads { white-space: nowrap; }
 
+  /* Coluna de ações no histórico */
+  td.actions {
+    white-space: nowrap;
+    text-align: right;
+  }
+
   /* ======= Melhorias pedidas para a coluna "Períodos" (6ª) ======= */
   /* 1) Padding mais estreito só na coluna de Períodos */
   table td:nth-child(6),
@@ -236,6 +242,7 @@
           <col style="width:100px"><!-- Dias -->
           <col style="width:180px"><!-- Períodos -->
           <col style="width:220px"><!-- Downloads -->
+          <col style="width:130px"><!-- Ações -->
         </colgroup>
         <thead>
           <tr>
@@ -246,6 +253,7 @@
             <th class="nowrap">Dias</th>
             <th>Períodos</th>
             <th id="thDownloads" class="nowrap">Downloads</th>
+            <th class="nowrap">Ações</th>
           </tr>
         </thead>
         <tbody id="subs"></tbody>
@@ -602,6 +610,38 @@
   }
   window.downloadFerias = downloadFerias;
 
+  // ---------------------- Exclusão de submissão ----------------------
+  async function deleteFerias(sid) {
+    if (!hasFeriasRole) {
+      alert('Você não tem permissão para excluir registros de férias.');
+      return;
+    }
+    const ok = window.confirm(
+      'Tem certeza que deseja remover este registro de férias?\n' +
+      'Ele deixará de aparecer nos painéis operacionais (servidor e RH) ' +
+      'e continuará registrado como deletado na auditoria interna.'
+    );
+    if (!ok) return;
+
+    try {
+      const r = await fetch(`./submissions/${sid}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        alert(j.message || 'Falha ao excluir o registro de férias.');
+        return;
+      }
+      alert('Registro de férias deletado com sucesso.');
+      await loadSubs();
+    } catch (e) {
+      alert('Falha ao excluir. Tente novamente.');
+    }
+  }
+  window.deleteFerias = deleteFerias;
+
   // ---------------------- Substituto toggle ----------------------
   $("#necessidadeSubst").addEventListener('change', ()=>{
     const show = ($("#necessidadeSubst").value === 'Sim');
@@ -749,6 +789,12 @@
     `;
   }
 
+  function deleteCellHtml(sid, status) {
+    if (!hasFeriasRole) return '<span class="note">—</span>';
+    if (status === 'running') return '<span class="note">em processamento</span>';
+    return `<button class="btn small danger" onclick="deleteFerias('${sid}')">Remover</button>`;
+  }
+
   function fmtQuando(s){
     if(!s) return '';
     const d = new Date(s);
@@ -781,6 +827,7 @@
         const dias = res.dias_total || res.dias || '';
         const exer = px.exercicio || '';
         const protocolo = res.protocolo || px.protocolo || '';
+        const status = (s.status || '').toLowerCase();
         tr.innerHTML = `
           <td class="nowrap">${fmtQuando(s.created_at || '')}</td>
           <td class="nowrap">${s.status||''}</td>
@@ -788,13 +835,14 @@
           <td class="nowrap">${exer}</td>
           <td class="nowrap">${dias||''}</td>
           <td class="wrap-any">${periodsCell(res, px)}</td>
-          <td class="downloads">${downloadsCellHtml(s.id, (s.status||'').toLowerCase())}</td>
+          <td class="downloads">${downloadsCellHtml(s.id, status)}</td>
+          <td class="actions">${deleteCellHtml(s.id, status)}</td>
         `;
         tbody.appendChild(tr);
       });
       ensureTableAutoRefresh(items);
     }catch(e){
-      const tr = document.createElement('tr'); tr.innerHTML = '<td colspan="7">Erro ao carregar histórico.</td>'; tbody.appendChild(tr);
+      const tr = document.createElement('tr'); tr.innerHTML = '<td colspan="8">Erro ao carregar histórico.</td>'; tbody.appendChild(tr);
     }
   }
 
