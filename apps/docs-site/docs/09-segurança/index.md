@@ -13,3 +13,7 @@ sidebar_position: 0
 - Estrutura e conceitos
 - Padrões adotados
 - Exemplos e referências aos arquivos do repositório
+
+---
+
+> _Criado em 2025-12-01_
