@@ -6,97 +6,252 @@ title: Guia de Estilo — Exemplos de Código
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Este guia define **como** escrever exemplos de código de forma consistente.
+Este guia define **como escrever exemplos de código** neste portal de docs
+(BFF, Host, infra, catálogo etc.), para que todos os trechos fiquem:
 
-## Padrões
-- Sempre usar `title="..."` nos blocos que representam arquivos ou comandos importantes.
-- Preferir `showLineNumbers` quando o snippet tiver mais de ~10 linhas.
-- Destacar linhas críticas com `{...}` ou **magic comments**.
-- Comando ≠ Saída: separar em blocos distintos.
-- Preferir abas (`Tabs/TabItem`) para múltiplas linguagens.
-- Usar `diff` para mudanças, e `mermaid` para diagramas.
+- fáceis de **copiar e colar**;
+- consistentes entre páginas;
+- úteis para quem está conhecendo o projeto.
+
+> Regra de ouro: sempre que possível, use exemplos que podem ser
+> **executados exatamente como estão** (comando real, arquivo real, endpoint real).
+
+---
+
+## Padrões gerais
+
+- Usar `title="..."` em blocos que representam **arquivos reais** ou **comandos importantes**.
+- Usar `showLineNumbers` quando o snippet tiver mais de ~10 linhas ou quando você quiser citar “linha X”.
+- Destacar linhas críticas com:
+  - intervalos (ex.: `{3,5-7}`) **ou**
+  - comentários especiais de highlight do Docusaurus.
+- Não misturar **comando** e **saída** no mesmo bloco.
+- Usar `Tabs`/`TabItem` para trechos em várias linguagens (cURL/TS/Python).
+- Usar `diff` para mostrar mudanças e `mermaid` para diagramas.
 
 ---
 
 ## 1) Título do bloco
 
-```bash title="Subindo com Docker Compose"
-docker compose up --build
-````
+Use o `title="..."` para deixar claro **o que é** aquele snippet.
 
-## 2) Números de linha
+- Arquivo → caminho relativo no monorepo.
+- Comando → descrição curta do que o comando faz.
 
-```ts title="vite.config.ts" showLineNumbers
+```bash title="Subindo ambiente de desenvolvimento com Docker Compose"
+docker compose -f infra/docker-compose.dev.yml up --build
+```
+
+**Boas práticas**:
+
+- Preferir caminhos reais:
+  - `apps/bff/app/main.py`
+  - `apps/host/src/App.tsx`
+  - `catalog/catalog.dev.json`
+- Evitar títulos muito genéricos tipo `"exemplo.py"` ou `"script.sh"`.
+
+---
+
+## 2) Números de linha (`showLineNumbers`)
+
+Use `showLineNumbers` em snippets mais longos ou que serão referenciados no texto.
+
+```ts title="apps/host/vite.config.ts" showLineNumbers
 export default {
-  server: { proxy: { "/api": "http://bff:8000" } },
+  server: {
+    proxy: {
+      "/api": "http://bff:8000",
+      "/catalog": "http://bff:8000",
+      "/devdocs": "http://docs:8000"
+    }
+  }
 };
 ```
 
-## 3) Destaque de linhas (2 jeitos)
+Depois, no texto, você pode se referir às linhas:
 
-**a) Por intervalo:**
+> Nas linhas 3–7, configuramos o proxy para BFF, catálogo e site de docs.
 
-```python title="apps/bff/main.py" {3,5-7}
+---
+
+## 3) Destaque de linhas
+
+### 3.1) Por intervalo (ex.: `{3,5-7}`)
+
+Quando quiser destacar linhas específicas, o padrão suportado pelo tema é:
+
+````md title="Exemplo de highlight por intervalo"
+```python title="apps/bff/app/main.py" {3,5-7}
 from fastapi import FastAPI
-app = FastAPI()
-@app.get("/api/me")                  # linha 3 destacada
-def me():                            # linhas 5-7 destacadas
+
+app = FastAPI(
+    title="Portal AGEPAR BFF",
+)
+
+@app.get("/api/me")
+def me():
     return {"ok": True}
 ```
+````
 
-**b) Por “magic comments”:**
+> O trecho `{3,5-7}` indica que a linha 3 e as linhas 5 a 7 devem aparecer
+> visualmente destacadas no snippet.
 
-```ts title="fetch.ts"
-const r = await fetch("/api/me");
+### 3.2) Por “magic comments” (highlight-next-line / highlight-start/end)
+
+Outra forma é marcar as linhas **dentro do próprio código**, usando comentários especiais:
+
+```ts title="apps/host/src/lib/api.ts"
+const response = await fetch("/api/me", {
+  credentials: "include",
+});
+
 // highlight-next-line
-if (!r.ok) throw new Error("Auth required");
+if (!response.ok) throw new Error("Auth required");
+
 /* highlight-start */
-const data = await r.json();
+const data = await response.json();
 renderUser(data);
 /* highlight-end */
 ```
 
-## 4) Blocos de diferença (diff)
+Essa estratégia é útil quando o arquivo real muda de tamanho, mas você quer continuar
+destacando o mesmo trecho lógico (a validação do `response.ok`, por exemplo).
 
-```diff title="apps/bff/app.py"
-- app = FastAPI()
-+ app = FastAPI(title="Plataforma AGEPAR BFF")
+---
+
+## 4) Blocos de diferença (`diff`)
+
+Use blocos `diff` quando quiser mostrar **antes vs depois** em um arquivo.
+
+```diff title="apps/bff/app/main.py"
+- APP = FastAPI(
+-     title="Portal AGEPAR",
+- )
++ APP = FastAPI(
++     title="Portal AGEPAR BFF",
++     version="0.3.0",
++ )
 ```
+
+Dicas:
+
+- Mostre apenas o trecho relevante (não é obrigatório incluir o arquivo inteiro).
+- Útil para explicar mudanças em releases ou em seções de “Migração”.
+
+---
 
 ## 5) Separar comando de saída
 
-```bash title="Requisição"
+Nunca misture comando e saída no mesmo bloco.  
+Isso facilita copiar apenas o comando, sem levar o output junto.
+
+```bash title="Requisição para /api/me"
 curl -i http://localhost:8000/api/me
 ```
 
 ```text title="Resposta (HTTP 200)"
 HTTP/1.1 200 OK
-content-type: application/json
-{"ok":true}
+content-type: application/json; charset=utf-8
+
+{"ok": true}
 ```
 
-## 6) Várias linguagens com abas
+Padrões:
+
+- Comandos de terminal → `bash`.
+- Respostas HTTP completas (status + headers + body) → `text`.
+- Quando for apenas o corpo JSON → `json`.
+
+---
+
+## 6) Várias linguagens com abas (`Tabs`)
+
+Use `Tabs` quando quiser mostrar **o mesmo fluxo** em mais de uma linguagem
+(ex.: cURL, TypeScript, Python).
+
+Exemplo: login no BFF
 
 <Tabs>
   <TabItem value="curl" label="cURL">
-    ```bash
-    curl -X POST http://localhost:8000/api/auth/login -d 'user=dev&pass=dev'
+    ```bash title="Login (cURL)"
+    curl -X POST http://localhost:8000/api/auth/login       -H "Content-Type: application/json"       -d '{"identifier":"dev@example.com","password":"dev"}'
     ```
   </TabItem>
   <TabItem value="ts" label="TypeScript">
-    ```ts
-    await fetch("/api/auth/login", { method: "POST", body: formData });
+    ```ts title="Login (Host / TypeScript)"
+    await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        identifier: "dev@example.com",
+        password: "dev",
+      }),
+    });
     ```
   </TabItem>
   <TabItem value="py" label="Python">
-    ```python
-    import requests; requests.post("http://localhost:8000/api/auth/login", data=payload)
+    ```python title="Login (Python requests)"
+    import requests
+
+    resp = requests.post(
+        "http://localhost:8000/api/auth/login",
+        json={"identifier": "dev@example.com", "password": "dev"},
+    )
+    resp.raise_for_status()
+    print(resp.json())
     ```
   </TabItem>
 </Tabs>
 
-## 7) Admonitions (Dicas/Notas)
+Boas práticas para abas:
+
+- `value` em minúsculo e sem espaços (`"curl"`, `"ts"`, `"py"`).
+- `label` é o texto amigável para o usuário.
+- Dentro de cada tab, um snippet completo o suficiente para ser executado.
+
+---
+
+## 7) Admonitions (Dicas, Notas, Atenções)
+
+Use admonitions para chamar a atenção para detalhes importantes:
+
+- `:::tip` → dicas práticas.
+- `:::info` → contexto adicional.
+- `:::caution` → riscos ou pegadinhas.
+- `:::danger` → avisos fortes (não faça X).
+
+Exemplo:
 
 :::tip Dica
-Use `title="..."`, `showLineNumbers` e **magic comments** para destacar passos críticos.
+Combine `title="..."`, `showLineNumbers` e **destaques de linha** quando estiver
+documentando trechos críticos (auth, RBAC, catálogo, automations de negócio).
 :::
+
+:::caution Atenção
+Evite exemplos que **não correspondem** ao código real do repositório.  
+Sempre que possível, copie o trecho da versão atual e só então resuma ou adaptar
+o que não for essencial.
+:::
+
+---
+
+## 8) Linguagens mais usadas (mapa rápido)
+
+Para manter consistência entre páginas, prefira:
+
+- **BFF / FastAPI / automations** → `python`
+- **Host / React / Vite / TypeScript** → `ts` ou `tsx`
+- **Scripts shell** → `bash`
+- **Config JSON / payloads** → `json`
+- **Respostas HTTP textuais** → `text`
+- **Diferenças de código** → `diff`
+- **Diagramas de fluxo/arquitetura** → `mermaid`
+
+> Em caso de dúvida, priorize o formato que facilita **copiar, adaptar e testar**
+> o exemplo (por exemplo, `bash` para chamadas de API e `json` para payloads de entrada/saída).
+
+---
+
+> _Atualizado em 2025-12-03_
