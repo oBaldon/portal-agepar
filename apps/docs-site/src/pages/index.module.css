@@ -13,7 +13,9 @@
   align-items: center;
 }
 
-.heroLeft { max-width: 720px; }
+.heroLeft {
+  max-width: 720px;
+}
 
 .title {
   margin: 0 0 .4rem;
@@ -29,13 +31,34 @@
   color: var(--agepar-text-secondary);
 }
 
-.ctaRow { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.cta { border-radius: 12px; padding: .65rem 1rem; }
+.ctaRow {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
 
-.meta { font-size: .95rem; opacity: .95; color: var(--agepar-text-secondary); }
-.meta ul { margin: .35rem 0 0 1rem; }
+.cta {
+  border-radius: 12px;
+  padding: .65rem 1rem;
+}
 
-.heroRight { display: flex; justify-content: center; }
+/* Mantém legibilidade em qualquer tema */
+.meta {
+  font-size: .95rem;
+  opacity: .95;
+  color: var(--agepar-text-secondary);
+}
+
+.meta ul {
+  margin: .35rem 0 0 1rem;
+  padding-left: 0;
+}
+
+.heroRight {
+  display: flex;
+  justify-content: center;
+}
 
 .codeCard {
   width: 100%;
@@ -46,20 +69,25 @@
   border: 1px solid var(--ifm-color-emphasis-200);
   overflow: hidden;
 }
+
+/* Melhor contraste e alinhado ao tema */
 .codeHeader {
   padding: .5rem .75rem;
   font-size: .8rem;
-  background: var(--ifm-navbar-background-color);
+  background: var(--ifm-color-primary);
+  color: var(--ifm-color-primary-contrast-foreground);
   border-bottom: 1px solid var(--ifm-color-emphasis-200);
-  color: #fff;
 }
+
 .codeBlock {
   margin: 0;
   padding: 1rem;
   font-size: .8rem;
   line-height: 1.4;
   overflow: auto;
+  font-family: var(--ifm-font-family-monospace);
 }
+
 .codeFooter {
   padding: .5rem .75rem;
   background: var(--ifm-background-surface-color);
@@ -67,11 +95,17 @@
   font-size: .8rem;
 }
 
+.codeFooter code {
+  font-family: var(--ifm-font-family-monospace);
+}
+
+/* Deixa o grid mais fluido em vários tamanhos de tela */
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
+
 .card {
   display: block;
   padding: 1rem;
@@ -81,29 +115,71 @@
   box-shadow: var(--ifm-global-shadow-lw);
   text-decoration: none;
   color: inherit;
-  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  transition:
+    transform .15s ease,
+    box-shadow .15s ease,
+    border-color .15s ease;
 }
+
 .card:hover {
   transform: translateY(-2px);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-global-shadow-md);
 }
+
 .card h3 {
   margin: .25rem 0 .25rem;
   font-size: 1.05rem;
   color: var(--agepar-text-primary);
 }
+
 .card p {
   margin: 0 0 .75rem;
   font-size: .9rem;
   color: var(--agepar-text-secondary);
 }
-.cardLink { font-size: .85rem; color: var(--ifm-color-primary); }
 
-@media (max-width: 996px) {
-  .heroInner { grid-template-columns: 1fr; }
-  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cardLink {
+  font-size: .85rem;
+  color: var(--ifm-color-primary);
 }
+
+/* Acessibilidade: foco visível para navegação por teclado */
+.card:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 3px;
+  border-color: var(--ifm-color-primary);
+}
+
+/* Responsividade */
+@media (max-width: 996px) {
+  .heroInner {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    padding-top: 3rem;
+  }
+
+  .heroRight {
+    order: -1; /* opcional: sobe o card de código no mobile */
+  }
+}
+
 @media (max-width: 600px) {
-  .grid { grid-template-columns: 1fr; }
+  .title {
+    font-size: 2.2rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+}
+
+/* Respeita quem desabilitou animações no sistema */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+    transform: none !important;
+  }
 }
