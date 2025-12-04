@@ -20,12 +20,23 @@ function Hero() {
             <Link className={`button button--primary ${styles.cta}`} to="/docs/intro">
               🚀 Começar pela Introdução
             </Link>
+
             <Link
               className={`button button--accent ${styles.cta}`}
               to="/docs/visão-geral-e-arquitetura"
             >
               🧭 Visão Geral & Arquitetura
             </Link>
+
+            {/* CTA para a aplicação em si */}
+            <a
+              className={`button button--secondary ${styles.cta}`}
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🌐 Abrir Portal (App)
+            </a>
           </div>
 
           <div className={styles.meta}>
