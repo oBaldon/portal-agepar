@@ -1,4 +1,5 @@
 // apps/host/src/pages/Login.tsx
+import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -59,7 +60,7 @@ function isNumericLike(s: string) {
   const t = (s || "").trim();
   if (!t) return false;
   if (/[a-zA-Z@]/.test(t)) return false;
-  return /^[[\d.\-\/\s]+$/.test(t);
+  return /^[\d.\-\/\s]+$/.test(t);
 }
 
 /**
@@ -126,18 +127,19 @@ export default function Login() {
   );
 
   /**
-   * Atalho: Alt + D abre a documentação técnica (rota /devdocs/).
+   * Atalho: Ctrl + D abre a documentação técnica (rota /devdocs/)
+   * em uma nova aba, sem alterar a página atual.
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey && (e.key === "d" || e.key === "D")) {
+      if (e.ctrlKey && (e.key === "d" || e.key === "D")) {
         e.preventDefault();
-        nav("/devdocs/");
+        window.open("/devdocs/", "_blank", "noopener,noreferrer");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [nav]);
+  }, []);
 
   /**
    * Sugestão de e-mail quando o identificador não contém "@"
@@ -329,7 +331,7 @@ export default function Login() {
           </Link>
         </div>
 
-        <span className="sr-only">Atalho: Alt + D abre a documentação técnica.</span>
+        <span className="sr-only">Atalho: Ctrl + D abre a documentação técnica.</span>
       </div>
     </div>
   );
