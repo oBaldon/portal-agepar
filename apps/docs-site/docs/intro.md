@@ -4,7 +4,7 @@ title: "Plataforma AGEPAR — Doc Técnica"
 sidebar_position: 0
 ---
 
-_Criado em 2025-10-27 11:32:36_
+_Criado em 2025-10-27_
 
 Este site documenta arquitetura, DevOps, BFF (FastAPI), Host (React/Vite/TS), Catálogo e Automations do Plataforma AGEPAR.
 
@@ -147,4 +147,4 @@ A documentação técnica da Plataforma AGEPAR está organizada por **seções n
 
 ---
 
-_Criado em 2025-10-27 11:32:36_
+_Criado em 2025-10-27_
