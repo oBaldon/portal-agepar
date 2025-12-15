@@ -217,102 +217,309 @@
   const prazosGroup = document.getElementById('prazosGroup');
   const protocoloEl = document.getElementById('protocolo'); // NOVO
 
-  function mesesDoAno(ano){ const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]; if(!/^[0-9]{4}$/.test(String(ano||""))) return []; return n.map(m=>`${m} de ${ano}`); }
-
-  async function loadModels(){ try{ const r=await fetch('./models'); if(!r.ok) return; const data=await r.json(); (data.items||[]).forEach(m=>{ const o=document.createElement('option'); o.value=m.slug; o.textContent=m.slug; modeloSel.appendChild(o); }); }catch{} }
-  function loadDiretoriasDemandantes(){ LISTS.diretoriasDemandantes.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; dirDemSel.appendChild(o); }); }
-  function loadGrauPrioridade(){ const gpSel=document.getElementById('grauPrioridade'); LISTS.grauPrioridade.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; gpSel.appendChild(o); }); }
-
-  function rebuildPrazosOptions(){
-    const ano=(pcaAnoEl?.value||'').trim(); const valid=/^[0-9]{4}$/.test(ano);
-    prazosSel.innerHTML='';
-    if(!valid){ prazosSel.disabled=true; prazosGroup.classList.add('group-disabled'); const o=document.createElement('option'); o.value=''; o.textContent='Informe o ano do PCA primeiro'; prazosSel.appendChild(o); return; }
-    prazosSel.disabled=false; prazosGroup.classList.remove('group-disabled');
-    const ph=document.createElement('option'); ph.value=''; ph.textContent='-- Selecionar --'; prazosSel.appendChild(ph);
-    mesesDoAno(ano).forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; prazosSel.appendChild(o); });
+  function mesesDoAno(ano){
+    const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+    if(!/^[0-9]{4}$/.test(String(ano||""))) return [];
+    return n.map(m=>`${m} de ${ano}`);
   }
 
-  function smoothScrollTo(el){ if(!el) return; const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches; el.scrollIntoView({behavior: reduced?'auto':'smooth', block:'start'}); }
+  async function loadModels(){
+    try{
+      const r=await fetch('./models');
+      if(!r.ok) return;
+      const data=await r.json();
+      (data.items||[]).forEach(m=>{
+        const o=document.createElement('option');
+        o.value=m.slug;
+        o.textContent=m.slug;
+        modeloSel.appendChild(o);
+      });
+    }catch{}
+  }
 
-  // NOVO: helper para saber se “apenas 1 item” está ativo
+  function loadDiretoriasDemandantes(){
+    LISTS.diretoriasDemandantes.forEach(v=>{
+      const o=document.createElement('option');
+      o.value=v;
+      o.textContent=v;
+      dirDemSel.appendChild(o);
+    });
+  }
+
+  function loadGrauPrioridade(){
+    const gpSel=document.getElementById('grauPrioridade');
+    LISTS.grauPrioridade.forEach(v=>{
+      const o=document.createElement('option');
+      o.value=v;
+      o.textContent=v;
+      gpSel.appendChild(o);
+    });
+  }
+
+  function rebuildPrazosOptions(){
+    const ano=(pcaAnoEl?.value||'').trim();
+    const valid=/^[0-9]{4}$/.test(ano);
+    prazosSel.innerHTML='';
+    if(!valid){
+      prazosSel.disabled=true;
+      prazosGroup.classList.add('group-disabled');
+      const o=document.createElement('option');
+      o.value='';
+      o.textContent='Informe o ano do PCA primeiro';
+      prazosSel.appendChild(o);
+      return;
+    }
+    prazosSel.disabled=false;
+    prazosGroup.classList.remove('group-disabled');
+    const ph=document.createElement('option');
+    ph.value='';
+    ph.textContent='-- Selecionar --';
+    prazosSel.appendChild(ph);
+    mesesDoAno(ano).forEach(v=>{
+      const o=document.createElement('option');
+      o.value=v;
+      o.textContent=v;
+      prazosSel.appendChild(o);
+    });
+  }
+
+  function smoothScrollTo(el){
+    if(!el) return;
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({behavior: reduced?'auto':'smooth', block:'start'});
+  }
+
+  // helper para saber se “apenas 1 item” está ativo
   function isSingleItemLocked(){
     return !!objetoUmItemEl?.checked;
   }
 
+  // remove itens extras quando “apenas 1 item” estiver ativo
+  function pruneItemsToSingle(){
+    if(!isSingleItemLocked()) return false;
+    let removed = false;
+    while(itemsEl && itemsEl.children && itemsEl.children.length > 1){
+      itemsEl.lastElementChild?.remove();
+      removed = true;
+    }
+    return removed;
+  }
+
   let itemSeq=0;
-  function buildSelect(options, placeholder="-- Selecionar --"){ const sel=document.createElement('select'); const o0=document.createElement('option'); o0.value=''; o0.textContent=placeholder; sel.appendChild(o0); options.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); }); return sel; }
-  function helpIcon(text){ const span=document.createElement('span'); span.className='inline-help'; const b=document.createElement('button'); b.type='button'; b.className='help'; b.setAttribute('aria-label','Ajuda'); b.textContent='?'; const tip=document.createElement('span'); tip.className='tip'; tip.textContent=text; span.appendChild(b); span.appendChild(tip); return span; }
+  function buildSelect(options, placeholder="-- Selecionar --"){
+    const sel=document.createElement('select');
+    const o0=document.createElement('option');
+    o0.value='';
+    o0.textContent=placeholder;
+    sel.appendChild(o0);
+    options.forEach(v=>{
+      const o=document.createElement('option');
+      o.value=v;
+      o.textContent=v;
+      sel.appendChild(o);
+    });
+    return sel;
+  }
+
+  function helpIcon(text){
+    const span=document.createElement('span');
+    span.className='inline-help';
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='help';
+    b.setAttribute('aria-label','Ajuda');
+    b.textContent='?';
+    const tip=document.createElement('span');
+    tip.className='tip';
+    tip.textContent=text;
+    span.appendChild(b);
+    span.appendChild(tip);
+    return span;
+  }
 
   function createItem(){
     const idx=itemSeq++;
-    const wrap=document.createElement('div'); wrap.className='item'; wrap.dataset.idx=idx;
+    const wrap=document.createElement('div');
+    wrap.className='item';
+    wrap.dataset.idx=idx;
 
-    const meta=document.createElement('div'); meta.className='meta';
-    const title=document.createElement('div'); title.innerHTML=`<span class="badge">Item</span> <strong class="item-number">#${idx+1}</strong>`;
+    const meta=document.createElement('div');
+    meta.className='meta';
+    const title=document.createElement('div');
+    title.innerHTML=`<span class="badge">Item</span> <strong class="item-number">#${idx+1}</strong>`;
     meta.appendChild(title);
 
-    const lblDesc=document.createElement('label'); lblDesc.textContent='Descrição sucinta do objeto'; lblDesc.appendChild(helpIcon('Texto resumido do que será contratado/adquirido.'));
-    const txtDesc=document.createElement('textarea'); txtDesc.name=`items[${idx}][descricao]`; txtDesc.id=`item-${idx}-descricao`; lblDesc.htmlFor=txtDesc.id;
+    const lblDesc=document.createElement('label');
+    lblDesc.textContent='Descrição sucinta do objeto';
+    lblDesc.appendChild(helpIcon('Texto resumido do que será contratado/adquirido.'));
+    const txtDesc=document.createElement('textarea');
+    txtDesc.name=`items[${idx}][descricao]`;
+    txtDesc.id=`item-${idx}-descricao`;
+    lblDesc.htmlFor=txtDesc.id;
 
-    const row1=document.createElement('div'); row1.className='row';
+    const row1=document.createElement('div');
+    row1.className='row';
 
-    const colDep=document.createElement('div'); colDep.className='col';
-    const lblDep=document.createElement('label'); lblDep.textContent='Há vinculação ou dependência com a contratação de outro item?'; lblDep.appendChild(helpIcon('Informe se este item possui vínculo/dependência com outra contratação.'));
-    const selDep=buildSelect(LISTS.simNao); selDep.name=`items[${idx}][haDependencia]`; selDep.id=`item-${idx}-haDependencia`; lblDep.htmlFor=selDep.id;
-    colDep.appendChild(lblDep); colDep.appendChild(selDep);
+    const colDep=document.createElement('div');
+    colDep.className='col';
+    const lblDep=document.createElement('label');
+    lblDep.textContent='Há vinculação ou dependência com a contratação de outro item?';
+    lblDep.appendChild(helpIcon('Informe se este item possui vínculo/dependência com outra contratação.'));
+    const selDep=buildSelect(LISTS.simNao);
+    selDep.name=`items[${idx}][haDependencia]`;
+    selDep.id=`item-${idx}-haDependencia`;
+    lblDep.htmlFor=selDep.id;
+    colDep.appendChild(lblDep);
+    colDep.appendChild(selDep);
 
-    const colRen=document.createElement('div'); colRen.className='col';
-    const lblRen=document.createElement('label'); lblRen.textContent='Renovação de contrato'; lblRen.appendChild(helpIcon('Indique se se trata de renovação de contrato.'));
-    const selRen=buildSelect(LISTS.simNao); selRen.name=`items[${idx}][renovacaoContrato]`; selRen.id=`item-${idx}-renovacaoContrato`; lblRen.htmlFor=selRen.id;
-    colRen.appendChild(lblRen); colRen.appendChild(selRen);
+    const colRen=document.createElement('div');
+    colRen.className='col';
+    const lblRen=document.createElement('label');
+    lblRen.textContent='Renovação de contrato';
+    lblRen.appendChild(helpIcon('Indique se se trata de renovação de contrato.'));
+    const selRen=buildSelect(LISTS.simNao);
+    selRen.name=`items[${idx}][renovacaoContrato]`;
+    selRen.id=`item-${idx}-renovacaoContrato`;
+    lblRen.htmlFor=selRen.id;
+    colRen.appendChild(lblRen);
+    colRen.appendChild(selRen);
 
-    row1.appendChild(colDep); row1.appendChild(colRen);
+    row1.appendChild(colDep);
+    row1.appendChild(colRen);
 
     // Detalhe do vínculo (COMEÇA DESABILITADO)
-    const row2a=document.createElement('div'); row2a.className='row';
-    const colQual=document.createElement('div'); colQual.className='col group-disabled'; colQual.id=`group-qual-${idx}`;
-    const lblQual=document.createElement('label'); lblQual.textContent="Se 'Sim', descreva o vínculo"; lblQual.appendChild(helpIcon('Descreva a contratação vinculada/dependente.'));
-    const inpQual=document.createElement('input'); inpQual.placeholder='Ex.: Depende do contrato ABC'; inpQual.name=`items[${idx}][dependenciaQual]`; inpQual.id=`item-${idx}-dependenciaQual`; inpQual.disabled=true; // << começa disabled
+    const row2a=document.createElement('div');
+    row2a.className='row';
+    const colQual=document.createElement('div');
+    colQual.className='col group-disabled';
+    colQual.id=`group-qual-${idx}`;
+    const lblQual=document.createElement('label');
+    lblQual.textContent="Se 'Sim', descreva o vínculo";
+    lblQual.appendChild(helpIcon('Descreva a contratação vinculada/dependente.'));
+    const inpQual=document.createElement('input');
+    inpQual.placeholder='Ex.: Depende do contrato ABC';
+    inpQual.name=`items[${idx}][dependenciaQual]`;
+    inpQual.id=`item-${idx}-dependenciaQual`;
+    inpQual.disabled=true; // começa disabled
     lblQual.htmlFor=inpQual.id;
-    colQual.appendChild(lblQual); colQual.appendChild(inpQual);
+    colQual.appendChild(lblQual);
+    colQual.appendChild(inpQual);
     row2a.appendChild(colQual);
 
     // Quantidade / UM / Valores
-    const row2=document.createElement('div'); row2.className='row';
+    const row2=document.createElement('div');
+    row2.className='row';
 
-    const colQt=document.createElement('div'); colQt.className='col';
-    const lblQt=document.createElement('label'); lblQt.textContent='Quantidade a ser adquirida'; lblQt.appendChild(helpIcon('Informe um número inteiro.'));
-    const inpQt=document.createElement('input'); inpQt.type='number'; inpQt.min='0'; inpQt.step='1'; inpQt.inputMode='numeric'; inpQt.name=`items[${idx}][quantidade]`; inpQt.id=`item-${idx}-quantidade`; lblQt.htmlFor=inpQt.id;
-    colQt.appendChild(lblQt); colQt.appendChild(inpQt);
+    const colQt=document.createElement('div');
+    colQt.className='col';
+    const lblQt=document.createElement('label');
+    lblQt.textContent='Quantidade a ser adquirida';
+    lblQt.appendChild(helpIcon('Informe um número inteiro.'));
+    const inpQt=document.createElement('input');
+    inpQt.type='number';
+    inpQt.min='0';
+    inpQt.step='1';
+    inpQt.inputMode='numeric';
+    inpQt.name=`items[${idx}][quantidade]`;
+    inpQt.id=`item-${idx}-quantidade`;
+    lblQt.htmlFor=inpQt.id;
+    colQt.appendChild(lblQt);
+    colQt.appendChild(inpQt);
 
-    const colUM=document.createElement('div'); colUM.className='col';
-    const lblUM=document.createElement('label'); lblUM.textContent='Unidade de medida'; lblUM.appendChild(helpIcon('Escolha uma unidade padronizada.'));
-    const selUM=buildSelect(LISTS.unidadeMedida); selUM.name=`items[${idx}][unidadeMedida]`; selUM.id=`item-${idx}-unidadeMedida`; lblUM.htmlFor=selUM.id;
-    colUM.appendChild(lblUM); colUM.appendChild(selUM);
+    const colUM=document.createElement('div');
+    colUM.className='col';
+    const lblUM=document.createElement('label');
+    lblUM.textContent='Unidade de medida';
+    lblUM.appendChild(helpIcon('Escolha uma unidade padronizada.'));
+    const selUM=buildSelect(LISTS.unidadeMedida);
+    selUM.name=`items[${idx}][unidadeMedida]`;
+    selUM.id=`item-${idx}-unidadeMedida`;
+    lblUM.htmlFor=selUM.id;
+    colUM.appendChild(lblUM);
+    colUM.appendChild(selUM);
 
-    const colVU=document.createElement('div'); colVU.className='col';
-    const lblVU=document.createElement('label'); lblVU.textContent='Estimativa de valor unitário (R$)'; lblVU.appendChild(helpIcon('Use ponto como separador decimal.'));
-    const inpVU=document.createElement('input'); inpVU.type='number'; inpVU.min='0'; inpVU.step='0.01'; inpVU.inputMode='decimal'; inpVU.name=`items[${idx}][valorUnitario]`; inpVU.id=`item-${idx}-valorUnitario`; lblVU.htmlFor=inpVU.id;
-    colVU.appendChild(lblVU); colVU.appendChild(inpVU);
+    const colVU=document.createElement('div');
+    colVU.className='col';
+    const lblVU=document.createElement('label');
+    lblVU.textContent='Estimativa de valor unitário (R$)';
+    lblVU.appendChild(helpIcon('Use ponto como separador decimal.'));
+    const inpVU=document.createElement('input');
+    inpVU.type='number';
+    inpVU.min='0';
+    inpVU.step='0.01';
+    inpVU.inputMode='decimal';
+    inpVU.name=`items[${idx}][valorUnitario]`;
+    inpVU.id=`item-${idx}-valorUnitario`;
+    lblVU.htmlFor=inpVU.id;
+    colVU.appendChild(lblVU);
+    colVU.appendChild(inpVU);
 
-    const colVT=document.createElement('div'); colVT.className='col group-disabled'; // visual cinza no label também
-    const lblVT=document.createElement('label'); lblVT.textContent='Estimativa de valor total (auto)'; lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário.'));
-    const inpVT=document.createElement('input'); inpVT.type='text'; inpVT.readOnly=true; inpVT.disabled=true; inpVT.tabIndex=-1; inpVT.classList.add('readonly'); inpVT.name=`items[${idx}][valorTotal]`; inpVT.id=`item-${idx}-valorTotal`; lblVT.htmlFor=inpVT.id;
-    colVT.appendChild(lblVT); colVT.appendChild(inpVT);
+    const colVT=document.createElement('div');
+    colVT.className='col group-disabled'; // visual cinza no label também
+    const lblVT=document.createElement('label');
+    lblVT.textContent='Estimativa de valor total (auto)';
+    lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário.'));
+    const inpVT=document.createElement('input');
+    inpVT.type='text';
+    inpVT.readOnly=true;
+    inpVT.disabled=true;
+    inpVT.tabIndex=-1;
+    inpVT.classList.add('readonly');
+    inpVT.name=`items[${idx}][valorTotal]`;
+    inpVT.id=`item-${idx}-valorTotal`;
+    lblVT.htmlFor=inpVT.id;
+    colVT.appendChild(lblVT);
+    colVT.appendChild(inpVT);
 
-    row2.appendChild(colQt); row2.appendChild(colUM); row2.appendChild(colVU); row2.appendChild(colVT);
+    row2.appendChild(colQt);
+    row2.appendChild(colUM);
+    row2.appendChild(colVU);
+    row2.appendChild(colVT);
 
-    const actions=document.createElement('div'); actions.className='item-actions';
-    const removeBtn=document.createElement('button'); removeBtn.type='button'; removeBtn.className='btn small danger remove-item'; removeBtn.textContent='Remover';
-    const addBtn=document.createElement('button'); addBtn.type='button'; addBtn.className='btn small secondary add-item'; addBtn.textContent='Adicionar item';
-    actions.appendChild(removeBtn); actions.appendChild(addBtn);
+    const actions=document.createElement('div');
+    actions.className='item-actions';
+    const removeBtn=document.createElement('button');
+    removeBtn.type='button';
+    removeBtn.className='btn small danger remove-item';
+    removeBtn.textContent='Remover';
+    const addBtn=document.createElement('button');
+    addBtn.type='button';
+    addBtn.className='btn small secondary add-item';
+    addBtn.textContent='Adicionar item';
+    actions.appendChild(removeBtn);
+    actions.appendChild(addBtn);
 
-    removeBtn.onclick=()=>{ if(itemsEl.children.length<=1){ removeBtn.blur(); wrap.style.animation='shake .2s'; setTimeout(()=>wrap.style.animation='',250); return; } wrap.remove(); recomputeItemNumbers(); updateItemButtons(); };
-    // Ajuste: respeitar o modo "apenas 1 item"
-    addBtn.onclick=()=>{ if (isSingleItemLocked()) return; itemsEl.appendChild(createItem()); recomputeItemNumbers(); updateItemButtons(); const last=itemsEl.lastElementChild; if(last) last.querySelector('textarea, input, select')?.focus(); };
+    removeBtn.onclick=()=>{
+      if(itemsEl.children.length<=1){
+        removeBtn.blur();
+        wrap.style.animation='shake .2s';
+        setTimeout(()=>wrap.style.animation='',250);
+        return;
+      }
+      wrap.remove();
+      recomputeItemNumbers();
+      updateItemButtons();
+    };
 
-    function recalc(){ const q=parseFloat(inpQt.value||'0'); const vu=parseFloat(inpVU.value||'0'); const vt=(isFinite(q)&&isFinite(vu))?(q*vu):0; inpVT.value=(Math.round(vt*100)/100).toFixed(2); }
-    inpQt.addEventListener('input', recalc); inpVU.addEventListener('input', recalc); recalc();
+    // respeitar o modo "apenas 1 item"
+    addBtn.onclick=()=>{
+      if (isSingleItemLocked()) return;
+      itemsEl.appendChild(createItem());
+      recomputeItemNumbers();
+      updateItemButtons();
+      const last=itemsEl.lastElementChild;
+      if(last) last.querySelector('textarea, input, select')?.focus();
+    };
+
+    function recalc(){
+      const q=parseFloat(inpQt.value||'0');
+      const vu=parseFloat(inpVU.value||'0');
+      const vt=(isFinite(q)&&isFinite(vu))?(q*vu):0;
+      inpVT.value=(Math.round(vt*100)/100).toFixed(2);
+    }
+    inpQt.addEventListener('input', recalc);
+    inpVU.addEventListener('input', recalc);
+    recalc();
 
     function toggleQual(){
       const show=(selDep.value==='Sim');
@@ -335,7 +542,7 @@
     return wrap;
   }
 
-  // Ajuste: esconder/desabilitar o "Adicionar item" quando travado
+  // esconder/desabilitar o "Adicionar item" quando travado
   function updateItemButtons(){
     const onlyOne=itemsEl.children.length<=1;
     const lock=isSingleItemLocked();
@@ -354,24 +561,54 @@
 
   function recomputeItemNumbers(){
     Array.from(itemsEl.children).forEach((div,i)=>{
-      const numEl=div.querySelector('.item-number'); if(numEl) numEl.textContent=`#${i+1}`;
+      const numEl=div.querySelector('.item-number');
+      if(numEl) numEl.textContent=`#${i+1}`;
       div.dataset.idx=String(i);
-      div.querySelectorAll('[name^="items["]').forEach(el=>{ el.name=el.name.replace(/items\[\d+\]/, `items[${i}]`); });
-      div.querySelectorAll('[id^="item-"]').forEach(el=>{ el.id=el.id.replace(/item-\d+-/, `item-${i}-`); });
-      div.querySelectorAll('label[for^="item-"]').forEach(l=>{ l.htmlFor=l.htmlFor.replace(/item-\d+-/, `item-${i}-`); });
+      div.querySelectorAll('[name^="items["]').forEach(el=>{
+        el.name=el.name.replace(/items\[\d+\]/, `items[${i}]`);
+      });
+      div.querySelectorAll('[id^="item-"]').forEach(el=>{
+        el.id=el.id.replace(/item-\d+-/, `item-${i}-`);
+      });
+      div.querySelectorAll('label[for^="item-"]').forEach(l=>{
+        l.htmlFor=l.htmlFor.replace(/item-\d+-/, `item-${i}-`);
+      });
     });
   }
 
-  function ensureOneItem(){ if(itemsEl.children.length===0){ itemsEl.appendChild(createItem()); recomputeItemNumbers(); updateItemButtons(); } else { updateItemButtons(); } }
+  function ensureOneItem(){
+    let changed = false;
+    if(itemsEl.children.length===0){
+      itemsEl.appendChild(createItem());
+      changed = true;
+    }
+    // se estiver travado em 1 item, descarta itens adicionais
+    if (pruneItemsToSingle()) changed = true;
+    if (changed) recomputeItemNumbers();
+    updateItemButtons();
+  }
 
   pcaAnoEl?.addEventListener('input', rebuildPrazosOptions);
 
-  function syncObjToFirstItem(){ const first=itemsEl.firstElementChild; if(!first) return; const desc=first.querySelector('textarea[name$="[descricao]"]'); if(desc) desc.value=objetoEl.value||""; }
-  // Ajuste: atualizar botões ao alternar o modo "apenas 1 item"
-  objetoUmItemEl?.addEventListener('change', ()=>{ ensureOneItem(); if(objetoUmItemEl.checked) syncObjToFirstItem(); updateItemButtons(); });
-  objetoEl?.addEventListener('input', ()=>{ if(objetoUmItemEl.checked) syncObjToFirstItem(); });
+  function syncObjToFirstItem(){
+    const first=itemsEl.firstElementChild;
+    if(!first) return;
+    const desc=first.querySelector('textarea[name$="[descricao]"]');
+    if(desc) desc.value=objetoEl.value||"";
+  }
 
-  // NOVO: governar o botão pela presença do Protocolo
+  // atualizar botões ao alternar o modo "apenas 1 item"
+  objetoUmItemEl?.addEventListener('change', ()=>{
+    ensureOneItem();
+    if(objetoUmItemEl.checked) syncObjToFirstItem();
+    updateItemButtons();
+  });
+
+  objetoEl?.addEventListener('input', ()=>{
+    if(objetoUmItemEl.checked) syncObjToFirstItem();
+  });
+
+  // governar o botão pela presença do Protocolo
   function updateSubmitState(){
     const hasProto = (protocoloEl?.value || '').trim().length > 0;
     submitBtn.disabled = !hasProto;
@@ -393,11 +630,18 @@
       prazosEnvolvidos:f.prazosEnvolvidos.value||"",
       consequenciaNaoAquisicao:f.consequenciaNaoAquisicao.value||"",
       grauPrioridade:f.grauPrioridade.value||"",
-      protocolo:f.protocolo.value||"" // NOVO
+      protocolo:f.protocolo.value||""
     };
-    const items=Array.from(itemsEl.children).map(div=>{
+
+    const children = Array.from(itemsEl.children);
+    const itemNodes = isSingleItemLocked() ? children.slice(0,1) : children;
+
+    const items = itemNodes.map(div=>{
       const pick=sel=>div.querySelector(sel);
-      const num=x=>{ const v=parseFloat(x||'0'); return isFinite(v)?v:0; };
+      const num=x=>{
+        const v=parseFloat(x||'0');
+        return isFinite(v)?v:0;
+      };
       const dep=(pick('select[name$="[haDependencia]"]')?.value||"");
       return {
         descricao: pick('textarea[name$="[descricao]"]')?.value||"",
@@ -410,6 +654,7 @@
         valorTotal: num(pick('input[name$="[valorTotal]"]')?.value)
       };
     });
+
     return { ...header, items };
   }
 
@@ -422,50 +667,137 @@
 
     const payload=formToPayload();
     let res, data;
-    try{ res=await fetch('./submit',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); try{ data=await res.json(); }catch{ data={}; } }
-    catch(e){ statusEl.textContent='Erro de rede ao enviar. Tente novamente.'; updateSubmitState(); return; }
+    try{
+      res=await fetch('./submit',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      try{ data=await res.json(); }catch{ data={}; }
+    }
+    catch(e){
+      statusEl.textContent='Erro de rede ao enviar. Tente novamente.';
+      updateSubmitState();
+      return;
+    }
 
     if(!res.ok){
       let msg=(data&&data.message)?data.message:`HTTP ${res.status}`;
       const details=(data&&data.details&&data.details.errors);
       if(Array.isArray(details)&&details.length){ msg+=' — '+details.join(' | '); }
-      statusEl.textContent='Erro: '+msg; smoothScrollTo(statusEl); updateSubmitState(); return;
+      statusEl.textContent='Erro: '+msg;
+      smoothScrollTo(statusEl);
+      updateSubmitState();
+      return;
     }
 
     statusEl.textContent='Fila criada, aguardando processamento...';
-    const sid=data.submissionId; let tries=0; let row=null;
-    while(tries<120){ await new Promise(r=>setTimeout(r,1000)); try{ const r=await fetch('./submissions/'+sid); row=await r.json(); }catch{} if(row&&(row.status==='done'||row.status==='error')) break; tries++; }
+    const sid=data.submissionId;
+    let tries=0;
+    let row=null;
 
-    if(!row){ statusEl.textContent='Falha ao acompanhar processamento.'; updateSubmitState(); return; }
+    while(tries<120){
+      await new Promise(r=>setTimeout(r,1000));
+      try{
+        const r=await fetch('./submissions/'+sid);
+        row=await r.json();
+      }catch{}
+      if(row&&(row.status==='done'||row.status==='error')) break;
+      tries++;
+    }
+
+    if(!row){
+      statusEl.textContent='Falha ao acompanhar processamento.';
+      updateSubmitState();
+      return;
+    }
 
     if(row.status==='done'){
       statusEl.textContent='Pronto! Download do arquivo abaixo.';
-      const div=document.createElement('div'); div.className='item';
-      const toObj=x=>{ if(!x) return {}; if(typeof x==='string'){ try{ return JSON.parse(x);}catch{return{};} } if(typeof x==='object') return x; return {}; };
-      const d=toObj(row.result);
-      const displayName=(()=>{ const n=(d.filename||d.filename_pdf||d.filename_docx||'').trim(); const i=n.lastIndexOf('.'); return i>0?n.slice(0,i):n; })();
-      const meta=document.createElement('div'); meta.className='meta';
-      const badge=document.createElement('span'); badge.className='badge'; badge.textContent='done';
-      const when=new Date(d.generated_at||Date.now()).toLocaleString();
-      const title=document.createElement('span'); title.textContent=` ${displayName} — ${when}`;
-      meta.appendChild(badge); meta.appendChild(title);
+      const div=document.createElement('div');
+      div.className='item';
 
-      const buttons=document.createElement('div'); buttons.className='btn-row';
+      const toObj=x=>{
+        if(!x) return {};
+        if(typeof x==='string'){ try{ return JSON.parse(x);}catch{return{};} }
+        if(typeof x==='object') return x;
+        return {};
+      };
+
+      const d=toObj(row.result);
+      const displayName=(()=>{
+        const n=(d.filename||d.filename_pdf||d.filename_docx||'').trim();
+        const i=n.lastIndexOf('.');
+        return i>0?n.slice(0,i):n;
+      })();
+
+      const meta=document.createElement('div');
+      meta.className='meta';
+      const badge=document.createElement('span');
+      badge.className='badge';
+      badge.textContent='done';
+      const when=new Date(d.generated_at||Date.now()).toLocaleString();
+      const title=document.createElement('span');
+      title.textContent=` ${displayName} — ${when}`;
+      meta.appendChild(badge);
+      meta.appendChild(title);
+
+      const buttons=document.createElement('div');
+      buttons.className='btn-row';
+
       if(d.filename_pdf && d.file_path_pdf){
-        const btnPdf=document.createElement('button'); btnPdf.type='button'; btnPdf.className='btn'; btnPdf.textContent='Baixar PDF';
-        btnPdf.onclick=async()=>{ try{ const dl=await fetch('./submissions/'+sid+'/download/pdf',{method:'POST'}); if(!dl.ok) throw new Error(); const blob=await dl.blob(); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(d.filename_pdf||('dfd_'+sid+'.pdf')); a.click(); URL.revokeObjectURL(a.href);}catch(e){ alert('Não foi possível baixar o PDF.'); } };
+        const btnPdf=document.createElement('button');
+        btnPdf.type='button';
+        btnPdf.className='btn';
+        btnPdf.textContent='Baixar PDF';
+        btnPdf.onclick=async()=>{
+          try{
+            const dl=await fetch('./submissions/'+sid+'/download/pdf',{method:'POST'});
+            if(!dl.ok) throw new Error();
+            const blob=await dl.blob();
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);
+            a.download=(d.filename_pdf||('dfd_'+sid+'.pdf'));
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }catch(e){
+            alert('Não foi possível baixar o PDF.');
+          }
+        };
         buttons.appendChild(btnPdf);
       }
-      const btnDocx=document.createElement('button'); btnDocx.type='button'; btnDocx.className='btn secondary'; btnDocx.textContent='Baixar DOCX';
-      btnDocx.onclick=async()=>{ try{ const dl=await fetch('./submissions/'+sid+'/download/docx',{method:'POST'}); if(!dl.ok) throw new Error(); const blob=await dl.blob(); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(d.filename_docx||('dfd_'+sid+'.docx')); a.click(); URL.revokeObjectURL(a.href);}catch(e){ alert('Não foi possível baixar o DOCX.'); } };
+
+      const btnDocx=document.createElement('button');
+      btnDocx.type='button';
+      btnDocx.className='btn secondary';
+      btnDocx.textContent='Baixar DOCX';
+      btnDocx.onclick=async()=>{
+        try{
+          const dl=await fetch('./submissions/'+sid+'/download/docx',{method:'POST'});
+          if(!dl.ok) throw new Error();
+          const blob=await dl.blob();
+          const a=document.createElement('a');
+          a.href=URL.createObjectURL(blob);
+          a.download=(d.filename_docx||('dfd_'+sid+'.docx'));
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }catch(e){
+          alert('Não foi possível baixar o DOCX.');
+        }
+      };
       buttons.appendChild(btnDocx);
 
-      div.appendChild(meta); div.appendChild(buttons);
-      subsEl.prepend(div); smoothScrollTo(div);
-      const firstBtn=div.querySelector('button'); if(firstBtn) firstBtn.focus();
+      div.appendChild(meta);
+      div.appendChild(buttons);
+      subsEl.prepend(div);
+      smoothScrollTo(div);
+      const firstBtn=div.querySelector('button');
+      if(firstBtn) firstBtn.focus();
     } else {
-      statusEl.textContent='Erro ao gerar: '+(row.error||'desconhecido'); smoothScrollTo(statusEl);
+      statusEl.textContent='Erro ao gerar: '+(row.error||'desconhecido');
+      smoothScrollTo(statusEl);
     }
+
     updateSubmitState();
   }
 
@@ -475,7 +807,7 @@
     loadGrauPrioridade();
     rebuildPrazosOptions();
     ensureOneItem();
-    updateSubmitState(); // NOVO: já inicia governando o botão
+    updateSubmitState();
   }
 
   f.addEventListener('submit', submit);
