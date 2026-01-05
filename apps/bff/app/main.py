@@ -310,8 +310,8 @@ def demo_home() -> HTMLResponse:
   <body>
     <div class="wrap">
       <div class="card">
-        <h1>Bem-vindo à Plataforma AGEPAR (demo)</h1>
-        <p>Este conteúdo está servido pelo BFF e embutido via &lt;iframe&gt;.</p>
+        <h1>Bem-vindo à Plataforma AGEPAR</h1>
+        <p style="text-align: center;">Este conteúdo está sendo desenvolvido.</p>
       </div>
     </div>
   </body>
