@@ -196,7 +196,7 @@ export default function Login() {
             A
           </div>
           <div>
-            <h1 className="text-lg font-semibold leading-tight">Portal AGEPAR</h1>
+            <h1 className="text-lg font-semibold leading-tight">Plataforma AGEPAR</h1>
             <p className="text-sm text-slate-600">Acesse sua conta</p>
           </div>
         </div>
