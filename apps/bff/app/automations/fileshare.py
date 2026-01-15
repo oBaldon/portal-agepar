@@ -505,7 +505,9 @@ async def upload(
                 detail="tipo de arquivo não permitido pela política do servidor",
             )
 
-    ttl = ttl if ttl in TTL_MAP else "7d"
+    if ttl not in TTL_MAP:
+        raise HTTPException(status_code=422, detail="ttl inválido; use 1d, 7d ou 30d")
+
     exp = _utcnow() + TTL_MAP[ttl]
 
     item_id = secrets.token_urlsafe(10)
@@ -836,8 +838,20 @@ def create_share_link(
                 )
                 raise HTTPException(status_code=403, detail="senha requerida para gerar link")
 
-    ttl = TTL_MAP.get(expires, TTL_MAP["7d"])
-    exp = _utcnow() + ttl
+    if expires not in TTL_MAP:
+        raise HTTPException(status_code=422, detail="expires inválido; use 1d, 7d ou 30d")
+
+    exp = _utcnow() + TTL_MAP[expires]
+
+    # Garante que o link nunca expira depois do próprio item.
+    item_exp = r.get("expires_at")
+    if isinstance(item_exp, str):
+        try:
+            item_exp = datetime.fromisoformat(item_exp.replace("Z", "+00:00"))
+        except Exception:
+            item_exp = None
+    if isinstance(item_exp, datetime) and exp > item_exp:
+        exp = item_exp
     token = _sign_link(r["id"], exp)
 
     db.audit_log(

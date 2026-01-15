@@ -64,6 +64,9 @@
   .table-wrap { overflow-x:auto; }
   @media (max-width: 800px){ .row { flex-direction:column; } }
   @media (max-width: 600px){ th:nth-child(5), td:nth-child(5) { width:auto; } .btn-row.right { justify-content:flex-end; } .toolbar { gap:6px; } }
+
+  dialog#shareDlg { border:none; padding:0; background:transparent; }
+  dialog#shareDlg::backdrop { background: rgba(15, 23, 42, .35); }
 </style>
 </head>
 <body>
@@ -117,7 +120,7 @@
         <label for="q">Busca</label>
         <input id="q" placeholder="nome do arquivo..." />
       </div>
-    </div>
+</div>
 
     <div class="toolbar">
       <span class="muted" id="status" aria-live="polite"></span>
@@ -143,6 +146,34 @@
   </div>
 </div>
 
+
+<!-- Modal: gerar link público -->
+<dialog id="shareDlg" aria-label="Gerar link público">
+  <div class="card" style="max-width:520px; margin:0; border-radius:14px;">
+    <h2 style="font-size:16px; margin:0 0 8px;">Gerar link</h2>
+    <div class="muted" id="shareFilename" style="margin-bottom:10px;"></div>
+
+    <label for="shareExpiresDlg">Validade do link</label>
+    <select id="shareExpiresDlg">
+      <option value="1d">1 dia</option>
+      <option value="7d" selected>1 semana</option>
+      <option value="30d">1 mês</option>
+    </select>
+
+    <div id="shareSecretWrap" style="display:none; margin-top:10px;">
+      <label for="shareSecretDlg">Senha do arquivo</label>
+      <input id="shareSecretDlg" placeholder="Obrigatória para este arquivo" autocomplete="new-password"/>
+      <div class="muted" style="margin-top:6px;">Para arquivos protegidos, a senha é exigida para gerar o link (exceto superusuário).</div>
+    </div>
+
+    <div class="btn-row right" style="margin-top:14px;">
+      <button class="btn secondary" id="shareCancel" type="button">Cancelar</button>
+      <button class="btn" id="shareOk" type="button">Gerar link</button>
+    </div>
+  </div>
+</dialog>
+
+
 <script>
   const $ = sel => document.querySelector(sel);
   const fmtSize = n => (!Number.isFinite(n) ? "—" : (n<1024? `${n} B` : n<1024**2? `${(n/1024).toFixed(1)} KB` : `${(n/1024**2).toFixed(1)} MB`));
@@ -150,6 +181,107 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
   let currentUser = { id: null, cpf: null, isSuperuser: false };
+
+  // ---------- Share (modal) ----------
+  let shareCtx = null;
+
+  function _isValidTTL(v){ return v === "1d" || v === "7d" || v === "30d"; }
+
+  function openShareModal(item){
+    const dlg = $("#shareDlg");
+    if(!dlg || typeof dlg.showModal !== "function") return false;
+
+    shareCtx = item;
+
+    const fn = $("#shareFilename");
+    if(fn) fn.textContent = item?.filename ? `Arquivo: ${item.filename}` : "Arquivo";
+
+    const sel = $("#shareExpiresDlg");
+    if(sel) sel.value = "7d";
+
+    const wrap = $("#shareSecretWrap");
+    const input = $("#shareSecretDlg");
+    const needSecret = !!item?.has_secret && !currentUser.isSuperuser;
+
+    if(wrap) wrap.style.display = needSecret ? "block" : "none";
+    if(input){
+      input.value = "";
+      input.required = needSecret;
+    }
+
+    dlg.showModal();
+    if(needSecret && input) { try { input.focus(); } catch(_) {} }
+    return true;
+  }
+
+  function closeShareModal(){
+    const dlg = $("#shareDlg");
+    if(dlg && dlg.open) dlg.close();
+    shareCtx = null;
+
+    const ok = $("#shareOk");
+    if(ok){ ok.disabled = false; ok.textContent = "Gerar link"; }
+  }
+
+  async function confirmShare(){
+    if(!shareCtx) return;
+
+    const ok = $("#shareOk");
+    if(ok){ ok.disabled = true; ok.textContent = "Gerando..."; }
+
+    const sel = $("#shareExpiresDlg");
+    const expires = (sel && sel.value) ? String(sel.value) : "7d";
+    if(!_isValidTTL(expires)){
+      alert("Validade inválida. Selecione uma das opções disponíveis.");
+      if(ok){ ok.disabled = false; ok.textContent = "Gerar link"; }
+      return;
+    }
+
+    const fd = new FormData();
+    fd.set("expires", expires);
+
+    const needSecret = !!shareCtx?.has_secret && !currentUser.isSuperuser;
+    if(needSecret){
+      const input = $("#shareSecretDlg");
+      const s = (input?.value || "").trim();
+      if(!s){
+        alert("Senha é obrigatória para gerar link deste arquivo.");
+        if(ok){ ok.disabled = false; ok.textContent = "Gerar link"; }
+        return;
+      }
+      fd.set("secret", s);
+    }
+
+    try{
+      const r = await fetch(`/api/automations/fileshare/items/${encodeURIComponent(shareCtx.id)}/share`, {
+        method:"POST",
+        body: fd,
+        credentials:"include"
+      });
+      if(!r.ok){
+        const msg = await r.text().catch(()=> "");
+        alert("Falha ao gerar link: " + (msg || r.status));
+        if(ok){ ok.disabled = false; ok.textContent = "Gerar link"; }
+        return;
+      }
+
+      const data = await r.json();
+      const full = (data.download_url?.startsWith("http") ? data.download_url : (location.origin + (data.download_url || "")));
+      try {
+        await navigator.clipboard.writeText(full);
+        alert("Link copiado para a área de transferência!");
+      } catch(_) {
+        prompt("Copie o link manualmente:", full);
+      }
+
+      closeShareModal();
+    }catch(_){
+      alert("Falha de rede ao gerar link.");
+      if(ok){ ok.disabled = false; ok.textContent = "Gerar link"; }
+    }
+  }
+
+
 
   async function getMe(){
     try{
@@ -335,14 +467,27 @@
         btnShare.type="button";
         btnShare.textContent="Link";
         btnShare.onclick = async ()=>{
+          // Preferir modal com seleção fechada de prazos.
+          if (openShareModal(it)) return;
+
+          // Fallback (navegadores sem <dialog>): validação estrita, sem default silencioso.
+          const raw = prompt("Validade do link (1d, 7d ou 30d):", "7d");
+          if (raw === null) return;
+          const expires = String(raw || "").trim();
+          if(!_isValidTTL(expires)){
+            alert("Validade inválida. Use 1d, 7d ou 30d.");
+            return;
+          }
+
           const fd = new FormData();
-          const expires = prompt("Validade do link: 1d, 7d ou 30d", "7d") || "7d";
           fd.set("expires", expires);
+
           if (it.has_secret && !currentUser.isSuperuser) {
             const s = prompt("Informe a senha do arquivo para gerar o link:");
             if (s === null || s.trim() === "") { alert("Senha é obrigatória para gerar link deste arquivo."); return; }
             fd.set("secret", s.trim());
           }
+
           const r = await fetch(`/api/automations/fileshare/items/${encodeURIComponent(it.id)}/share`, { method:"POST", body: fd, credentials:"include" });
           if(!r.ok){
             const msg = await r.text().catch(()=> "");
@@ -398,6 +543,17 @@
     $("#owner").value = "all";
     await getMe();
     setupDropzone();
+    // Modal de geração de link (opcional; requer suporte a <dialog>)
+    const dlg = $("#shareDlg");
+    const btnCancel = $("#shareCancel");
+    const btnOk = $("#shareOk");
+    if(btnCancel) btnCancel.addEventListener("click", closeShareModal);
+    if(btnOk) btnOk.addEventListener("click", confirmShare);
+    if(dlg){
+      // Impede fechamento que deixe o estado interno inconsistente
+      dlg.addEventListener("cancel", (e)=>{ e.preventDefault(); closeShareModal(); });
+    }
+
     await load();
   });
 </script>
