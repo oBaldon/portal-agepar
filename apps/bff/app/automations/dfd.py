@@ -110,7 +110,7 @@ def _to_obj(x, default=None):
 
 def none_if_empty(v: Optional[str]) -> Optional[str]:
     """
-    Converte strings vazias em `None` para facilitar validações de obrigatoriedade.
+    Converte strings vazias em `None` para facilitar algumas validações.
     """
     if v is None:
         return None
@@ -178,8 +178,8 @@ def _owns_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
     owner_cpf = (row.get("actor_cpf") or "").strip() or None
     owner_email = (row.get("actor_email") or "").strip() or None
     return bool(
-        (owner_cpf and u_cpf and owner_cpf == u_cpf) or
-        (not owner_cpf and owner_email and u_email and owner_email == u_email)
+        (owner_cpf and u_cpf and owner_cpf == u_cpf)
+        or (not owner_cpf and owner_email and u_email and owner_email == u_email)
     )
 
 
@@ -211,11 +211,12 @@ def _read_html(name: str) -> str:
 MAX_ASSUNTO_LEN = 200
 MAX_TEXTO_LONGO = 8000
 MAX_PROTOCOLO_LEN = 100
+MAX_NUMERO_LEN = 100
 
 ALLOWED_UNIDADES = {
-    "Caixa","Caloria","Cartela","Cartucho","Dose","Dúzia","Frasco","Grama","Kit","Litro","Mês","Metro",
-    "Metro cúbico","Metro linear","Metro quadrado","Milheiro","Miligrama","Mililitro","Outras Unidades de Medidas",
-    "Par","Quilograma","Quilograma do peso drenado","Quilômetro","Rolo","Teste","Tubo","Unidade Internacional","Unitário"
+    "Caixa", "Caloria", "Cartela", "Cartucho", "Dose", "Dúzia", "Frasco", "Grama", "Kit", "Litro", "Mês", "Metro",
+    "Metro cúbico", "Metro linear", "Metro quadrado", "Milheiro", "Miligrama", "Mililitro", "Outras Unidades de Medidas",
+    "Par", "Quilograma", "Quilograma do peso drenado", "Quilômetro", "Rolo", "Teste", "Tubo", "Unidade Internacional", "Unitário"
 }
 ALLOWED_PRIORIDADE = {
     "Alto, quando a impossibilidade de contratação provoca interrupção de processo crítico ou estratégico.",
@@ -224,23 +225,49 @@ ALLOWED_PRIORIDADE = {
     "Muito baixo, quando a continuidade do processo é possível mediante o emprego de uma solução de contorno."
 }
 ALLOWED_SIMNAO = {"Sim", "Não"}
-MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
-REGEX_DATA_PRETENDIDA = re.compile(r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$")
+REGEX_DATA_PRETENDIDA = re.compile(
+    r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$"
+)
 
 
 class Item(BaseModel):
     """
     Item de aquisição do DFD, com validação de regras de negócio e cálculo de total.
+
+    Observação importante
+    ---------------------
+    Por solicitação de UI, TODOS os campos são obrigatórios, com exceção de:
+      - 'haDependencia' (pode vir vazio e será normalizado para "Não")
     """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    descricao: str = Field("", max_length=MAX_TEXTO_LONGO)
-    haDependencia: str
+
+    descricao: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
+
+    # Exceção: pode ser vazio na UI. Normalizamos para "Não".
+    haDependencia: Optional[str] = Field(default="", description="Sim/Não (vazio será tratado como 'Não').")
+
     dependenciaQual: Optional[str] = Field(default=None, max_length=MAX_TEXTO_LONGO)
-    renovacaoContrato: str
-    quantidade: int = Field(0, ge=0)
-    unidadeMedida: str
-    valorUnitario: float = Field(0.0, ge=0.0)
+
+    renovacaoContrato: str = Field(..., min_length=1)
+    quantidade: int = Field(..., ge=0)
+    unidadeMedida: str = Field(..., min_length=1)
+    valorUnitario: float = Field(..., ge=0.0)
     valorTotal: Optional[float] = Field(None, ge=0.0)
+
+    @field_validator("haDependencia")
+    @classmethod
+    def _valid_dep_relaxed(cls, v: Optional[str]) -> str:
+        """
+        'haDependencia' pode vir vazio/None; nesse caso vira "Não".
+        Se vier preenchido, exige 'Sim' ou 'Não'.
+        """
+        if v is None:
+            return "Não"
+        if isinstance(v, str) and v.strip() == "":
+            return "Não"
+        if v in ALLOWED_SIMNAO:
+            return v
+        raise ValueError("Valor deve ser 'Sim' ou 'Não'.")
 
     @field_validator("unidadeMedida")
     @classmethod
@@ -252,7 +279,7 @@ class Item(BaseModel):
             return v
         raise ValueError("Unidade de medida inválida.")
 
-    @field_validator("haDependencia", "renovacaoContrato")
+    @field_validator("renovacaoContrato")
     @classmethod
     def _valid_simnao(cls, v: str) -> str:
         """
@@ -269,11 +296,13 @@ class Item(BaseModel):
         """
         if self.haDependencia == "Sim" and not (self.dependenciaQual or "").strip():
             raise ValueError("Campo 'Se Sim, descreva o vínculo' é obrigatório quando há vínculo.")
+
         try:
             qt = int(self.quantidade or 0)
             vu = float(self.valorUnitario or 0.0)
         except Exception:
             qt, vu = 0, 0.0
+
         self.valorTotal = round(qt * vu, 2)
         return self
 
@@ -281,42 +310,49 @@ class Item(BaseModel):
 class DfdIn(BaseModel):
     """
     Modelo de entrada do DFD, alinhado à UI atual e validado por Pydantic.
+
+    Regra aplicada (UI + backend)
+    -----------------------------
+    - Todos os campos do DFD são obrigatórios.
+    - Exceção é apenas dentro do item: 'haDependencia' (normaliza para "Não").
     """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-    modelo_slug: str = Field(..., alias="modeloSlug")
-    numero: str
+
+    modelo_slug: str = Field(..., alias="modeloSlug", min_length=1)
+    numero: str = Field(..., min_length=1, max_length=MAX_NUMERO_LEN)
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
     pca_ano: str = Field(..., alias="pcaAno", pattern=r"^\d{4}$")
     protocolo: str = Field(..., min_length=1, max_length=MAX_PROTOCOLO_LEN)
-    diretoria_demandante: str = Field(..., alias="diretoriaDemandante")
-    alinhamento_pe: Optional[str] = Field("", alias="alinhamentoPE", max_length=MAX_TEXTO_LONGO)
-    justificativa_necessidade: Optional[str] = Field("", alias="justificativaNecessidade", max_length=MAX_TEXTO_LONGO)
+
+    diretoria_demandante: str = Field(..., alias="diretoriaDemandante", min_length=1)
+    alinhamento_pe: str = Field(..., alias="alinhamentoPE", min_length=1, max_length=MAX_TEXTO_LONGO)
+    justificativa_necessidade: str = Field(..., alias="justificativaNecessidade", min_length=1, max_length=MAX_TEXTO_LONGO)
+
     objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
-    prazos_envolvidos: Optional[str] = Field("", alias="prazosEnvolvidos")
-    consequencia_nao_aquisicao: Optional[str] = Field("", alias="consequenciaNaoAquisicao", max_length=MAX_TEXTO_LONGO)
-    grau_prioridade: Optional[str] = Field(None, alias="grauPrioridade")
+    prazos_envolvidos: str = Field(..., alias="prazosEnvolvidos", min_length=1)
+    consequencia_nao_aquisicao: str = Field(..., alias="consequenciaNaoAquisicao", min_length=1, max_length=MAX_TEXTO_LONGO)
+    grau_prioridade: str = Field(..., alias="grauPrioridade", min_length=1)
+
     items: List[Item] = Field(..., min_length=1)
 
     @field_validator("grau_prioridade")
     @classmethod
-    def _valid_prioridade_geral(cls, v: Optional[str]) -> Optional[str]:
+    def _valid_prioridade_geral(cls, v: str) -> str:
         """
-        Aceita vazio ou um valor da lista de prioridades permitidas.
+        Exige um valor da lista de prioridades permitidas.
         """
-        if v in (None, ""):
-            return ""
         if v in ALLOWED_PRIORIDADE:
             return v
         raise ValueError("Grau de prioridade inválido.")
 
     @field_validator("prazos_envolvidos")
     @classmethod
-    def _valid_prazos_fmt(cls, v: Optional[str]) -> Optional[str]:
+    def _valid_prazos_fmt(cls, v: str) -> str:
         """
-        Exige o formato 'mês de AAAA' em minúsculas, quando informado.
+        Exige o formato 'mês de AAAA' em minúsculas.
         """
-        if not v:
-            return ""
+        if not v or not str(v).strip():
+            raise ValueError("Campo 'Prazos envolvidos' é obrigatório.")
         if not REGEX_DATA_PRETENDIDA.match(v.strip()):
             raise ValueError("Use o formato 'mês de AAAA' (em minúsculas).")
         return v
@@ -324,15 +360,14 @@ class DfdIn(BaseModel):
     @model_validator(mode="after")
     def _valid_relacoes(self):
         """
-        Garante coerência entre `prazos_envolvidos` e `pca_ano` quando houver prazos.
+        Garante coerência entre `prazos_envolvidos` e `pca_ano`.
         """
-        if self.prazos_envolvidos:
-            m = REGEX_DATA_PRETENDIDA.match(self.prazos_envolvidos.strip())
-            if not m:
-                raise ValueError("Campo 'Prazos envolvidos' inválido.")
-            ano_prazo = m.group(2)
-            if ano_prazo != (self.pca_ano or "").strip():
-                raise ValueError(f"'Prazos envolvidos' deve estar no ano do PCA ({self.pca_ano}).")
+        m = REGEX_DATA_PRETENDIDA.match((self.prazos_envolvidos or "").strip())
+        if not m:
+            raise ValueError("Campo 'Prazos envolvidos' inválido.")
+        ano_prazo = m.group(2)
+        if ano_prazo != (self.pca_ano or "").strip():
+            raise ValueError(f"'Prazos envolvidos' deve estar no ano do PCA ({self.pca_ano}).")
         return self
 
 
@@ -359,25 +394,25 @@ SCHEMA = {
 FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "modeloSlug": {"label": "Timbre"},
     "modelo_slug": {"label": "Timbre"},
-    "numero": {"label": "Nº do Memorando"},
+    "numero": {"label": "Nº do Memorando", "min_length": 1, "max_length": MAX_NUMERO_LEN},
     "assunto": {"label": "Assunto", "max_length": MAX_ASSUNTO_LEN, "min_length": 1},
     "pcaAno": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
     "pca_ano": {"label": "Ano de execução do PCA", "pattern": r"^\d{4}$"},
-    "diretoriaDemandante": {"label": "Diretoria demandante"},
-    "diretoria_demandante": {"label": "Diretoria demandante"},
-    "alinhamentoPE": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
-    "alinhamento_pe": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO},
-    "justificativaNecessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO},
-    "justificativa_necessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO},
+    "diretoriaDemandante": {"label": "Diretoria demandante", "min_length": 1},
+    "diretoria_demandante": {"label": "Diretoria demandante", "min_length": 1},
+    "alinhamentoPE": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "alinhamento_pe": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "justificativaNecessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "justificativa_necessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
     "objeto": {"label": "Objeto", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
-    "prazosEnvolvidos": {"label": "Prazos envolvidos"},
-    "prazos_envolvidos": {"label": "Prazos envolvidos"},
-    "consequenciaNaoAquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO},
-    "consequencia_nao_aquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO},
-    "grauPrioridade": {"label": "Grau de prioridade"},
-    "grau_prioridade": {"label": "Grau de prioridade"},
+    "prazosEnvolvidos": {"label": "Prazos envolvidos", "min_length": 1},
+    "prazos_envolvidos": {"label": "Prazos envolvidos", "min_length": 1},
+    "consequenciaNaoAquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "consequencia_nao_aquisicao": {"label": "Consequência da não aquisição", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "grauPrioridade": {"label": "Grau de prioridade", "min_length": 1},
+    "grau_prioridade": {"label": "Grau de prioridade", "min_length": 1},
     "protocolo": {"label": "Protocolo", "min_length": 1, "max_length": MAX_PROTOCOLO_LEN},
-    "descricao": {"label": "Descrição sucinta do objeto"},
+    "descricao": {"label": "Descrição sucinta do objeto", "min_length": 1, "max_length": MAX_TEXTO_LONGO},
     "haDependencia": {"label": "Há vinculação ou dependência com a contratação de outro item?"},
     "dependenciaQual": {"label": "Se 'Sim', descreva o vínculo"},
     "renovacaoContrato": {"label": "Renovação de contrato"},
@@ -396,10 +431,9 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
     for err in ve.errors():
         loc = err.get("loc") or ()
         field_key = str(loc[-1]) if loc else "campo"
-        info = FIELD_INFO.get(field_key) or FIELD_INFO.get(
-            field_key.replace("modelo_slug", "modeloSlug"), {}
-        )
+        info = FIELD_INFO.get(field_key) or FIELD_INFO.get(field_key.replace("modelo_slug", "modeloSlug"), {})
         label = info.get("label", field_key)
+
         typ = err.get("type", "")
         ctx = err.get("ctx") or {}
         msg = err.get("msg", "")
@@ -409,7 +443,10 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
             msgs.append(f"Campo '{label}' excedeu o limite de {limit} caracteres.")
         elif typ == "string_too_short" and "min_length" in ctx:
             minimum = ctx["min_length"]
-            msgs.append(f"Campo '{label}' deve ter pelo menos {minimum} caractere(s).")
+            if minimum == 1:
+                msgs.append(f"Campo '{label}' é obrigatório.")
+            else:
+                msgs.append(f"Campo '{label}' deve ter pelo menos {minimum} caractere(s).")
         elif typ == "string_pattern_mismatch" and "pattern" in ctx:
             if field_key in ("pcaAno", "pca_ano"):
                 msgs.append(f"Campo '{label}' deve conter 4 dígitos (ex.: 2025).")
@@ -449,7 +486,7 @@ async def get_models(user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_
 
 @router.get("/submissions")
 async def list_my_submissions(
-    request: Request,
+    request: Request,  # mantido para padronização (IP/UA podem ser usados futuramente)
     user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES)),
     limit: int = 50,
     offset: int = 0,
@@ -463,7 +500,7 @@ async def list_my_submissions(
         return err_json(
             422,
             code="identity_missing",
-            message="Não foi possível identificar o usuário para filtrar as submissões (sem CPF e e-mail). Faça login novamente."
+            message="Não foi possível identificar o usuário para filtrar as submissões (sem CPF e e-mail). Faça login novamente.",
         )
     try:
         rows = list_submissions(
@@ -534,6 +571,7 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
 
         out_dir = "/app/data/files/dfd"
         os.makedirs(out_dir, exist_ok=True)
+
         numero_safe = _safe_comp(raw["numero"])
         base = f"dfd_{raw['modeloSlug'].lower()}_{numero_safe}"
         today_iso = datetime.utcnow().date().isoformat()
@@ -656,20 +694,22 @@ async def submit_dfd(
     - Cria submissão `queued`, audita `submitted` e agenda `_process_submission`.
     """
     raw = {
-        "modeloSlug": none_if_empty(body.get("modeloSlug")),
+        "modeloSlug": (body.get("modeloSlug") or "").strip(),
         "numero": (body.get("numero") or "").strip(),
         "assunto": (body.get("assunto") or "").strip(),
         "pcaAno": (body.get("pcaAno") or "").strip(),
         "protocolo": (body.get("protocolo") or "").strip(),
-        "diretoriaDemandante": none_if_empty(body.get("diretoriaDemandante")),
+        "diretoriaDemandante": (body.get("diretoriaDemandante") or "").strip(),
         "alinhamentoPE": (body.get("alinhamentoPE") or "").strip(),
         "justificativaNecessidade": (body.get("justificativaNecessidade") or "").strip(),
         "objeto": (body.get("objeto") or "").strip(),
         "prazosEnvolvidos": (body.get("prazosEnvolvidos") or "").strip(),
         "consequenciaNaoAquisicao": (body.get("consequenciaNaoAquisicao") or "").strip(),
-        "grauPrioridade": none_if_empty(body.get("grauPrioridade")),
+        "grauPrioridade": (body.get("grauPrioridade") or "").strip(),
         "items": body.get("items") or [],
     }
+
+    # mensagens rápidas para os 3 campos mais “críticos” da UI (mantém UX boa)
     if not raw["modeloSlug"]:
         return err_json(422, code="validation_error", message="Timbre é obrigatório.")
     if not raw["numero"]:
@@ -690,30 +730,30 @@ async def submit_dfd(
     try:
         numero_val = (payload.numero or "").strip()
         protocolo_val = (payload.protocolo or "").strip()
-        if numero_val:
-            if exists_submission_payload_value(KIND, "numero", numero_val):
-                try:
-                    add_audit(KIND, "duplicate_rejected", user, {"field": "numero", "numero": numero_val})
-                except Exception:
-                    logger.exception("audit duplicate (numero) failed (non-blocking)")
-                return err_json(
-                    409,
-                    code="duplicate",
-                    message="Já existe um DFD com este Nº do memorando.",
-                    details={"field": "numero", "value": numero_val},
-                )
-        if protocolo_val:
-            if exists_submission_payload_value(KIND, "protocolo", protocolo_val):
-                try:
-                    add_audit(KIND, "duplicate_rejected", user, {"field": "protocolo", "protocolo": protocolo_val})
-                except Exception:
-                    logger.exception("audit duplicate (protocolo) failed (non-blocking)")
-                return err_json(
-                    409,
-                    code="duplicate",
-                    message="Já existe um DFD com este Protocolo.",
-                    details={"field": "protocolo", "value": protocolo_val},
-                )
+
+        if numero_val and exists_submission_payload_value(KIND, "numero", numero_val):
+            try:
+                add_audit(KIND, "duplicate_rejected", user, {"field": "numero", "numero": numero_val})
+            except Exception:
+                logger.exception("audit duplicate (numero) failed (non-blocking)")
+            return err_json(
+                409,
+                code="duplicate",
+                message="Já existe um DFD com este Nº do memorando.",
+                details={"field": "numero", "value": numero_val},
+            )
+
+        if protocolo_val and exists_submission_payload_value(KIND, "protocolo", protocolo_val):
+            try:
+                add_audit(KIND, "duplicate_rejected", user, {"field": "protocolo", "protocolo": protocolo_val})
+            except Exception:
+                logger.exception("audit duplicate (protocolo) failed (non-blocking)")
+            return err_json(
+                409,
+                code="duplicate",
+                message="Já existe um DFD com este Protocolo.",
+                details={"field": "protocolo", "value": protocolo_val},
+            )
     except Exception as e:
         logger.exception("duplicate check failed")
         return err_json(500, code="storage_error", message="Falha ao verificar duplicidade.", details=str(e))
@@ -740,7 +780,11 @@ async def submit_dfd(
 
     logger.info(
         "[DFD] Submissão %s criada por %s (%s) | modelo=%s | numero=%s",
-        sid, user.get("nome"), user.get("cpf"), raw["modeloSlug"], raw["numero"]
+        sid,
+        user.get("nome"),
+        user.get("cpf"),
+        raw["modeloSlug"],
+        raw["numero"],
     )
 
     background.add_task(_process_submission, sid, payload, user)
@@ -775,7 +819,12 @@ async def download_result(
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
 
     if row.get("status") != "done":
-        return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
+        return err_json(
+            409,
+            code="not_ready",
+            message="Resultado ainda não está pronto.",
+            details={"status": row.get("status")},
+        )
 
     try:
         result = _to_obj(row.get("result"), {})
@@ -789,14 +838,19 @@ async def download_result(
 
         try:
             ext = (os.path.splitext(filename)[1] or "").lstrip(".").lower() or "auto"
-            add_audit(KIND, "download", user, {
-                "sid": sid,
-                "filename": filename,
-                "bytes": len(data),
-                "fmt": ext,
-                "ip": (getattr(request.client, "host", None) if request and request.client else None),
-                "ua": (request.headers.get("user-agent") if request else None),
-            })
+            add_audit(
+                KIND,
+                "download",
+                user,
+                {
+                    "sid": sid,
+                    "filename": filename,
+                    "bytes": len(data),
+                    "fmt": ext,
+                    "ip": (getattr(request.client, "host", None) if request and request.client else None),
+                    "ua": (request.headers.get("user-agent") if request else None),
+                },
+            )
         except Exception:
             logger.exception("audit (download legacy) failed (non-blocking)")
 
@@ -842,7 +896,12 @@ async def download_result_fmt(
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
 
     if row.get("status") != "done":
-        return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
+        return err_json(
+            409,
+            code="not_ready",
+            message="Resultado ainda não está pronto.",
+            details={"status": row.get("status")},
+        )
 
     try:
         result = _to_obj(row.get("result"), {})
@@ -856,20 +915,30 @@ async def download_result_fmt(
             filename = result.get("filename_docx") or (result.get("filename") or f"dfd_{sid}.docx")
 
         if not file_path or not os.path.exists(file_path):
-            return err_json(410, code="file_not_found", message="Arquivo não está mais disponível.", details={"sid": sid, "fmt": fmt})
+            return err_json(
+                410,
+                code="file_not_found",
+                message="Arquivo não está mais disponível.",
+                details={"sid": sid, "fmt": fmt},
+            )
 
         with open(file_path, "rb") as f:
             data = f.read()
 
         try:
-            add_audit(KIND, "download", user, {
-                "sid": sid,
-                "filename": filename,
-                "bytes": len(data),
-                "fmt": fmt,
-                "ip": (getattr(request.client, "host", None) if request and request.client else None),
-                "ua": (request.headers.get("user-agent") if request else None),
-            })
+            add_audit(
+                KIND,
+                "download",
+                user,
+                {
+                    "sid": sid,
+                    "filename": filename,
+                    "bytes": len(data),
+                    "fmt": fmt,
+                    "ip": (getattr(request.client, "host", None) if request and request.client else None),
+                    "ua": (request.headers.get("user-agent") if request else None),
+                },
+            )
         except Exception:
             logger.exception("audit (download fmt) failed (non-blocking)")
 

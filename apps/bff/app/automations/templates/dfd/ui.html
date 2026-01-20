@@ -47,6 +47,11 @@
   .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
   .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
 
+  /* indicação de obrigatoriedade */
+  .req-star { color:#dc2626; font-weight:700; margin-left:4px; }
+  .req-legend { display:flex; align-items:center; gap:6px; margin: 8px 0 12px; }
+  .group-disabled .req-star { color:#94a3b8; }
+
   .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
 
   /* inativos/readonly em cinza */
@@ -77,6 +82,11 @@
 
   <div class="card">
     <form id="f" novalidate>
+      <div class="note req-legend">
+        <span class="req-star" aria-hidden="true">*</span>
+        <span>Campos obrigatórios.</span>
+      </div>
+
       <div class="row">
         <div class="col">
           <label for="modeloSlug">Timbre
@@ -117,16 +127,16 @@
       <select name="diretoriaDemandante" id="diretoriaDemandante" required>
         <option value="">-- Selecionar --</option>
       </select>
-      
+
       <label for="alinhamentoPE">Alinhamento com o <em>Planejamento Estratégico</em>
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Alinhamento">?</button><span class="tip">Explique o alinhamento.</span></span>
       </label>
-      <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico"></textarea>
+      <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico" required></textarea>
 
       <label for="justificativaNecessidade">Justificativa da necessidade
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa da necessidade">?</button><span class="tip">Por que a demanda é necessária.</span></span>
       </label>
-      <textarea name="justificativaNecessidade" id="justificativaNecessidade" placeholder="Contexto e motivação da demanda"></textarea>
+      <textarea name="justificativaNecessidade" id="justificativaNecessidade" placeholder="Contexto e motivação da demanda" required></textarea>
 
       <label for="objeto">Objeto
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Objeto">?</button><span class="tip">Descreva o objeto da contratação.</span></span>
@@ -150,7 +160,7 @@
         <label for="prazosEnvolvidos">Prazos envolvidos
           <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Prazos envolvidos">?</button><span class="tip">Selecione “mês de AAAA”.</span></span>
         </label>
-        <select name="prazosEnvolvidos" id="prazosEnvolvidos" disabled>
+        <select name="prazosEnvolvidos" id="prazosEnvolvidos" disabled required>
           <option value="">Informe o ano do PCA primeiro</option>
         </select>
       </div>
@@ -158,16 +168,16 @@
       <label for="consequenciaNaoAquisicao">Consequência da não aquisição
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Consequência da não aquisição">?</button><span class="tip">Impactos se não contratar.</span></span>
       </label>
-      <textarea name="consequenciaNaoAquisicao" id="consequenciaNaoAquisicao" placeholder="Descreva as consequências"></textarea>
+      <textarea name="consequenciaNaoAquisicao" id="consequenciaNaoAquisicao" placeholder="Descreva as consequências" required></textarea>
 
       <label for="grauPrioridade">Grau de prioridade
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Grau de prioridade">?</button><span class="tip">Selecione conforme impacto.</span></span>
       </label>
-      <select name="grauPrioridade" id="grauPrioridade">
+      <select name="grauPrioridade" id="grauPrioridade" required>
         <option value="">-- Selecionar --</option>
       </select>
 
-      <!-- NOVO: Protocolo (fica ao fim da página e governa o botão de envio) -->
+      <!-- Protocolo (fica ao fim da página e governa o botão de envio) -->
       <label for="protocolo">Protocolo
         <span class="inline-help">
           <button type="button" class="help" aria-label="Ajuda sobre Protocolo">?</button>
@@ -215,7 +225,7 @@
   const objetoUmItemEl = document.getElementById('objetoUmItem');
   const prazosSel = document.getElementById('prazosEnvolvidos');
   const prazosGroup = document.getElementById('prazosGroup');
-  const protocoloEl = document.getElementById('protocolo'); // NOVO
+  const protocoloEl = document.getElementById('protocolo');
 
   function mesesDoAno(ano){
     const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
@@ -289,12 +299,10 @@
     el.scrollIntoView({behavior: reduced?'auto':'smooth', block:'start'});
   }
 
-  // helper para saber se “apenas 1 item” está ativo
   function isSingleItemLocked(){
     return !!objetoUmItemEl?.checked;
   }
 
-  // remove itens extras quando “apenas 1 item” estiver ativo
   function pruneItemsToSingle(){
     if(!isSingleItemLocked()) return false;
     let removed = false;
@@ -337,6 +345,47 @@
     return span;
   }
 
+  // ======= obrigatoriedade (asterisco) =======
+  function ensureRequiredStar(labelEl, required=true){
+    if(!labelEl) return;
+    const existing = labelEl.querySelector(':scope > .req-star');
+    if(!required){
+      if(existing) existing.remove();
+      return;
+    }
+    if(existing) return;
+
+    const star=document.createElement('span');
+    star.className='req-star';
+    star.textContent='*';
+    star.setAttribute('aria-hidden','true');
+
+    const help = labelEl.querySelector(':scope > .inline-help');
+    if(help) labelEl.insertBefore(star, help);
+    else labelEl.appendChild(star);
+  }
+
+  function applyRequiredStars(root=document){
+    if(!root || !root.querySelectorAll) return;
+    root.querySelectorAll('label[for]').forEach(lbl=>{
+      const forId = (lbl.getAttribute('for')||'').trim();
+      if(!forId) return;
+
+      // controles/inputs que NÃO devem levar asterisco:
+      // - checkbox de UI
+      if(forId === 'objetoUmItem') return;
+      // - exceção solicitada
+      if(forId.includes('haDependencia')) return;
+      // - condicional: estrela controlada dinamicamente
+      if(forId.includes('dependenciaQual')) return;
+      // - calculado automaticamente (read-only)
+      if(forId.includes('valorTotal')) return;
+
+      ensureRequiredStar(lbl, true);
+    });
+  }
+  // ==========================================
+
   function createItem(){
     const idx=itemSeq++;
     const wrap=document.createElement('div');
@@ -355,6 +404,7 @@
     const txtDesc=document.createElement('textarea');
     txtDesc.name=`items[${idx}][descricao]`;
     txtDesc.id=`item-${idx}-descricao`;
+    txtDesc.required=true;
     lblDesc.htmlFor=txtDesc.id;
 
     const row1=document.createElement('div');
@@ -368,6 +418,7 @@
     const selDep=buildSelect(LISTS.simNao);
     selDep.name=`items[${idx}][haDependencia]`;
     selDep.id=`item-${idx}-haDependencia`;
+    // NÃO obrigatório (exceção)
     lblDep.htmlFor=selDep.id;
     colDep.appendChild(lblDep);
     colDep.appendChild(selDep);
@@ -380,6 +431,7 @@
     const selRen=buildSelect(LISTS.simNao);
     selRen.name=`items[${idx}][renovacaoContrato]`;
     selRen.id=`item-${idx}-renovacaoContrato`;
+    selRen.required=true;
     lblRen.htmlFor=selRen.id;
     colRen.appendChild(lblRen);
     colRen.appendChild(selRen);
@@ -387,7 +439,7 @@
     row1.appendChild(colDep);
     row1.appendChild(colRen);
 
-    // Detalhe do vínculo (COMEÇA DESABILITADO)
+    // Detalhe do vínculo (COMEÇA DESABILITADO e não obrigatório até "Sim")
     const row2a=document.createElement('div');
     row2a.className='row';
     const colQual=document.createElement('div');
@@ -400,7 +452,8 @@
     inpQual.placeholder='Ex.: Depende do contrato ABC';
     inpQual.name=`items[${idx}][dependenciaQual]`;
     inpQual.id=`item-${idx}-dependenciaQual`;
-    inpQual.disabled=true; // começa disabled
+    inpQual.disabled=true;
+    inpQual.required=false;
     lblQual.htmlFor=inpQual.id;
     colQual.appendChild(lblQual);
     colQual.appendChild(inpQual);
@@ -422,6 +475,7 @@
     inpQt.inputMode='numeric';
     inpQt.name=`items[${idx}][quantidade]`;
     inpQt.id=`item-${idx}-quantidade`;
+    inpQt.required=true;
     lblQt.htmlFor=inpQt.id;
     colQt.appendChild(lblQt);
     colQt.appendChild(inpQt);
@@ -434,6 +488,7 @@
     const selUM=buildSelect(LISTS.unidadeMedida);
     selUM.name=`items[${idx}][unidadeMedida]`;
     selUM.id=`item-${idx}-unidadeMedida`;
+    selUM.required=true;
     lblUM.htmlFor=selUM.id;
     colUM.appendChild(lblUM);
     colUM.appendChild(selUM);
@@ -450,12 +505,13 @@
     inpVU.inputMode='decimal';
     inpVU.name=`items[${idx}][valorUnitario]`;
     inpVU.id=`item-${idx}-valorUnitario`;
+    inpVU.required=true;
     lblVU.htmlFor=inpVU.id;
     colVU.appendChild(lblVU);
     colVU.appendChild(inpVU);
 
     const colVT=document.createElement('div');
-    colVT.className='col group-disabled'; // visual cinza no label também
+    colVT.className='col group-disabled';
     const lblVT=document.createElement('label');
     lblVT.textContent='Estimativa de valor total (auto)';
     lblVT.appendChild(helpIcon('Calculado automaticamente: Quantidade × Valor unitário.'));
@@ -501,7 +557,6 @@
       updateItemButtons();
     };
 
-    // respeitar o modo "apenas 1 item"
     addBtn.onclick=()=>{
       if (isSingleItemLocked()) return;
       itemsEl.appendChild(createItem());
@@ -525,12 +580,16 @@
       const show=(selDep.value==='Sim');
       inpQual.disabled=!show;
       inpQual.required=show;
+
+      // estrela condicional (só quando obrigatório)
+      ensureRequiredStar(lblQual, show);
+
       const group=document.getElementById(`group-qual-${idx}`);
       if(group) group.classList.toggle('group-disabled', !show);
       if(!show) inpQual.value="";
     }
     selDep.addEventListener('change', toggleQual);
-    toggleQual(); // garante estado inicial desabilitado
+    toggleQual();
 
     wrap.appendChild(meta);
     wrap.appendChild(lblDesc); wrap.appendChild(txtDesc);
@@ -539,10 +598,12 @@
     wrap.appendChild(row2);
     wrap.appendChild(actions);
 
+    // aplica estrelas no item (inclui labels gerados dinamicamente)
+    applyRequiredStars(wrap);
+
     return wrap;
   }
 
-  // esconder/desabilitar o "Adicionar item" quando travado
   function updateItemButtons(){
     const onlyOne=itemsEl.children.length<=1;
     const lock=isSingleItemLocked();
@@ -582,7 +643,6 @@
       itemsEl.appendChild(createItem());
       changed = true;
     }
-    // se estiver travado em 1 item, descarta itens adicionais
     if (pruneItemsToSingle()) changed = true;
     if (changed) recomputeItemNumbers();
     updateItemButtons();
@@ -597,7 +657,6 @@
     if(desc) desc.value=objetoEl.value||"";
   }
 
-  // atualizar botões ao alternar o modo "apenas 1 item"
   objetoUmItemEl?.addEventListener('change', ()=>{
     ensureOneItem();
     if(objetoUmItemEl.checked) syncObjToFirstItem();
@@ -608,7 +667,6 @@
     if(objetoUmItemEl.checked) syncObjToFirstItem();
   });
 
-  // governar o botão pela presença do Protocolo
   function updateSubmitState(){
     const hasProto = (protocoloEl?.value || '').trim().length > 0;
     submitBtn.disabled = !hasProto;
@@ -808,6 +866,9 @@
     rebuildPrazosOptions();
     ensureOneItem();
     updateSubmitState();
+
+    // aplica estrelas no formulário estático
+    applyRequiredStars(document);
   }
 
   f.addEventListener('submit', submit);
