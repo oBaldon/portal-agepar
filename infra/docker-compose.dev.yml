@@ -44,6 +44,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
+    env_file:
+      - .env
+      
   host:
     image: node:20-alpine
     container_name: portal-agepar-host

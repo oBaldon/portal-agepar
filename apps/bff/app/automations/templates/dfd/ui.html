@@ -66,6 +66,21 @@
   .checkline input[type="checkbox"] { width:auto; margin:0; }
   .checkline label { margin:0; font-size:12px; color:var(--muted); }
 
+  /* Aviso do período de reajuste do PCA */
+  .banner {
+    border:1px solid #f59e0b;
+    background:#fffbeb;
+    color:#92400e;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin: 12px 0;
+    font-size: 13px;
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .banner strong { color:#7c2d12; }
+
   @keyframes shake { from{transform:translateX(0)} 33%{transform:translateX(-2px)} 66%{transform:translateX(2px)} to{transform:translateX(0)} }
   @media (max-width: 640px) {
     .actions { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -137,6 +152,9 @@
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa da necessidade">?</button><span class="tip">Por que a demanda é necessária.</span></span>
       </label>
       <textarea name="justificativaNecessidade" id="justificativaNecessidade" placeholder="Contexto e motivação da demanda" required></textarea>
+
+      <!-- Inserção dinâmica (somente quando reajuste do PCA estiver ativo) -->
+      <div id="reajustePcaBox"></div>
 
       <label for="objeto">Objeto
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Objeto">?</button><span class="tip">Descreva o objeto da contratação.</span></span>
@@ -226,11 +244,60 @@
   const prazosSel = document.getElementById('prazosEnvolvidos');
   const prazosGroup = document.getElementById('prazosGroup');
   const protocoloEl = document.getElementById('protocolo');
+  const reajustePcaBox = document.getElementById('reajustePcaBox');
+
+  let __CONFIG_LOADED__ = false;
+  let __REAJUSTE_PCA_ATIVO__ = false;
 
   function mesesDoAno(ano){
     const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
     if(!/^[0-9]{4}$/.test(String(ano||""))) return [];
     return n.map(m=>`${m} de ${ano}`);
+  }
+
+  async function loadConfig(){
+    try{
+      const r = await fetch('./config');
+      if(!r.ok) throw new Error('config_http_'+r.status);
+      const data = await r.json();
+      __REAJUSTE_PCA_ATIVO__ = !!(data && data.reajustePcaAtivo);
+      __CONFIG_LOADED__ = true;
+      return true;
+    }catch(e){
+      __REAJUSTE_PCA_ATIVO__ = false;
+      __CONFIG_LOADED__ = false;
+      statusEl.textContent = 'Não foi possível carregar a configuração do período de reajuste do PCA. Recarregue a página.';
+      return false;
+    }
+  }
+
+  function renderReajustePcaField(){
+    if(!reajustePcaBox) return;
+    reajustePcaBox.innerHTML = '';
+    if(!__REAJUSTE_PCA_ATIVO__) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'banner';
+    banner.innerHTML = `<div aria-hidden="true">⚠️</div>
+      <div><strong>Período de reajuste do PCA ativo.</strong> O campo abaixo é obrigatório para gerar o DFD.</div>`;
+
+    const lbl = document.createElement('label');
+    lbl.setAttribute('for', 'justificativaInclusaoItem');
+    lbl.textContent = 'Justificativa para a inclusão do item';
+    lbl.appendChild(helpIcon('Obrigatório durante o período de reajuste do PCA. Informe a justificativa para a inclusão desta DFD no período.'));
+
+    const ta = document.createElement('textarea');
+    ta.name = 'justificativaInclusaoItem';
+    ta.id = 'justificativaInclusaoItem';
+    ta.placeholder = 'Descreva a justificativa (uma por DFD).';
+    ta.required = true;
+
+    reajustePcaBox.appendChild(banner);
+    reajustePcaBox.appendChild(lbl);
+    reajustePcaBox.appendChild(ta);
+
+    // aplica asterisco no label recém-criado
+    ensureRequiredStar(lbl, true);
   }
 
   async function loadModels(){
@@ -669,9 +736,10 @@
 
   function updateSubmitState(){
     const hasProto = (protocoloEl?.value || '').trim().length > 0;
-    submitBtn.disabled = !hasProto;
-    submitBtn.setAttribute('aria-disabled', String(!hasProto));
-    submitBtn.title = hasProto ? '' : 'Informe o Protocolo para gerar o DFD';
+    const enabled = __CONFIG_LOADED__ && hasProto;
+    submitBtn.disabled = !enabled;
+    submitBtn.setAttribute('aria-disabled', String(!enabled));
+    submitBtn.title = enabled ? '' : (!__CONFIG_LOADED__ ? 'Carregando configuração do período...' : 'Informe o Protocolo para gerar o DFD');
   }
   protocoloEl?.addEventListener('input', updateSubmitState);
 
@@ -690,6 +758,12 @@
       grauPrioridade:f.grauPrioridade.value||"",
       protocolo:f.protocolo.value||""
     };
+
+    // Campo condicional: só envia quando o período estiver ativo E o campo existir
+    if(__REAJUSTE_PCA_ATIVO__){
+      const j = document.getElementById('justificativaInclusaoItem');
+      header.justificativaInclusaoItem = (j?.value || "");
+    }
 
     const children = Array.from(itemsEl.children);
     const itemNodes = isSingleItemLocked() ? children.slice(0,1) : children;
@@ -724,6 +798,17 @@
     ensureOneItem();
 
     const payload=formToPayload();
+    // Validação client-side do campo condicional (melhora UX; backend valida também)
+    if(__REAJUSTE_PCA_ATIVO__){
+      const txt = (payload.justificativaInclusaoItem || '').trim();
+      if(!txt){
+        statusEl.textContent='Erro: Justificativa para a inclusão do item é obrigatória durante o período de reajuste do PCA.';
+        smoothScrollTo(statusEl);
+        updateSubmitState();
+        return;
+      }
+    }
+
     let res, data;
     try{
       res=await fetch('./submit',{
@@ -859,16 +944,24 @@
     updateSubmitState();
   }
 
-  function init(){
+  async function init(){
     loadModels();
     loadDiretoriasDemandantes();
     loadGrauPrioridade();
     rebuildPrazosOptions();
     ensureOneItem();
-    updateSubmitState();
+    // carrega config antes de habilitar o submit e antes de aplicar estrelas finais
+    statusEl.textContent = 'Carregando configuração...';
+    const ok = await loadConfig();
+    if(ok){
+      renderReajustePcaField();
+      statusEl.textContent = '';
+    }
 
-    // aplica estrelas no formulário estático
+    // aplica estrelas no formulário (inclui campos inseridos dinamicamente)
     applyRequiredStars(document);
+
+    updateSubmitState();
   }
 
   f.addEventListener('submit', submit);

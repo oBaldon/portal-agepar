@@ -506,6 +506,7 @@ def _append_body_sections_xml_et(
     - Diretoria demandante
     - Alinhamento com o PE (multilinha)
     - Justificativa da necessidade (GERAL)
+    - Justificativa para a inclusão do item (CONDICIONAL: período de reajuste do PCA)
     - Objeto (multilinha)
     - Tabela 1: Itens (Item | Descrição | Vínculo | Renovação)
     - Valores estimados + Tabela 2 (Item | Quantidade | Unidade | VU | VT + Total)
@@ -559,6 +560,20 @@ def _append_body_sections_xml_et(
         elems.append(_mk_p(text="Justificativa da necessidade", bold=True))
         elems.append(ET.Element(_w("p")))
         for line in _split_lines(just_geral):
+            elems.append(_mk_p(text=line, left_indent_level=0, first_line_indent_level=1))
+        elems.append(ET.Element(_w("p")))
+
+    # Condicional: período de reajuste do PCA (1 justificativa por DFD)
+    reajuste_ativo = bool(context.get("reajuste_pca_ativo") or context.get("reajustePcaAtivo") or False)
+    just_inclusao = str(
+        context.get("justificativa_inclusao_item")
+        or context.get("justificativaInclusaoItem")
+        or ""
+    ).strip()
+    if reajuste_ativo and just_inclusao:
+        elems.append(_mk_p(text="Justificativa para a inclusão do item", bold=True))
+        elems.append(ET.Element(_w("p")))
+        for line in _split_lines(just_inclusao):
             elems.append(_mk_p(text=line, left_indent_level=0, first_line_indent_level=1))
         elems.append(ET.Element(_w("p")))
 
@@ -717,7 +732,7 @@ def _render_fixed_timbre(template_path: str, context: Dict[str, Any], out_path: 
     ano_pca = str(context.get("pca_ano") or context.get("pcaAno") or "").strip()
 
     intro_lines = [
-        "À Diretoria de Administrativo-Financeira",
+        "À Diretoria Administrativo-Financeira",
         "",
         f"Encaminha-se o presente Documento de Formalização da Demanda – DFD, para fins de inclusão no Plano de Contratações Anual – PCA do exercício {ano_pca}, nos seguintes termos:",
     ]

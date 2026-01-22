@@ -52,12 +52,36 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "2.4.0"
+DFD_VERSION = "2.5.0"
 REQUIRED_ROLES = ("compras",)
 ELEVATED_ROLES = ("admin", "coordenador")
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "dfd"
+ENV_REAJUSTE_PCA_ACTIVE = "DFD_REAJUSTE_PCA_ACTIVE"
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    """
+    Lê uma flag booleana de env-var com tolerância a valores comuns.
+    Aceita: 1/true/yes/y/on (case-insensitive) como True; 0/false/no/n/off como False.
+    """
+    v = os.environ.get(name)
+    if v is None:
+        return default
+    s = str(v).strip().lower()
+    if s in ("1", "true", "yes", "y", "on"):
+        return True
+    if s in ("0", "false", "no", "n", "off"):
+        return False
+    return default
+
+
+def is_reajuste_pca_ativo() -> bool:
+    """
+    Retorna True quando estivermos no período de reajuste do PCA.
+    Nesta fase, é controlado por env-var (DFD_REAJUSTE_PCA_ACTIVE).
+    """
+    return _env_flag(ENV_REAJUSTE_PCA_ACTIVE, default=False)
 
 def err_json(status: int, **payload):
     """
@@ -311,10 +335,12 @@ class DfdIn(BaseModel):
     """
     Modelo de entrada do DFD, alinhado à UI atual e validado por Pydantic.
 
-    Regra aplicada (UI + backend)
-    -----------------------------
-    - Todos os campos do DFD são obrigatórios.
-    - Exceção é apenas dentro do item: 'haDependencia' (normaliza para "Não").
+    Regras aplicadas (UI + backend)
+    -------------------------------
+    - Campos-base do DFD são obrigatórios (conforme UI atual).
+    - Exceção no item: 'haDependencia' (normaliza para "Não").
+    - Campo condicional (período de reajuste do PCA):
+        * 'justificativaInclusaoItem' (1 por DFD) só existe/é obrigatório quando `DFD_REAJUSTE_PCA_ACTIVE` estiver ativo.
     """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -332,6 +358,14 @@ class DfdIn(BaseModel):
     prazos_envolvidos: str = Field(..., alias="prazosEnvolvidos", min_length=1)
     consequencia_nao_aquisicao: str = Field(..., alias="consequenciaNaoAquisicao", min_length=1, max_length=MAX_TEXTO_LONGO)
     grau_prioridade: str = Field(..., alias="grauPrioridade", min_length=1)
+    
+    # Condicional (período de reajuste do PCA):
+    # - obrigatório quando o período estiver ativo (regra aplicada no endpoint /submit).
+    justificativa_inclusao_item: Optional[str] = Field(
+        default=None, alias="justificativaInclusaoItem", max_length=MAX_TEXTO_LONGO
+    )
+    # Snapshot do estado do período no momento do submit (útil para auditoria/rastreabilidade).
+    reajuste_pca_ativo: bool = Field(default=False, alias="reajustePcaAtivo")
 
     items: List[Item] = Field(..., min_length=1)
 
@@ -382,6 +416,7 @@ SCHEMA = {
         {"name": "diretoriaDemandante", "type": "select", "label": "Diretoria demandante"},
         {"name": "alinhamentoPE", "type": "textarea", "label": "Alinhamento com o Planejamento Estratégico"},
         {"name": "justificativaNecessidade", "type": "textarea", "label": "Justificativa da necessidade"},
+        {"name": "justificativaInclusaoItem", "type": "textarea", "label": "Justificativa para a inclusão do item (somente no período de reajuste do PCA)"},
         {"name": "objeto", "type": "textarea", "label": "Objeto"},
         {"name": "items", "type": "array", "label": "Itens"},
         {"name": "prazosEnvolvidos", "type": "select", "label": "Prazos envolvidos"},
@@ -404,6 +439,9 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "alinhamento_pe": {"label": "Alinhamento com o Planejamento Estratégico", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
     "justificativaNecessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
     "justificativa_necessidade": {"label": "Justificativa da necessidade", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
+    "justificativaInclusaoItem": {"label": "Justificativa para a inclusão do item", "max_length": MAX_TEXTO_LONGO},
+    "justificativa_inclusao_item": {"label": "Justificativa para a inclusão do item", "max_length": MAX_TEXTO_LONGO},
+    "reajustePcaAtivo": {"label": "Período de reajuste do PCA (auto)"},
     "objeto": {"label": "Objeto", "max_length": MAX_TEXTO_LONGO, "min_length": 1},
     "prazosEnvolvidos": {"label": "Prazos envolvidos", "min_length": 1},
     "prazos_envolvidos": {"label": "Prazos envolvidos", "min_length": 1},
@@ -470,6 +508,15 @@ async def get_schema():
     Expõe metadados de schema consumidos pela UI do DFD.
     """
     return {"kind": KIND, "schema": SCHEMA}
+
+@router.get("/config")
+async def get_config(user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES))):
+    """
+    Configuração dinâmica da UI do DFD.
+
+    Nesta fase, `reajustePcaAtivo` é controlado por env-var (DFD_REAJUSTE_PCA_ACTIVE).
+    """
+    return {"kind": KIND, "version": DFD_VERSION, "reajustePcaAtivo": is_reajuste_pca_ativo()}
 
 
 @router.get("/models")
@@ -608,6 +655,8 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "prazos_envolvidos": raw.get("prazosEnvolvidos") or "",
             "consequencia_nao_aquisicao": raw.get("consequenciaNaoAquisicao") or "",
             "grau_prioridade": raw.get("grauPrioridade") or "",
+            "reajuste_pca_ativo": bool(raw.get("reajustePcaAtivo") or False),
+            "justificativa_inclusao_item": raw.get("justificativaInclusaoItem") or "",
             "itens": itens_out,
             "total_geral": round(total_geral, 2),
         }
@@ -693,6 +742,12 @@ async def submit_dfd(
     - Checa duplicidade por `numero` e `protocolo`.
     - Cria submissão `queued`, audita `submitted` e agenda `_process_submission`.
     """
+    
+    reajuste_ativo = is_reajuste_pca_ativo()
+    justificativa_in = none_if_empty((body.get("justificativaInclusaoItem") or "").strip())
+    # Fora do período, não persistimos a justificativa mesmo que venha no payload.
+    justificativa_final = justificativa_in if reajuste_ativo else None
+
     raw = {
         "modeloSlug": (body.get("modeloSlug") or "").strip(),
         "numero": (body.get("numero") or "").strip(),
@@ -702,6 +757,8 @@ async def submit_dfd(
         "diretoriaDemandante": (body.get("diretoriaDemandante") or "").strip(),
         "alinhamentoPE": (body.get("alinhamentoPE") or "").strip(),
         "justificativaNecessidade": (body.get("justificativaNecessidade") or "").strip(),
+        "justificativaInclusaoItem": justificativa_final,
+        "reajustePcaAtivo": reajuste_ativo,
         "objeto": (body.get("objeto") or "").strip(),
         "prazosEnvolvidos": (body.get("prazosEnvolvidos") or "").strip(),
         "consequenciaNaoAquisicao": (body.get("consequenciaNaoAquisicao") or "").strip(),
@@ -716,6 +773,16 @@ async def submit_dfd(
         return err_json(422, code="validation_error", message="Número do memorando é obrigatório.")
     if not raw["protocolo"]:
         return err_json(422, code="validation_error", message="Protocolo é obrigatório.")
+
+    # Regra condicional do período de reajuste do PCA: justificativa obrigatória (1 por DFD).
+    if reajuste_ativo and not (raw.get("justificativaInclusaoItem") or "").strip():
+        return err_json(
+            422,
+            code="validation_error",
+            message="Justificativa para a inclusão do item é obrigatória durante o período de reajuste do PCA.",
+            details={"field": "justificativaInclusaoItem"},
+        )
+
 
     try:
         payload = DfdIn(**raw)
@@ -773,7 +840,12 @@ async def submit_dfd(
     }
     try:
         insert_submission(sub)
-        add_audit(KIND, "submitted", user, {"sid": sid, "protocolo": raw.get("protocolo")})
+        add_audit(
+            KIND,
+            "submitted",
+            user,
+            {"sid": sid, "protocolo": raw.get("protocolo"), "reajustePcaAtivo": reajuste_ativo},
+        )
     except Exception as e:
         logger.exception("insert_submission failed")
         return err_json(500, code="storage_error", message="Falha ao salvar a submissão.", details=str(e))
