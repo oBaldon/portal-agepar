@@ -361,7 +361,7 @@ class DfdIn(BaseModel):
         estratégico na mesma DFD.
 
         A UI gera linhas no formato:
-        "Está alinhado ao Planejamento Estratégico da Agepar 2026-2029 – Pilar X - Objetivo estratégico Y - ..."
+        "Está alinhado ao Planejamento Estratégico da Agepar 2026-2029 – Pilar X - Objetivo estratégico Y: ..."
 
         Mesmo que o texto não siga exatamente o padrão, aplicamos uma checagem de
         duplicidade por linha normalizada.
@@ -448,7 +448,7 @@ SCHEMA = {
         {"name": "assunto", "type": "text", "label": "Assunto"},
         {"name": "pcaAno", "type": "text", "label": "Ano de execução do PCA"},
         {"name": "diretoriaDemandante", "type": "select", "label": "Diretoria demandante"},
-        {"name": "alinhamentoPE", "type": "textarea", "label": "Alinhamento com o Planejamento Estratégico"},
+        {"name": "alinhamentoPE", "type": "hidden", "label": "Alinhamento com o Planejamento Estratégico"},
         {"name": "justificativaNecessidade", "type": "textarea", "label": "Justificativa da necessidade"},
         {"name": "justificativaInclusaoItem", "type": "textarea", "label": "Justificativa para a inclusão do item (somente no período de reajuste do PCA)"},
         {"name": "objeto", "type": "textarea", "label": "Objeto"},

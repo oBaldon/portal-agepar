@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
+<!-- UI DFD -->
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>DFD — Documento de Formalização da Demanda (MVP)</title>
@@ -183,14 +184,13 @@
           <button type="button" class="btn secondary small" id="peAdd">Adicionar alinhamento</button>
         </div>
 
-        <!-- Mensagens de erro do bloco de alinhamento (SEM scroll automático) -->
+        <!-- Mensagens de erro do bloco de alinhamento (sem scroll automático) -->
         <div id="peMsg" class="pe-msg" role="status" aria-live="polite"></div>
 
         <div id="peSelected" class="pe-selected" aria-live="polite"></div>
 
-        <label for="alinhamentoPE">Texto gerado do alinhamento (auto)</label>
-        <!-- Ajuste solicitado: PREVIEW como disabled -->
-        <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Adicione pelo menos 1 objetivo estratégico acima." disabled></textarea>
+        <!-- Campo escondido: é ele que vai no payload e entra no documento -->
+        <input type="hidden" name="alinhamentoPE" id="alinhamentoPE" value="" />
 
         <div class="note" style="margin-top:8px;">
           Exemplo: “Está alinhado ao Planejamento Estratégico da Agepar 2026-2029 – Pilar 2 - Objetivo estratégico 2: Reduzir conflitos internos e otimizar fluxos de trabalho.”
@@ -550,6 +550,7 @@
 
   function peSyncTextarea(){
     if(!alinhamentoEl) return;
+    // hidden input
     alinhamentoEl.value = peSelected.map(x=>peBuildLine(x.pilarN, x.objetivoN, x.objetivoTxt)).join("\n");
   }
 
@@ -640,7 +641,6 @@
     const pilarN = parseInt(pePilarEl?.value || "", 10);
     const objetivoN = parseInt(peObjetivoEl?.value || "", 10);
 
-    // 1) sem seleção (não faz scroll; mantém foco no bloco)
     if(!pilarN){
       peSetMsg('Selecione um Pilar para continuar.');
       pePilarEl?.focus();
@@ -660,7 +660,6 @@
       return;
     }
 
-    // 2) repetido
     const k = peKey(pilarN, objetivoN);
     if(peSelected.some(x=>peKey(x.pilarN, x.objetivoN)===k)){
       peSetMsg('Esse Objetivo Estratégico já foi adicionado (não é permitido repetir).');
@@ -961,7 +960,7 @@
 
   function updateSubmitState(){
     const hasProto = (protocoloEl?.value || '').trim().length > 0;
-    const hasPE = (alinhamentoEl?.value || '').trim().length > 0; // textarea está disabled, mas value existe
+    const hasPE = (alinhamentoEl?.value || '').trim().length > 0; // hidden input
     const enabled = __CONFIG_LOADED__ && hasProto && hasPE;
 
     submitBtn.disabled = !enabled;
@@ -983,7 +982,7 @@
       assunto:f.assunto.value||"",
       pcaAno:f.pcaAno.value||"",
       diretoriaDemandante:f.diretoriaDemandante.value||"",
-      alinhamentoPE:(alinhamentoEl?.value || ""), // <- não usa f.alinhamentoPE (está disabled)
+      alinhamentoPE:(alinhamentoEl?.value || ""), // hidden input
       justificativaNecessidade:f.justificativaNecessidade.value||"",
       objeto:f.objeto.value||"",
       prazosEnvolvidos:f.prazosEnvolvidos.value||"",
@@ -1201,7 +1200,7 @@
       peLoadObjetivos(isFinite(pN)?pN:0);
     });
 
-    // FIX 1: garante que o clique no "Adicionar alinhamento" não dispare nada do form (nem navegação/foco automático)
+    // impede qualquer “comportamento estranho” (foco/submit) ao clicar
     peAddBtn?.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
