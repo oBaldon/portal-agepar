@@ -81,8 +81,20 @@
   }
   .banner strong { color:#7c2d12; }
 
+  /* ======= Planejamento Estratégico (menu + múltiplos objetivos) ======= */
+  .pe-box { border:1px dashed #cbd5e1; border-radius: 12px; padding: 12px; background: #ffffff; }
+  .pe-selected { display:flex; flex-direction:column; gap:10px; margin-top: 10px; }
+  .pe-item { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding: 10px 12px; border:1px solid #e2e8f0; border-radius: 12px; background:#f8fafc; }
+  .pe-item .txt { font-size: 13px; color: var(--fg); line-height: 1.35; }
+  .pe-item .meta { display:flex; gap:8px; align-items:center; }
+  .pe-item .tag { font-size: 12px; color: var(--muted); background:#ffffff; border:1px solid #e2e8f0; padding: 3px 8px; border-radius: 999px; }
+  .pe-item .rm { white-space: nowrap; }
+  .pe-msg { margin-top: 10px; font-size: 13px; color:#b91c1c; }
+  /* ==================================================================== */
+
   @keyframes shake { from{transform:translateX(0)} 33%{transform:translateX(-2px)} 66%{transform:translateX(2px)} to{transform:translateX(0)} }
   @media (max-width: 640px) {
+    .row { flex-direction: column; }
     .actions { flex-direction: column; align-items: stretch; gap: 8px; }
     .actions .btn-row { justify-content: flex-end; }
   }
@@ -143,10 +155,47 @@
         <option value="">-- Selecionar --</option>
       </select>
 
-      <label for="alinhamentoPE">Alinhamento com o <em>Planejamento Estratégico</em>
-        <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Alinhamento">?</button><span class="tip">Explique o alinhamento.</span></span>
+      <label>Alinhamento com o <em>Planejamento Estratégico</em>
+        <span class="inline-help">
+          <button type="button" class="help" aria-label="Ajuda sobre Alinhamento">?</button>
+          <span class="tip">Selecione um <strong>Pilar</strong> e um <strong>Objetivo Estratégico</strong> e clique em “Adicionar”. Você pode adicionar mais de um objetivo (sem repetir).</span>
+        </span>
       </label>
-      <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Descreva o alinhamento com o Planejamento Estratégico" required></textarea>
+
+      <div class="pe-box">
+        <div class="row">
+          <div class="col">
+            <label for="pePilar">Pilar</label>
+            <select id="pePilar">
+              <option value="">-- Selecionar --</option>
+            </select>
+          </div>
+
+          <div class="col">
+            <label for="peObjetivo">Objetivo estratégico</label>
+            <select id="peObjetivo" disabled>
+              <option value="">-- Selecionar --</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:10px;">
+          <button type="button" class="btn secondary small" id="peAdd">Adicionar alinhamento</button>
+        </div>
+
+        <!-- Mensagens de erro do bloco de alinhamento (SEM scroll automático) -->
+        <div id="peMsg" class="pe-msg" role="status" aria-live="polite"></div>
+
+        <div id="peSelected" class="pe-selected" aria-live="polite"></div>
+
+        <label for="alinhamentoPE">Texto gerado do alinhamento (auto)</label>
+        <!-- Ajuste solicitado: PREVIEW como disabled -->
+        <textarea name="alinhamentoPE" id="alinhamentoPE" placeholder="Adicione pelo menos 1 objetivo estratégico acima." disabled></textarea>
+
+        <div class="note" style="margin-top:8px;">
+          Exemplo: “Está alinhado ao Planejamento Estratégico da Agepar 2026-2029 – Pilar 2 - Objetivo estratégico 2: Reduzir conflitos internos e otimizar fluxos de trabalho.”
+        </div>
+      </div>
 
       <label for="justificativaNecessidade">Justificativa da necessidade
         <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa da necessidade">?</button><span class="tip">Por que a demanda é necessária.</span></span>
@@ -207,7 +256,7 @@
       <div class="actions" style="margin-top:16px">
         <span class="status" id="status" role="status" aria-live="polite"></span>
         <div class="btn-row">
-          <button type="submit" class="btn" id="submitBtn" disabled aria-disabled="true" title="Informe o Protocolo para gerar o DFD">Gerar DFD</button>
+          <button type="submit" class="btn" id="submitBtn" disabled aria-disabled="true" title="Informe o Protocolo e selecione ao menos 1 objetivo estratégico para gerar o DFD">Gerar DFD</button>
         </div>
       </div>
     </form>
@@ -227,9 +276,32 @@
     ],
     simNao: ["Sim","Não"],
     diretoriasDemandantes: [
-      "Diretoria da Presidência - DP","Diretoria Administrativa e Financeira - DAF","Diretoria de Regulação Econômica - DRE","Diretoria de Fiscalização e Qualidade de Serviços - DFQS","Diretoria de Normas e Regulamentação - DNR",
+      "Diretoria da Presidência - DP",
+      "Diretoria Administrativa e Financeira - DAF",
+      "Diretoria de Regulação Econômica - DRE",
+      "Diretoria de Fiscalização e Qualidade de Serviços - DFQS",
+      "Diretoria de Normas e Regulamentação - DNR",
     ]
   };
+
+  // Planejamento Estratégico 2026–2029 (Pilares + Objetivos)
+  const PE_2026_2029 = [
+    { n: 1, label: "Pilar 1 – Regulação, Fiscalização e Normatização", objetivos: [
+      "Expandir o uso de recursos tecnológicos na regulação e fiscalização.",
+      "Contratar apoio operacional ou parcerias entre entidades públicas para as áreas de fiscalização e regulação.",
+      "Elaborar estratégia específica para o mercado de resíduos sólidos e drenagem e manejo de águas pluviais.",
+      "Ampliar a presença da Agepar junto à sociedade mediante o incremento das ações de fiscalização em campo"
+    ]},
+    { n: 2, label: "Pilar 2 – Autonomia Técnica e Administrativa", objetivos: [
+      "Fortalecer a Independência Institucional, a Integridade e a Transparência da Agepar.",
+      "Reduzir conflitos internos e otimizar fluxos de trabalho."
+    ]},
+    { n: 3, label: "Pilar 3 – Gestão & Governança Corporativa Sustentável", objetivos: [
+      "Consolidar a cultura de Governança Sustentável Ambiental e Social interna da Agepar.",
+      "Otimizar a comunicação interna, promover o engajamento dos servidores e a cultura de Governança Sustentável Ambiental e Social.",
+      "Impulsionar a modernização tecnológica."
+    ]}
+  ];
 
   const f = document.getElementById('f');
   const statusEl = document.getElementById('status');
@@ -246,8 +318,20 @@
   const protocoloEl = document.getElementById('protocolo');
   const reajustePcaBox = document.getElementById('reajustePcaBox');
 
+  // Planejamento Estratégico UI
+  const pePilarEl = document.getElementById('pePilar');
+  const peObjetivoEl = document.getElementById('peObjetivo');
+  const peAddBtn = document.getElementById('peAdd');
+  const peSelectedEl = document.getElementById('peSelected');
+  const peMsgEl = document.getElementById('peMsg');
+  const alinhamentoEl = document.getElementById('alinhamentoPE');
+
   let __CONFIG_LOADED__ = false;
   let __REAJUSTE_PCA_ATIVO__ = false;
+
+  // Lista de objetivos adicionados: [{pilarN, objetivoN, objetivoTxt}]
+  let peSelected = [];
+  let __PE_MSG_TIMER__ = null;
 
   function mesesDoAno(ano){
     const n=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
@@ -269,6 +353,22 @@
       statusEl.textContent = 'Não foi possível carregar a configuração do período de reajuste do PCA. Recarregue a página.';
       return false;
     }
+  }
+
+  function helpIcon(text){
+    const span=document.createElement('span');
+    span.className='inline-help';
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='help';
+    b.setAttribute('aria-label','Ajuda');
+    b.textContent='?';
+    const tip=document.createElement('span');
+    tip.className='tip';
+    tip.textContent=text;
+    span.appendChild(b);
+    span.appendChild(tip);
+    return span;
   }
 
   function renderReajustePcaField(){
@@ -396,22 +496,6 @@
     return sel;
   }
 
-  function helpIcon(text){
-    const span=document.createElement('span');
-    span.className='inline-help';
-    const b=document.createElement('button');
-    b.type='button';
-    b.className='help';
-    b.setAttribute('aria-label','Ajuda');
-    b.textContent='?';
-    const tip=document.createElement('span');
-    tip.className='tip';
-    tip.textContent=text;
-    span.appendChild(b);
-    span.appendChild(tip);
-    return span;
-  }
-
   // ======= obrigatoriedade (asterisco) =======
   function ensureRequiredStar(labelEl, required=true){
     if(!labelEl) return;
@@ -439,19 +523,160 @@
       if(!forId) return;
 
       // controles/inputs que NÃO devem levar asterisco:
-      // - checkbox de UI
-      if(forId === 'objetoUmItem') return;
-      // - exceção solicitada
-      if(forId.includes('haDependencia')) return;
-      // - condicional: estrela controlada dinamicamente
-      if(forId.includes('dependenciaQual')) return;
-      // - calculado automaticamente (read-only)
-      if(forId.includes('valorTotal')) return;
+      if(forId === 'objetoUmItem') return;                 // checkbox de UI
+      if(forId === 'pePilar' || forId === 'peObjetivo') return; // selects auxiliares
+      if(forId.includes('haDependencia')) return;          // exceção solicitada
+      if(forId.includes('dependenciaQual')) return;        // condicional
+      if(forId.includes('valorTotal')) return;             // auto/read-only
 
       ensureRequiredStar(lbl, true);
     });
   }
   // ==========================================
+
+  // ======= Planejamento Estratégico (menu em 2 níveis + múltiplos) =======
+  function peSetMsg(msg){
+    if(!peMsgEl) return;
+    peMsgEl.textContent = msg || '';
+    if(__PE_MSG_TIMER__) clearTimeout(__PE_MSG_TIMER__);
+    if(msg){
+      __PE_MSG_TIMER__ = setTimeout(()=>{ peMsgEl.textContent=''; }, 6000);
+    }
+  }
+
+  function peBuildLine(pilarN, objetivoN, objetivoTxt){
+    return `Está alinhado ao Planejamento Estratégico da Agepar 2026-2029 – Pilar ${pilarN} - Objetivo estratégico ${objetivoN}: ${objetivoTxt}`;
+  }
+
+  function peSyncTextarea(){
+    if(!alinhamentoEl) return;
+    alinhamentoEl.value = peSelected.map(x=>peBuildLine(x.pilarN, x.objetivoN, x.objetivoTxt)).join("\n");
+  }
+
+  function peRenderSelected(){
+    if(!peSelectedEl) return;
+    peSelectedEl.innerHTML = "";
+
+    if(peSelected.length===0){
+      const empty=document.createElement('div');
+      empty.className='note';
+      empty.style.marginTop='8px';
+      empty.textContent='Nenhum objetivo selecionado ainda.';
+      peSelectedEl.appendChild(empty);
+      return;
+    }
+
+    peSelected.forEach((x, idx)=>{
+      const row=document.createElement('div');
+      row.className='pe-item';
+
+      const left=document.createElement('div');
+      left.className='txt';
+
+      const meta=document.createElement('div');
+      meta.className='meta';
+      const tag=document.createElement('span');
+      tag.className='tag';
+      tag.textContent=`Pilar ${x.pilarN} • Obj ${x.objetivoN}`;
+      meta.appendChild(tag);
+
+      const txt=document.createElement('div');
+      txt.style.marginTop='6px';
+      txt.textContent = peBuildLine(x.pilarN, x.objetivoN, x.objetivoTxt);
+
+      left.appendChild(meta);
+      left.appendChild(txt);
+
+      const rm=document.createElement('button');
+      rm.type='button';
+      rm.className='btn small danger rm';
+      rm.textContent='Remover';
+      rm.onclick=()=>{
+        peSelected.splice(idx,1);
+        peRenderSelected();
+        peSyncTextarea();
+        peSetMsg('');
+        updateSubmitState();
+      };
+
+      row.appendChild(left);
+      row.appendChild(rm);
+      peSelectedEl.appendChild(row);
+    });
+  }
+
+  function peLoadPilares(){
+    if(!pePilarEl) return;
+    if(pePilarEl.dataset.loaded === "1") return;
+    PE_2026_2029.forEach(p=>{
+      const o=document.createElement('option');
+      o.value=String(p.n);
+      o.textContent=p.label;
+      pePilarEl.appendChild(o);
+    });
+    pePilarEl.dataset.loaded = "1";
+  }
+
+  function peLoadObjetivos(pilarN){
+    if(!peObjetivoEl) return;
+    peObjetivoEl.innerHTML = '<option value="">-- Selecionar --</option>';
+    const p = PE_2026_2029.find(x=>x.n===pilarN);
+    if(!p){
+      peObjetivoEl.disabled=true;
+      return;
+    }
+    p.objetivos.forEach((txt, i)=>{
+      const o=document.createElement('option');
+      o.value=String(i+1);
+      o.textContent=`Objetivo ${i+1} — ${txt}`;
+      peObjetivoEl.appendChild(o);
+    });
+    peObjetivoEl.disabled=false;
+  }
+
+  function peKey(pilarN, objetivoN){ return `${pilarN}-${objetivoN}`; }
+
+  function peAddSelected(){
+    const pilarN = parseInt(pePilarEl?.value || "", 10);
+    const objetivoN = parseInt(peObjetivoEl?.value || "", 10);
+
+    // 1) sem seleção (não faz scroll; mantém foco no bloco)
+    if(!pilarN){
+      peSetMsg('Selecione um Pilar para continuar.');
+      pePilarEl?.focus();
+      return;
+    }
+    if(!objetivoN){
+      peSetMsg('Selecione um Objetivo Estratégico para adicionar.');
+      peObjetivoEl?.focus();
+      return;
+    }
+
+    const p = PE_2026_2029.find(x=>x.n===pilarN);
+    const objetivoTxt = p?.objetivos?.[objetivoN-1];
+    if(!p || !objetivoTxt){
+      peSetMsg('Objetivo inválido. Selecione novamente.');
+      peObjetivoEl?.focus();
+      return;
+    }
+
+    // 2) repetido
+    const k = peKey(pilarN, objetivoN);
+    if(peSelected.some(x=>peKey(x.pilarN, x.objetivoN)===k)){
+      peSetMsg('Esse Objetivo Estratégico já foi adicionado (não é permitido repetir).');
+      peObjetivoEl?.focus();
+      return;
+    }
+
+    peSelected.push({ pilarN, objetivoN, objetivoTxt });
+    peSelected.sort((a,b)=> (a.pilarN-b.pilarN) || (a.objetivoN-b.objetivoN));
+
+    peRenderSelected();
+    peSyncTextarea();
+    peSetMsg('');
+    updateSubmitState();
+  }
+  // =====================================================================
 
   function createItem(){
     const idx=itemSeq++;
@@ -736,11 +961,19 @@
 
   function updateSubmitState(){
     const hasProto = (protocoloEl?.value || '').trim().length > 0;
-    const enabled = __CONFIG_LOADED__ && hasProto;
+    const hasPE = (alinhamentoEl?.value || '').trim().length > 0; // textarea está disabled, mas value existe
+    const enabled = __CONFIG_LOADED__ && hasProto && hasPE;
+
     submitBtn.disabled = !enabled;
     submitBtn.setAttribute('aria-disabled', String(!enabled));
-    submitBtn.title = enabled ? '' : (!__CONFIG_LOADED__ ? 'Carregando configuração do período...' : 'Informe o Protocolo para gerar o DFD');
+
+    if(enabled){ submitBtn.title = ''; return; }
+    if(!__CONFIG_LOADED__){ submitBtn.title = 'Carregando configuração do período...'; return; }
+    if(!hasProto && !hasPE){ submitBtn.title = 'Informe o Protocolo e selecione ao menos 1 objetivo estratégico.'; return; }
+    if(!hasProto){ submitBtn.title = 'Informe o Protocolo para gerar o DFD.'; return; }
+    if(!hasPE){ submitBtn.title = 'Selecione ao menos 1 objetivo estratégico para gerar o DFD.'; return; }
   }
+
   protocoloEl?.addEventListener('input', updateSubmitState);
 
   function formToPayload(){
@@ -750,7 +983,7 @@
       assunto:f.assunto.value||"",
       pcaAno:f.pcaAno.value||"",
       diretoriaDemandante:f.diretoriaDemandante.value||"",
-      alinhamentoPE:f.alinhamentoPE.value||"",
+      alinhamentoPE:(alinhamentoEl?.value || ""), // <- não usa f.alinhamentoPE (está disabled)
       justificativaNecessidade:f.justificativaNecessidade.value||"",
       objeto:f.objeto.value||"",
       prazosEnvolvidos:f.prazosEnvolvidos.value||"",
@@ -759,7 +992,6 @@
       protocolo:f.protocolo.value||""
     };
 
-    // Campo condicional: só envia quando o período estiver ativo E o campo existir
     if(__REAJUSTE_PCA_ATIVO__){
       const j = document.getElementById('justificativaInclusaoItem');
       header.justificativaInclusaoItem = (j?.value || "");
@@ -798,7 +1030,15 @@
     ensureOneItem();
 
     const payload=formToPayload();
-    // Validação client-side do campo condicional (melhora UX; backend valida também)
+
+    // Validações client-side (UX; backend valida também)
+    const peTxt = (payload.alinhamentoPE || '').trim();
+    if(!peTxt){
+      statusEl.textContent='Erro: selecione ao menos 1 Objetivo Estratégico para o alinhamento com o Planejamento Estratégico.';
+      smoothScrollTo(statusEl);
+      updateSubmitState();
+      return;
+    }
     if(__REAJUSTE_PCA_ATIVO__){
       const txt = (payload.justificativaInclusaoItem || '').trim();
       if(!txt){
@@ -950,7 +1190,25 @@
     loadGrauPrioridade();
     rebuildPrazosOptions();
     ensureOneItem();
-    // carrega config antes de habilitar o submit e antes de aplicar estrelas finais
+
+    // Planejamento Estratégico
+    peLoadPilares();
+    peRenderSelected();
+    peSyncTextarea();
+    pePilarEl?.addEventListener('change', ()=>{
+      peSetMsg('');
+      const pN=parseInt(pePilarEl.value||'',10);
+      peLoadObjetivos(isFinite(pN)?pN:0);
+    });
+
+    // FIX 1: garante que o clique no "Adicionar alinhamento" não dispare nada do form (nem navegação/foco automático)
+    peAddBtn?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      peAddSelected();
+    });
+
+    // carrega config antes de habilitar o submit
     statusEl.textContent = 'Carregando configuração...';
     const ok = await loadConfig();
     if(ok){
@@ -958,7 +1216,7 @@
       statusEl.textContent = '';
     }
 
-    // aplica estrelas no formulário (inclui campos inseridos dinamicamente)
+    // aplica estrelas no formulário
     applyRequiredStars(document);
 
     updateSubmitState();

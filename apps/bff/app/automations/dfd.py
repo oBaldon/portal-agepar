@@ -352,6 +352,40 @@ class DfdIn(BaseModel):
 
     diretoria_demandante: str = Field(..., alias="diretoriaDemandante", min_length=1)
     alinhamento_pe: str = Field(..., alias="alinhamentoPE", min_length=1, max_length=MAX_TEXTO_LONGO)
+
+    @field_validator("alinhamento_pe")
+    @classmethod
+    def _alinhamento_pe_no_duplicados(cls, v: str) -> str:
+        """
+        Permite múltiplos objetivos (um por linha), mas impede repetição do mesmo objetivo
+        estratégico na mesma DFD.
+
+        A UI gera linhas no formato:
+        "Está alinhado ao Planejamento Estratégico da Agepar 2026-2029 – Pilar X - Objetivo estratégico Y - ..."
+
+        Mesmo que o texto não siga exatamente o padrão, aplicamos uma checagem de
+        duplicidade por linha normalizada.
+        """
+        if not isinstance(v, str):
+            raise ValueError("Alinhamento com o Planejamento Estratégico inválido.")
+        # normaliza quebras de linha e remove vazios
+        lines = [ln.strip() for ln in re.split(r"[\r\n]+", v) if ln.strip()]
+        if not lines:
+            return ""
+        seen = set()
+        for ln in lines:
+            key = None
+            mm = re.search(r"pilar\s*(\d+)\s*[-–]\s*objetivo\s*estrat[eé]gico\s*(\d+)", ln, flags=re.IGNORECASE)
+            if mm:
+                key = (int(mm.group(1)), int(mm.group(2)))
+            else:
+                key = ln.casefold()
+            if key in seen:
+                raise ValueError("Não é permitido repetir o mesmo objetivo estratégico no alinhamento com o Planejamento Estratégico.")
+            seen.add(key)
+        # devolve texto consistente
+        return "\n".join(lines)
+    
     justificativa_necessidade: str = Field(..., alias="justificativaNecessidade", min_length=1, max_length=MAX_TEXTO_LONGO)
 
     objeto: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
