@@ -50,6 +50,7 @@ import { userCanSeeBlock } from "@/types";
 import NotFound from "@/pages/NotFound";
 import HomeDashboard from "@/pages/HomeDashboard";
 import CategoryView from "@/pages/CategoryView";
+import DfdEntry from "@/pages/DfdEntry";
 import AccountSessions from "@/pages/AccountSessions";
 import Forbidden from "@/pages/Forbidden";
 import { useAuth } from "@/auth/AuthProvider";
@@ -166,6 +167,10 @@ export default function App() {
 
   const initials =
     user?.nome?.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AG";
+
+    const dfdBlock = useMemo(() => {
+    return (catalog?.blocks ?? []).find((b: any) => b?.name === "dfd") ?? null;
+  }, [catalog]);
 
   const visibleCategories = useMemo(() => {
     const cats = catalog?.categories ?? [];
@@ -284,6 +289,59 @@ export default function App() {
 
         <Route path="/categoria/:id" element={<CategoryView catalog={catalog} />} />
 
+        <Route
+          path="/dfd"
+          element={
+            dfdBlock ? (
+              <RequireRoles user={user} block={dfdBlock}>
+                <DfdEntry />
+              </RequireRoles>
+            ) : (
+              <div className="p-6">Carregando…</div>
+            )
+          }
+        />
+
+        <Route
+          path="/dfd/padrao"
+          element={
+            dfdBlock ? (
+              <RequireRoles user={user} block={dfdBlock}>
+                <IframeBlock
+                  src={
+                    dfdBlock.ui.type === "iframe"
+                      ? dfdBlock.ui.url + (dfdBlock.ui.url.includes("?") ? "&" : "?") + "tipo=padrao"
+                      : "/dfd"
+                  }
+                />
+              </RequireRoles>
+            ) : (
+              <div className="p-6">Carregando…</div>
+            )
+          }
+        />
+
+        <Route
+          path="/dfd/capacitacao"
+          element={
+            dfdBlock ? (
+              <RequireRoles user={user} block={dfdBlock}>
+                <IframeBlock
+                  src={
+                    dfdBlock.ui.type === "iframe"
+                      ? dfdBlock.ui.url +
+                        (dfdBlock.ui.url.includes("?") ? "&" : "?") +
+                        "tipo=capacitacao"
+                      : "/dfd"
+                  }
+                />
+              </RequireRoles>
+            ) : (
+              <div className="p-6">Carregando…</div>
+            )
+          }
+        />
+
         <Route path="/" element={<RootRedirect user={user} catalog={catalog} />} />
 
         <Route path="/conta/sessoes" element={<AccountSessions />} />
@@ -291,17 +349,19 @@ export default function App() {
         {(catalog?.blocks ?? [])
           .filter((b: any) => !b?.hidden)
           .map((b) =>
-            b.routes?.map((r) => (
-              <Route
-                key={`${b.name}:${r.path}`}
-                path={r.path}
-                element={
-                  <RequireRoles user={user} block={b}>
-                    {routeElementFor(b, r)}
-                  </RequireRoles>
-                }
-              />
-            ))
+            b.routes
+              ?.filter((r) => !(b?.name === "dfd" && r?.path === "/dfd"))
+              .map((r) => (
+                <Route
+                  key={`${b.name}:${r.path}`}
+                  path={r.path}
+                  element={
+                    <RequireRoles user={user} block={b}>
+                      {routeElementFor(b, r)}
+                    </RequireRoles>
+                  }
+                />
+              ))
           )}
 
         <Route path="/__ping" element={<PingView />} />

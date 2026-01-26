@@ -182,7 +182,7 @@
     },
     {
       "name": "ferias",
-      "displayName": "Férias - Requerimento e Substituição",
+      "displayName": "Férias — Requerimento e Substituição",
       "version": "0.1.0",
       "categoryId": "ferias",
       "description": "Requerimento + Substituição em um único fluxo (gera dois PDFs).",
