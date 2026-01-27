@@ -20,10 +20,11 @@ Segurança / Efeitos colaterais
 
 Observações
 -----------
-- **Lógica original preservada integralmente**; apenas:
+- **Lógica base preservada**; além disso:
   - docstrings adicionadas/expandida em pt-BR;
   - comentários removidos/condensados em docstrings de funções e módulo;
   - referência de topo incluída.
+  - adicionada renderização de tabelas (modo capacitação) quando houver dados.
 """
 
 from typing import Dict, Any, List, Tuple
@@ -411,8 +412,27 @@ def _tbl(rows: list[list[ET.Element]], *, borders: bool = True, col_widths: list
     tbl = ET.Element(_w("tbl"))
     tblpr = ET.SubElement(tbl, _w("tblPr"))
     tblw = ET.SubElement(tblpr, _w("tblW"))
-    tblw.set(_w("type"), "auto")
-    tblw.set(_w("w"), "0")
+    if col_widths:
+        # Em DOCX, o Word pode ignorar <w:tblGrid> sozinho e "estourar" a página.
+        # Para garantir que a tabela respeite a área útil, usamos:
+        # - <w:tblW w:type="dxa" w:w="...">
+        # - <w:tblLayout w:type="fixed">
+        tblw.set(_w("type"), "dxa")
+        tblw.set(_w("w"), str(sum(col_widths)))
+        layout = ET.SubElement(tblpr, _w("tblLayout"))
+        layout.set(_w("type"), "fixed")
+
+        # Evita "vazar pra esquerda" por indent/herança de estilo:
+        # - indent 0
+        # - alinhamento explícito
+        tblind = ET.SubElement(tblpr, _w("tblInd"))
+        tblind.set(_w("type"), "dxa")
+        tblind.set(_w("w"), "0")
+        jc = ET.SubElement(tblpr, _w("jc"))
+        jc.set(_w("val"), "left")
+    else:
+        tblw.set(_w("type"), "auto")
+        tblw.set(_w("w"), "0")
     if borders:
         tb = ET.SubElement(tblpr, _w("tblBorders"))
         for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
@@ -428,6 +448,45 @@ def _tbl(rows: list[list[ET.Element]], *, borders: bool = True, col_widths: list
             gc.set(_w("w"), str(w))
     for r in rows:
         tbl.append(_tr(r))
+
+    # Se houver col_widths, fixa largura por célula (tcW) respeitando gridSpan.
+    if col_widths:
+        def _get_span(tc: ET.Element) -> int:
+            tcpr = tc.find(_w("tcPr"))
+            if tcpr is None:
+                return 1
+            gs = tcpr.find(_w("gridSpan"))
+            if gs is None:
+                return 1
+            try:
+                return int(gs.get(_w("val")) or "1")
+            except Exception:
+                return 1
+
+        def _ensure_tcW(tc: ET.Element, width: int) -> None:
+            tcpr = tc.find(_w("tcPr"))
+            if tcpr is None:
+                tcpr = ET.SubElement(tc, _w("tcPr"))
+            tcw = tcpr.find(_w("tcW"))
+            if tcw is None:
+                tcw = ET.SubElement(tcpr, _w("tcW"))
+            tcw.set(_w("type"), "dxa")
+            tcw.set(_w("w"), str(width))
+
+        for tr_el in tbl.findall(_w("tr")):
+            col_i = 0
+            for tc in tr_el.findall(_w("tc")):
+                span = _get_span(tc)
+                # soma larguras das colunas que a célula abrange
+                w = 0
+                for j in range(span):
+                    if col_i + j < len(col_widths):
+                        w += int(col_widths[col_i + j])
+                if w <= 0:
+                    w = int(col_widths[min(col_i, len(col_widths) - 1)])
+                _ensure_tcW(tc, w)
+                col_i += span
+
     return tbl
 
 
@@ -509,6 +568,8 @@ def _append_body_sections_xml_et(
     - Justificativa para a inclusão do item (CONDICIONAL: período de reajuste do PCA)
     - Objeto (multilinha)
     - Tabela 1: Itens (Item | Descrição | Vínculo | Renovação)
+    - (Capacitação) Tabela: Eventos/Congressos/Seminários (quando informada)
+    - (Capacitação) Tabela: Cursos/Treinamentos (quando informada)
     - Valores estimados + Tabela 2 (Item | Quantidade | Unidade | VU | VT + Total)
     - Prazos envolvidos
     - Consequências da não aquisição
@@ -587,6 +648,7 @@ def _append_body_sections_xml_et(
 
     itens = context.get("itens") or []
     if isinstance(itens, list) and itens:
+        # Tabela 1: Itens (deve vir ANTES das tabelas de capacitação)
         elems.append(ET.Element(_w("p")))
         header = [
             _tc("Item", bold=True, align="left"),
@@ -610,6 +672,114 @@ def _append_body_sections_xml_et(
         elems.append(_tbl(rows, borders=True))
         elems.append(ET.Element(_w("p")))
 
+    # === CAPACITAÇÃO: tabelas detalhadas (Eventos/Cursos) ===
+    # O backend (dfd.py) injeta em `context` as chaves:
+    #   - cap_eventos_rows, cap_eventos_outros_temas, cap_eventos_outros_valor_total, cap_eventos_outros_prazo
+    #   - cap_cursos_rows,  cap_cursos_outros_temas,  cap_cursos_outros_valor_total,  cap_cursos_outros_prazo
+    # Quando presentes, renderizamos uma tabela para cada uma (eventos e/ou cursos).
+    ano_pca = str(context.get("pca_ano") or context.get("pcaAno") or "").strip()
+
+    def _append_cap_table(
+        title: str,
+        rows_in: Any,
+        outros_label: str,
+        outros_temas: str,
+        outros_valor_total: Any,
+        outros_prazo: str,
+    ) -> None:
+        rows_list = rows_in if isinstance(rows_in, list) else []
+
+        outros_temas_txt = (outros_temas or "").strip()
+        try:
+            outros_v = float(outros_valor_total or 0.0)
+        except Exception:
+            outros_v = 0.0
+        outros_prazo_txt = (outros_prazo or "").strip()
+
+        # Renderiza se houver linhas OU se o bloco "Outros" tiver conteúdo relevante.
+        # (Prazo sozinho costuma vir preenchido pela UI, então não usamos como gatilho.)
+        should_render = bool(rows_list) or bool(outros_temas_txt) or (outros_v > 0)
+        if not should_render:
+            return
+
+        # Mantém padrão visual das demais tabelas (itens/valores):
+        # título como parágrafo acima + tabela sem col_widths (auto-fit).
+        elems.append(_mk_p(text=title, bold=True))
+        elems.append(ET.Element(_w("p")))
+
+        header = [
+            _tc("Descrição", bold=True, align="left"),
+            _tc("Valor unitário estimado para inscrição", bold=True, align="left"),
+            _tc("Número de inscrições previstas", bold=True, align="left"),
+            _tc("Valor Total Estimado", bold=True, align="right"),
+            _tc("Prazo estimado", bold=True, align="left"),
+        ]
+        t_rows: list[list[ET.Element]] = [header]
+
+        for r in rows_list:
+            if not isinstance(r, dict):
+                continue
+            desc = (r.get("descricao") or "").strip()
+            prazo = (r.get("prazo_estimado") or "").strip()
+
+            vu = r.get("valor_unitario")
+            n = r.get("inscricoes_previstas")
+            vt = r.get("valor_total")
+
+            try:
+                n_txt = str(int(n)) if n is not None else ""
+            except Exception:
+                n_txt = str(n) if n is not None else ""
+
+            t_rows.append([
+                _tc(desc, align="left"),
+                _tc(_fmt_money(vu), align="left"),
+                _tc(n_txt, align="left"),
+                _tc(_fmt_money(vt), align="right"),
+                _tc(prazo, align="left"),
+            ])
+
+        # Linha "Outros..." aparece quando houver conteúdo no bloco "Outros" (temas e/ou valor).
+        if outros_temas_txt or outros_v > 0:
+            desc = outros_label
+            if outros_temas_txt:
+                desc = f"{desc} — temas: {outros_temas_txt}"
+
+            vt_txt = _fmt_money(outros_v) if outros_v > 0 else "R$ ____"
+            prazo_txt = outros_prazo_txt or (f"No decorrer de {ano_pca}" if ano_pca else "")
+
+            t_rows.append([
+                _tc(desc, align="left"),
+                _tc("A definir", align="left"),
+                _tc("A definir", align="left"),
+                _tc(vt_txt, align="right"),
+                _tc(prazo_txt, align="left"),
+            ])
+
+        elems.append(_tbl(t_rows, borders=True))
+        elems.append(ET.Element(_w("p")))
+
+    _append_cap_table(
+        "Eventos/Congressos/Seminários",
+        context.get("cap_eventos_rows") or [],
+        "Outros eventos/congressos/seminários não especificados anteriormente",
+        str(context.get("cap_eventos_outros_temas") or ""),
+        context.get("cap_eventos_outros_valor_total"),
+        str(context.get("cap_eventos_outros_prazo") or ""),
+    )
+
+    _append_cap_table(
+        "Cursos",
+        context.get("cap_cursos_rows") or [],
+        "Outros cursos/treinamentos não especificados anteriormente",
+        str(context.get("cap_cursos_outros_temas") or ""),
+        context.get("cap_cursos_outros_valor_total"),
+        str(context.get("cap_cursos_outros_prazo") or ""),
+    )
+    
+
+    # Valores estimados vem depois das tabelas detalhadas (quando existirem)
+    if isinstance(itens, list) and itens:
         elems.append(_mk_p(text="Valores estimados:", bold=True))
         elems.append(ET.Element(_w("p")))
         v_header = [
