@@ -6,106 +6,408 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>DFD — Documento de Formalização da Demanda</title>
 <style>
-  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
-  * { box-sizing: border-box; }
-  html, body { margin:0; padding:0; }
-  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif; background:var(--bg); color:var(--fg); }
-  .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
-  h1 { font-size: 20px; margin: 0 0 12px; }
-  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
-  .card { background:var(--card); border:1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 16px; }
+:root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --pri:#2563eb; }
 
-  .hidden { display:none !important; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; }
 
-  label { display:block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
-  input:not([type="checkbox"]):not([type="radio"]), textarea, select { width: 100%; padding: 10px 12px; border:1px solid #cbd5e1; border-radius: 10px; font: inherit; background:#fff; }
-  textarea { min-height: 100px; resize: vertical; }
-  .row { display:flex; gap: 12px; }
-  .col { flex:1; min-width: 0; }
+body{
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans','Apple Color Emoji','Noto Color Emoji',sans-serif;
+  background:var(--bg);
+  color:var(--fg);
+}
 
-  .actions { display:flex; gap: 12px; align-items:center; justify-content: space-between; }
-  .btn { background: var(--pri); color:#fff; border:1px solid transparent; border-radius: 10px; padding: 10px 16px; cursor:pointer; transition:.16s ease; }
-  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2,6,23,.08); }
-  .btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
-  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
-  .btn.secondary:hover { background:#f8fafc; }
-  .btn.small { padding: 8px 12px; font-size: 12px; }
-  .btn.danger { background:#b91c1c; }
-  .btn[disabled] { opacity:.6; cursor: not-allowed; transform:none; box-shadow:none; }
-  .btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+.wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+h1 { font-size: 20px; margin: 0 0 12px; }
 
-  .note { font-size:12px; color:var(--muted); }
-  .status { font-size:13px; color: var(--muted); }
-  .list { margin-top: 24px; }
+.header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
 
-  .item { position: relative; padding:12px; padding-bottom: 64px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
-  .item .meta { display:flex; justify-content:flex-start; align-items:center; margin-bottom:8px; gap:8px; }
-  .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius: 999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
+.card{
+  background:var(--card);
+  border:1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  padding: 16px;
+}
 
-  .inline-help { display:inline-flex; align-items:center; position:relative; margin-left:6px; }
-  .inline-help .help { width:18px; height:18px; border-radius:999px; background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1; font-size:12px; line-height:16px; text-align:center; padding:0; cursor:pointer; }
-  .inline-help .help:hover { background:#dbeafe; border-color:#93c5fd; }
-  .inline-help .help:focus-visible { outline:2px solid #93c5fd; outline-offset: 2px; }
-  .inline-help .tip { position:absolute; top:120%; left:0; z-index:10; min-width: 220px; max-width: 360px; background:#0f172a; color:#fff; padding:8px 10px; border-radius:10px; font-size:12px; box-shadow: 0 8px 24px rgba(2,6,23,.18); pointer-events:none; opacity:0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
-  .inline-help:hover .tip, .inline-help:focus-within .tip { opacity:1; transform: translateY(0); }
-  .tip code { background: rgba(255,255,255,.12); padding:0 4px; border-radius:4px; }
+.hidden { display:none !important; }
 
-  .req-star { color:#dc2626; font-weight:700; margin-left:4px; }
-  .req-legend { display:flex; align-items:center; gap:6px; margin: 8px 0 12px; }
-  .group-disabled .req-star { color:#94a3b8; }
+label{
+  display:block;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 12px 0 6px;
+}
 
-  .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select{
+  width: 100%;
+  padding: 10px 12px;
+  border:1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  background:#fff;
+}
 
-  input[disabled], textarea[disabled], select[disabled] { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; cursor:not-allowed; }
-  input.readonly, textarea.readonly { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
-  .group-disabled label { color:#94a3b8; }
-  .group-disabled .inline-help .help { background:#e5e7eb; color:#94a3b8; border-color:#e5e7eb; }
-  .group-disabled input:not([type="checkbox"]):not([type="radio"]), .group-disabled select, .group-disabled textarea { background:#f1f5f9; color:#64748b; border-color:#e2e8f0; }
+textarea{ min-height: 100px; resize: vertical; }
 
-  .item-actions { position:absolute; right:12px; bottom:12px; display:flex; gap:8px; }
-  .checkline { display:flex; align-items:center; gap:8px; padding:6px 0; }
-  .checkline input[type="checkbox"] { width:auto; margin:0; }
-  .checkline label { margin:0; font-size:12px; color:var(--muted); }
+.row{ display:flex; gap: 12px; }
+.col{ flex:1; min-width: 0; }
 
-  .banner {
-    border:1px solid #f59e0b;
-    background:#fffbeb;
-    color:#92400e;
-    border-radius: 12px;
-    padding: 10px 12px;
-    margin: 12px 0;
-    font-size: 13px;
-    display:flex;
-    align-items:flex-start;
-    gap:10px;
-  }
-  .banner strong { color:#7c2d12; }
+.actions{
+  display:flex;
+  gap: 12px;
+  align-items:center;
+  justify-content: space-between;
+}
 
-  .pe-box { border:1px dashed #cbd5e1; border-radius: 12px; padding: 12px; background: #ffffff; }
-  .pe-selected { display:flex; flex-direction:column; gap:10px; margin-top: 10px; }
-  .pe-item { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding: 10px 12px; border:1px solid #e2e8f0; border-radius: 12px; background:#f8fafc; }
-  .pe-item .txt { font-size: 13px; color: var(--fg); line-height: 1.35; }
-  .pe-item .meta { display:flex; gap:8px; align-items:center; }
-  .pe-item .tag { font-size: 12px; color: var(--muted); background:#ffffff; border:1px solid #e2e8f0; padding: 3px 8px; border-radius: 999px; }
-  .pe-item .rm { white-space: nowrap; }
-  .pe-msg { margin-top: 10px; font-size: 13px; color:#b91c1c; }
+.btn{
+  background: var(--pri);
+  color:#fff;
+  border:1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor:pointer;
+  transition:.16s ease;
+}
 
-  textarea.bigtext { min-height: 280px; }
+.btn:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2,6,23,.08);
+}
 
-  .cap-box { border:1px dashed #cbd5e1; border-radius: 12px; padding: 12px; background:#fff; margin-top: 10px; }
-  .cap-box h3 { margin:0 0 6px; font-size: 13px; }
-  .cap-checks { display:flex; flex-direction:column; gap:8px; margin-top: 8px; }
-  .cap-check { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid #e2e8f0; border-radius: 12px; background:#f8fafc; cursor:pointer; }
-  .cap-check input { width:auto; margin-top: 2px; }
-  .cap-check .txt { font-size: 13px; color: var(--fg); line-height: 1.35; }
-  .cap-check .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.btn:focus-visible{ outline: 2px solid #93c5fd; outline-offset: 2px; }
 
-  @keyframes shake { from{transform:translateX(0)} 33%{transform:translateX(-2px)} 66%{transform:translateX(2px)} to{transform:translateX(0)} }
-  @media (max-width: 640px) {
-    .row { flex-direction: column; }
-    .actions { flex-direction: column; align-items: stretch; gap: 8px; }
-    .actions .btn-row { justify-content: flex-end; }
-  }
+.btn.secondary{
+  background:#fff;
+  color:#334155;
+  border-color:#cbd5e1;
+}
+.btn.secondary:hover{ background:#f8fafc; }
+
+.btn.small{ padding: 8px 12px; font-size: 12px; }
+.btn.danger{ background:#b91c1c; }
+
+.btn[disabled]{
+  opacity:.6;
+  cursor: not-allowed;
+  transform:none;
+  box-shadow:none;
+}
+
+.btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.note{ font-size:12px; color:var(--muted); }
+.status{ font-size:13px; color: var(--muted); }
+.list{ margin-top: 24px; }
+
+.item{
+  position: relative;
+  padding:12px;
+  padding-bottom: 64px;
+  border:1px dashed #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background:#fff;
+}
+
+.item .meta{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  margin-bottom:8px;
+  gap:8px;
+}
+
+.badge{
+  display:inline-block;
+  font-size:11px;
+  padding:2px 6px;
+  border-radius: 999px;
+  background:#eef2ff;
+  color:#1e3a8a;
+  margin-right:6px;
+}
+
+.inline-help{
+  display:inline-flex;
+  align-items:center;
+  position:relative;
+  margin-left:6px;
+}
+
+.inline-help .help{
+  width:18px;
+  height:18px;
+  border-radius:999px;
+  background:#e2e8f0;
+  color:#0f172a;
+  border:1px solid #cbd5e1;
+  font-size:12px;
+  line-height:16px;
+  text-align:center;
+  padding:0;
+  cursor:pointer;
+}
+
+.inline-help .help:hover{ background:#dbeafe; border-color:#93c5fd; }
+.inline-help .help:focus-visible{ outline:2px solid #93c5fd; outline-offset: 2px; }
+
+.inline-help .tip{
+  position:absolute;
+  top:120%;
+  left:0;
+  z-index:10;
+  min-width: 220px;
+  max-width: 360px;
+  background:#0f172a;
+  color:#fff;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:12px;
+  box-shadow: 0 8px 24px rgba(2,6,23,.18);
+  pointer-events:none;
+  opacity:0;
+  transform: translateY(-4px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.inline-help:hover .tip,
+.inline-help:focus-within .tip{
+  opacity:1;
+  transform: translateY(0);
+}
+
+.tip code{
+  background: rgba(255,255,255,.12);
+  padding:0 4px;
+  border-radius:4px;
+}
+
+.req-star{ color:#dc2626; font-weight:700; margin-left:4px; }
+.req-legend{ display:flex; align-items:center; gap:6px; margin: 8px 0 12px; }
+.group-disabled .req-star{ color:#94a3b8; }
+
+.hr{ height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+
+input[disabled], textarea[disabled], select[disabled]{
+  background:#f1f5f9;
+  color:#64748b;
+  border-color:#e2e8f0;
+  cursor:not-allowed;
+}
+
+input.readonly, textarea.readonly{
+  background:#f1f5f9;
+  color:#64748b;
+  border-color:#e2e8f0;
+}
+
+.group-disabled label{ color:#94a3b8; }
+.group-disabled .inline-help .help{ background:#e5e7eb; color:#94a3b8; border-color:#e5e7eb; }
+
+.group-disabled input:not([type="checkbox"]):not([type="radio"]),
+.group-disabled select,
+.group-disabled textarea{
+  background:#f1f5f9;
+  color:#64748b;
+  border-color:#e2e8f0;
+}
+
+.item-actions{
+  position:absolute;
+  right:12px;
+  bottom:12px;
+  display:flex;
+  gap:8px;
+}
+
+.checkline{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 0;
+}
+
+.checkline input[type="checkbox"]{ width:auto; margin:0; }
+
+.checkline label{
+  margin:0;
+  font-size:12px;
+  color:var(--muted);
+}
+
+.banner{
+  border:1px solid #f59e0b;
+  background:#fffbeb;
+  color:#92400e;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  font-size: 13px;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+.banner strong{ color:#7c2d12; }
+
+/* Planejamento Estratégico */
+.pe-box{
+  border:1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.pe-selected{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top: 10px;
+}
+
+.pe-item{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding: 10px 12px;
+  border:1px solid #e2e8f0;
+  border-radius: 12px;
+  background:#f8fafc;
+}
+
+.pe-item .txt{ font-size: 13px; color: var(--fg); line-height: 1.35; }
+.pe-item .meta{ display:flex; gap:8px; align-items:center; }
+
+.pe-item .tag{
+  font-size: 12px;
+  color: var(--muted);
+  background:#ffffff;
+  border:1px solid #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.pe-item .rm{ white-space: nowrap; }
+.pe-msg{ margin-top: 10px; font-size: 13px; color:#b91c1c; }
+
+textarea.bigtext{ min-height: 280px; }
+
+/* CAP — seleção de itens */
+.cap-box{
+  border:1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  background:#fff;
+  margin-top: 10px;
+}
+
+.cap-box h3{ margin:0 0 6px; font-size: 13px; }
+
+.cap-checks{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top: 8px;
+}
+
+.cap-check{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid #e2e8f0;
+  border-radius: 12px;
+  background:#f8fafc;
+  cursor:pointer;
+}
+
+.cap-check input{ width:auto; margin-top: 2px; }
+.cap-check .txt{ font-size: 13px; color: var(--fg); line-height: 1.35; }
+.cap-check .sub{ font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* CAP — seções e texto */
+.cap-subbox{
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+.cap-subbox h4{ margin: 0 0 10px; font-size: 13px; }
+
+.cap-muted{ color: var(--muted); font-size: 12px; }
+.cap-enunciado{ color: var(--fg); font-size: 13px; line-height: 1.35; }
+
+/* CAP — FORM CARDS (sem <table>) */
+.cap-formlist{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top: 10px;
+}
+
+.cap-formrow{
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
+/* labels dentro do card não devem herdar o margin global */
+.cap-formrow label{
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cap-formrow textarea{ min-height: 120px; }
+
+.cap-grid4{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 720px){
+  .cap-grid4{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px){
+  .cap-grid4{ grid-template-columns: 1fr; }
+}
+
+.cap-row-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top: 10px;
+}
+
+.cap-row-footer .left,
+.cap-row-footer .right{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* (opcional, mas útil) animação usada no JS */
+@keyframes shake{
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
 </style>
 </head>
 <body>
@@ -323,6 +625,77 @@
   const prazosGroup = document.getElementById('prazosGroup');
   const prazosTipEl = prazosGroup?.querySelector('.inline-help .tip') || null;
 
+  // === Formatação pt-BR (moeda) — usada só para exibição na UI ===
+  const __FMT_BRL__ = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
+  function fmtBRL(v){
+    const n = Number(v);
+    return __FMT_BRL__.format(Number.isFinite(n) ? n : 0);
+  }
+ 
+  // === Parsing “pt-BR friendly” (aceita: 1234.56 | 1234,56 | 1.234,56 | R$ 1.234,56) ===
+  function parseDecimalBR(v){
+    let raw = String(v ?? '').trim();
+    if(!raw) return 0;
+
+    // permite "(1.234,56)" como negativo
+    let negative = false;
+    if(raw.includes('(') && raw.includes(')')){
+      negative = true;
+      raw = raw.replace(/[()]/g, '');
+    }
+
+    // remove espaços e tudo que não seja dígito, ponto, vírgula ou sinal
+    let s = raw.replace(/\s+/g, '').replace(/[^\d.,-]/g, '');
+    if(!s) return 0;
+
+    // mantém só o primeiro '-' (se estiver no começo)
+    s = s.replace(/(?!^)-/g, '');
+
+    const hasComma = s.includes(',');
+    const hasDot = s.includes('.');
+
+    // Caso tenha os dois: usa o ÚLTIMO separador como decimal (funciona p/ "1.234,56" e "1,234.56")
+    if(hasComma && hasDot){
+      const lastComma = s.lastIndexOf(',');
+      const lastDot   = s.lastIndexOf('.');
+      const decSep = (lastComma > lastDot) ? ',' : '.';
+      const thouSep = (decSep === ',') ? '.' : ',';
+
+      s = s.replaceAll(thouSep, '');
+      if(decSep === ',') s = s.replace(',', '.'); // troca só o separador decimal
+    }
+    // Só vírgula
+    else if(hasComma){
+      // milhar estilo "1,234" ou "12,345,678"
+      if(/^-?\d{1,3}(,\d{3})+$/.test(s)){
+        s = s.replace(/,/g, '');
+      } else {
+        // decimal estilo "1234,56" (ou "1234,5")
+        s = s.replace(',', '.');
+      }
+    }
+    // Só ponto
+    else if(hasDot){
+      // milhar estilo "1.234" ou "12.345.678"
+      if(/^-?\d{1,3}(\.\d{3})+$/.test(s)){
+        s = s.replace(/\./g, '');
+      }
+      // senão, mantém como decimal (ex.: 12.34)
+    }
+
+    // evita múltiplos pontos residuais (segurança)
+    const parts = s.split('.');
+    if(parts.length > 2){
+      s = parts.shift() + '.' + parts.join('');
+    }
+
+    let n = Number(s);
+    if(!Number.isFinite(n)) return 0;
+    if(negative) n = -Math.abs(n);
+    return n;
+  }
+
+
   function applyPrazosTip(){
     if(!prazosTipEl) return;
     // tip padrão (para DFD padrão)
@@ -405,7 +778,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     return d || "—";
   }
   function buildObjetoCap(d){ return `Capacitação de Servidores da ${d}`; }
-  function buildItemDescEventos(d){ return `Participação de servidores da ${d} em eventos/congressos /seminários;`; }
+  function buildItemDescEventos(d){ return `Participação de servidores da ${d} em eventos/congressos/seminários;`; }
   function buildItemDescCursos(d){ return `Cursos/treinamentos para os servidores da ${d}`; }
 
   let __OBJETO_DIRTY__ = false;
@@ -456,6 +829,666 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
   let capKeepEventos = false;
   let capKeepCursos = false;
   let __CAP_RENDER_KEY__ = '';
+
+  // ======= Tabela de Eventos (capacitacao) =======
+  let capEventosRows = []; // linhas normais (editáveis)
+  let capEventosOutrosTemas = "";
+  let capEventosOutrosTotal = ""; // string/number
+
+  // ======= Tabela de Cursos (capacitacao) =======
+  let capCursosRows = []; // linhas normais (editáveis)
+  let capCursosOutrosTemas = "";
+  let capCursosOutrosTotal = ""; // string/number
+
+  function capEnsureAtLeastOneRow(){
+    if(!__IS_CAP__) return;
+    if(!capEventosIsOn()) return;
+    if(!Array.isArray(capEventosRows)) capEventosRows = [];
+    if(capEventosRows.length < 1){
+      capEventosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+    }
+  }
+
+  function capCursosEnsureAtLeastOneRow(){
+    if(!__IS_CAP__) return;
+    if(!capCursosIsOn()) return;
+    if(!Array.isArray(capCursosRows)) capCursosRows = [];
+    if(capCursosRows.length < 1){
+      capCursosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+    }
+  }
+ 
+  function capEventosIsOn(){
+    const ev = (capChkEventos ? capChkEventos.checked : capKeepEventos);
+    return !!ev;
+  }
+
+  function capCursosIsOn(){
+    const cu = (capChkCursos ? capChkCursos.checked : capKeepCursos);
+    return !!cu;
+  }
+ 
+  function capEventosRowTotal(row){
+    const vu = parseDecimalBR(row?.valorUnitario ?? "");
+    const n  = parseInt((row?.inscricoesPrevistas ?? "").toString(), 10);
+    const okVu = isFinite(vu) ? vu : 0;
+    const okN  = isFinite(n) ? n : 0;
+    return Math.round(okVu * okN * 100) / 100;
+  }
+
+  function capCursosRowTotal(row){
+    const vu = parseDecimalBR(row?.valorUnitario ?? "");
+    const n  = parseInt((row?.inscricoesPrevistas ?? "").toString(), 10);
+    const okVu = isFinite(vu) ? vu : 0;
+    const okN  = isFinite(n) ? n : 0;
+    return Math.round(okVu * okN * 100) / 100;
+  }
+
+  function capEventosTotalGeral(){
+    const sum = capEventosRows.reduce((acc, r)=> acc + capEventosRowTotal(r), 0);
+    const outros = parseDecimalBR(capEventosOutrosTotal ?? "");
+    const o = isFinite(outros) ? outros : 0;
+    return Math.round((sum + o) * 100) / 100;
+  }
+
+  function capCursosTotalGeral(){
+    const sum = capCursosRows.reduce((acc, r)=> acc + capCursosRowTotal(r), 0);
+    const outros = parseDecimalBR(capCursosOutrosTotal ?? "");
+    const o = isFinite(outros) ? outros : 0;
+    return Math.round((sum + o) * 100) / 100;
+  }
+
+  function capEventosUpdateTotalNote(){
+    const el = document.getElementById('capEventosTotalNote');
+    if(el) el.textContent = `Total estimado (eventos): ${fmtBRL(capEventosTotalGeral())}`;
+  }
+
+  function capCursosUpdateTotalNote(){
+    const el = document.getElementById('capCursosTotalNote');
+    if(el) el.textContent = `Total estimado (cursos): ${fmtBRL(capCursosTotalGeral())}`;
+  }
+
+  function capAnoTxt(){
+    const ano = (pcaAnoEl?.value || "").trim();
+    return isValidAno(ano) ? ano : "";
+  }
+
+  function capPrazoNoDecorrer(){
+    const ano = capAnoTxt();
+    return ano ? `No decorrer de ${ano}` : `No decorrer de <ano do PCA>`;
+  }
+
+  function renderCapEventosSection(){
+    const wrap = document.getElementById('capEventosSection');
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    if(!__IS_CAP__ || !capEventosIsOn()) return;
+
+    capEnsureAtLeastOneRow();
+
+    const sub = document.createElement('div');
+    sub.className = 'cap-subbox';
+
+    const h4 = document.createElement('h4');
+    h4.textContent = 'Eventos/Congressos/Seminários';
+    sub.appendChild(h4);
+
+    const note = document.createElement('div');
+    note.className = 'cap-enunciado';
+    note.textContent = 'Adicione eventos conforme necessário. A 1ª linha é obrigatória (não removível) e a última linha (“Outros…”) é fixa.';
+    sub.appendChild(note);
+
+    const meses = mesesDoAno(capAnoTxt());
+
+    const list = document.createElement('div');
+    list.className = 'cap-formlist';
+
+    capEventosRows.forEach((row, idx)=>{
+      const card = document.createElement('div');
+      card.className = 'cap-formrow';
+
+      // ===== Descrição (full) =====
+      const lblDesc = document.createElement('label');
+      lblDesc.textContent = 'Descrição';
+      const ta = document.createElement('textarea');
+      ta.rows = 4;
+      ta.placeholder = 'Ex.: Congresso X (tema Y)';
+      ta.value = row.descricao ?? '';
+      ta.addEventListener('input', ()=>{
+        capEventosRows[idx].descricao = ta.value;
+        ta.style.height = "auto";
+        ta.style.height = (ta.scrollHeight + 2) + "px";
+      });
+      ta.style.height = "auto";
+      ta.style.height = (ta.scrollHeight + 2) + "px";
+
+      card.appendChild(lblDesc);
+      card.appendChild(ta);
+
+      // ===== Grid 4 campos =====
+      const grid = document.createElement('div');
+      grid.className = 'cap-grid4';
+
+      // Valor unitário
+      const fVU = document.createElement('div');
+      const lVU = document.createElement('label');
+      lVU.textContent = 'Valor unitário';
+      const iVU = document.createElement('input');
+      // type="number" não aceita vírgula (pt-BR). Usamos text + parseDecimalBR().
+      iVU.type = 'text';
+      iVU.inputMode = 'decimal';
+      iVU.autocomplete = 'off';
+      iVU.pattern = '[0-9.,-]*';
+      iVU.placeholder = 'Ex.: 850,00';
+      iVU.value = (row.valorUnitario ?? '');
+      fVU.appendChild(lVU);
+      fVU.appendChild(iVU);
+
+      // Inscrições
+      const fN = document.createElement('div');
+      const lN = document.createElement('label');
+      lN.textContent = 'Inscrições';
+      const iN = document.createElement('input');
+      iN.type = 'number';
+      iN.min = '0';
+      iN.step = '1';
+      iN.inputMode = 'numeric';
+      iN.placeholder = 'Ex.: 3';
+      iN.value = (row.inscricoesPrevistas ?? '');
+      fN.appendChild(lN);
+      fN.appendChild(iN);
+
+      // Total (auto)
+      const fVT = document.createElement('div');
+      const lVT = document.createElement('label');
+      lVT.textContent = 'Valor total';
+      const out = document.createElement('input');
+      out.type = 'text';
+      out.disabled = true;
+      out.classList.add('readonly');
+      out.value = fmtBRL(capEventosRowTotal(row));
+      fVT.appendChild(lVT);
+      fVT.appendChild(out);
+
+      // Prazo
+      const fP = document.createElement('div');
+      const lP = document.createElement('label');
+      lP.textContent = 'Prazo';
+      const selP = document.createElement('select');
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = meses.length ? '-- Selecionar --' : 'Informe o ano do PCA primeiro';
+      selP.appendChild(ph);
+      if(meses.length){
+        meses.forEach(v=>{
+          const o = document.createElement('option');
+          o.value = v;
+          o.textContent = v;
+          selP.appendChild(o);
+        });
+        selP.disabled = false;
+      }else{
+        selP.disabled = true;
+      }
+      selP.value = row.prazoEstimado ?? '';
+      fP.appendChild(lP);
+      fP.appendChild(selP);
+
+      grid.appendChild(fVU);
+      grid.appendChild(fN);
+      grid.appendChild(fVT);
+      grid.appendChild(fP);
+
+      card.appendChild(grid);
+
+      function updateRowTotal(){
+        out.value = fmtBRL(capEventosRowTotal(capEventosRows[idx]));
+        capEventosUpdateTotalNote();
+      }
+
+      iVU.addEventListener('input', ()=>{
+        capEventosRows[idx].valorUnitario = iVU.value;
+        updateRowTotal();
+      });
+      iN.addEventListener('input', ()=>{
+        capEventosRows[idx].inscricoesPrevistas = iN.value;
+        updateRowTotal();
+      });
+      selP.addEventListener('change', ()=>{
+        capEventosRows[idx].prazoEstimado = selP.value;
+      });
+
+      // ===== Footer (Remover / Adicionar no último) =====
+      const footer = document.createElement('div');
+      footer.className = 'cap-row-footer';
+
+      const left = document.createElement('div');
+      left.className = 'left';
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'btn small danger';
+      rm.textContent = 'Remover';
+
+      const nonRemovable = (idx === 0);
+      rm.disabled = nonRemovable || (capEventosRows.length <= 1);
+      rm.title = nonRemovable
+        ? 'Este evento é obrigatório e não pode ser removido.'
+        : (capEventosRows.length <= 1 ? 'Deve existir ao menos 1 evento.' : '');
+
+      rm.addEventListener('click', ()=>{
+        if(idx === 0 || capEventosRows.length <= 1) return;
+        capEventosRows.splice(idx, 1);
+        capEnsureAtLeastOneRow();
+        renderCapEventosSection();
+      });
+
+      left.appendChild(rm);
+
+      const right = document.createElement('div');
+      right.className = 'right';
+
+      if(idx === capEventosRows.length - 1){
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'btn secondary small';
+        add.textContent = 'Adicionar evento';
+        add.addEventListener('click', ()=>{
+          capEventosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+          renderCapEventosSection();
+        });
+        right.appendChild(add);
+      }
+
+      footer.appendChild(left);
+      footer.appendChild(right);
+      card.appendChild(footer);
+
+      list.appendChild(card);
+    });
+
+    // ===== Card fixo "Outros..." =====
+    {
+      const card = document.createElement('div');
+      card.className = 'cap-formrow';
+
+      const lblDesc = document.createElement('label');
+      lblDesc.textContent = 'Descrição';
+
+      const fixed = document.createElement('div');
+      fixed.className = 'cap-enunciado';
+      fixed.textContent = 'Outros eventos/congressos/seminários não especificados anteriormente nos temas de:';
+
+      const inpTemas = document.createElement('input');
+      inpTemas.type = 'text';
+      inpTemas.placeholder = 'preencher...';
+      inpTemas.value = capEventosOutrosTemas || '';
+      inpTemas.addEventListener('input', ()=>{ capEventosOutrosTemas = inpTemas.value; });
+
+      card.appendChild(lblDesc);
+      card.appendChild(fixed);
+      card.appendChild(inpTemas);
+
+      const grid = document.createElement('div');
+      grid.className = 'cap-grid4';
+
+      const fVU = document.createElement('div');
+      const lVU = document.createElement('label');
+      lVU.textContent = 'Valor unitário';
+      const iVU = document.createElement('input');
+      iVU.type = 'text';
+      iVU.value = 'A definir';
+      iVU.disabled = true;
+      fVU.appendChild(lVU);
+      fVU.appendChild(iVU);
+
+      const fN = document.createElement('div');
+      const lN = document.createElement('label');
+      lN.textContent = 'Inscrições';
+      const iN = document.createElement('input');
+      iN.type = 'text';
+      iN.value = 'A definir';
+      iN.disabled = true;
+      fN.appendChild(lN);
+      fN.appendChild(iN);
+
+      const fVT = document.createElement('div');
+      const lVT = document.createElement('label');
+      lVT.textContent = 'Valor total';
+      const iVT = document.createElement('input');
+      iVT.type = 'text';
+      iVT.inputMode = 'decimal';
+      iVT.autocomplete = 'off';
+      iVT.pattern = '[0-9.,-]*';
+      iVT.placeholder = 'preencher...';
+      iVT.value = (capEventosOutrosTotal ?? '');
+      iVT.addEventListener('input', ()=>{
+        capEventosOutrosTotal = iVT.value;
+        capEventosUpdateTotalNote();
+      });
+      fVT.appendChild(lVT);
+      fVT.appendChild(iVT);
+
+      const fP = document.createElement('div');
+      const lP = document.createElement('label');
+      lP.textContent = 'Prazo';
+      const iP = document.createElement('input');
+      iP.type = 'text';
+      iP.value = capPrazoNoDecorrer();
+      iP.disabled = true;
+      fP.appendChild(lP);
+      fP.appendChild(iP);
+
+      grid.appendChild(fVU);
+      grid.appendChild(fN);
+      grid.appendChild(fVT);
+      grid.appendChild(fP);
+
+      card.appendChild(grid);
+      list.appendChild(card);
+    }
+
+    sub.appendChild(list);
+
+    // Total no rodapé da seção
+    const btns = document.createElement('div');
+    btns.className = 'btn-row';
+    btns.style.marginTop = '10px';
+
+    const totalNote = document.createElement('div');
+    totalNote.className = 'cap-muted';
+    totalNote.id = 'capEventosTotalNote';
+    totalNote.style.marginLeft = 'auto';
+    totalNote.textContent = `Total estimado (eventos): ${fmtBRL(capEventosTotalGeral())}`;
+
+    btns.appendChild(totalNote);
+    sub.appendChild(btns);
+
+    wrap.appendChild(sub);
+  }
+  // ============================================
+
+  // ======= Tabela de Cursos (capacitacao) =======
+  function renderCapCursosSection(){
+    const wrap = document.getElementById('capCursosSection');
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    if(!__IS_CAP__ || !capCursosIsOn()) return;
+
+    capCursosEnsureAtLeastOneRow();
+
+    const sub = document.createElement('div');
+    sub.className = 'cap-subbox';
+
+    const h4 = document.createElement('h4');
+    h4.textContent = 'Cursos';
+    sub.appendChild(h4);
+
+    const note = document.createElement('div');
+    note.className = 'cap-enunciado';
+    note.textContent = 'Adicione cursos conforme necessário. A 1ª linha é obrigatória (não removível) e a última linha ("Outros…") é fixa.';
+    sub.appendChild(note);
+
+    const meses = mesesDoAno(capAnoTxt());
+
+    const list = document.createElement('div');
+    list.className = 'cap-formlist';
+
+    capCursosRows.forEach((row, idx)=>{
+      const card = document.createElement('div');
+      card.className = 'cap-formrow';
+
+      const lblDesc = document.createElement('label');
+      lblDesc.textContent = 'Descrição';
+      const ta = document.createElement('textarea');
+      ta.rows = 4;
+      ta.placeholder = 'Ex.: Curso X (tema Y)';
+      ta.value = row.descricao ?? '';
+      ta.addEventListener('input', ()=>{
+        capCursosRows[idx].descricao = ta.value;
+        ta.style.height = "auto";
+        ta.style.height = (ta.scrollHeight + 2) + "px";
+      });
+      ta.style.height = "auto";
+      ta.style.height = (ta.scrollHeight + 2) + "px";
+
+      card.appendChild(lblDesc);
+      card.appendChild(ta);
+
+      const grid = document.createElement('div');
+      grid.className = 'cap-grid4';
+
+      const fVU = document.createElement('div');
+      const lVU = document.createElement('label');
+      lVU.textContent = 'Valor unitário';
+      const iVU = document.createElement('input');
+      iVU.type = 'text';
+      iVU.inputMode = 'decimal';
+      iVU.autocomplete = 'off';
+      iVU.pattern = '[0-9.,-]*';
+      iVU.placeholder = 'Ex.: 850,00';
+      iVU.value = (row.valorUnitario ?? '');
+      fVU.appendChild(lVU);
+      fVU.appendChild(iVU);
+
+      const fN = document.createElement('div');
+      const lN = document.createElement('label');
+      lN.textContent = 'Inscrições';
+      const iN = document.createElement('input');
+      iN.type = 'number';
+      iN.min = '0';
+      iN.step = '1';
+      iN.inputMode = 'numeric';
+      iN.placeholder = 'Ex.: 3';
+      iN.value = (row.inscricoesPrevistas ?? '');
+      fN.appendChild(lN);
+      fN.appendChild(iN);
+
+      const fVT = document.createElement('div');
+      const lVT = document.createElement('label');
+      lVT.textContent = 'Valor total';
+      const out = document.createElement('input');
+      out.type = 'text';
+      out.disabled = true;
+      out.classList.add('readonly');
+      out.value = fmtBRL(capCursosRowTotal(row));
+      fVT.appendChild(lVT);
+      fVT.appendChild(out);
+
+      const fP = document.createElement('div');
+      const lP = document.createElement('label');
+      lP.textContent = 'Prazo';
+      const selP = document.createElement('select');
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = meses.length ? '-- Selecionar --' : 'Informe o ano do PCA primeiro';
+      selP.appendChild(ph);
+      if(meses.length){
+        meses.forEach(v=>{
+          const o = document.createElement('option');
+          o.value = v;
+          o.textContent = v;
+          selP.appendChild(o);
+        });
+        selP.disabled = false;
+      }else{
+        selP.disabled = true;
+      }
+      selP.value = row.prazoEstimado ?? '';
+      fP.appendChild(lP);
+      fP.appendChild(selP);
+
+      grid.appendChild(fVU);
+      grid.appendChild(fN);
+      grid.appendChild(fVT);
+      grid.appendChild(fP);
+
+      card.appendChild(grid);
+
+      function updateRowTotal(){
+        out.value = fmtBRL(capCursosRowTotal(capCursosRows[idx]));
+        capCursosUpdateTotalNote();
+      }
+
+      iVU.addEventListener('input', ()=>{
+        capCursosRows[idx].valorUnitario = iVU.value;
+        updateRowTotal();
+      });
+      iN.addEventListener('input', ()=>{
+        capCursosRows[idx].inscricoesPrevistas = iN.value;
+        updateRowTotal();
+      });
+      selP.addEventListener('change', ()=>{
+        capCursosRows[idx].prazoEstimado = selP.value;
+      });
+
+      const footer = document.createElement('div');
+      footer.className = 'cap-row-footer';
+
+      const left = document.createElement('div');
+      left.className = 'left';
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'btn small danger';
+      rm.textContent = 'Remover';
+
+      const nonRemovable = (idx === 0);
+      rm.disabled = nonRemovable || (capCursosRows.length <= 1);
+      rm.title = nonRemovable
+        ? 'Este curso é obrigatório e não pode ser removido.'
+        : (capCursosRows.length <= 1 ? 'Deve existir ao menos 1 curso.' : '');
+
+      rm.addEventListener('click', ()=>{
+        if(idx === 0 || capCursosRows.length <= 1) return;
+        capCursosRows.splice(idx, 1);
+        capCursosEnsureAtLeastOneRow();
+        renderCapCursosSection();
+      });
+
+      left.appendChild(rm);
+
+      const right = document.createElement('div');
+      right.className = 'right';
+
+      if(idx === capCursosRows.length - 1){
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'btn secondary small';
+        add.textContent = 'Adicionar curso';
+        add.addEventListener('click', ()=>{
+          capCursosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+          renderCapCursosSection();
+        });
+        right.appendChild(add);
+      }
+
+      footer.appendChild(left);
+      footer.appendChild(right);
+      card.appendChild(footer);
+
+      list.appendChild(card);
+    });
+
+    // ===== Card fixo "Outros..." =====
+    {
+      const card = document.createElement('div');
+      card.className = 'cap-formrow';
+
+      const lblDesc = document.createElement('label');
+      lblDesc.textContent = 'Descrição';
+
+      const fixed = document.createElement('div');
+      fixed.className = 'cap-enunciado';
+      fixed.textContent = 'Outros cursos/treinamentos não especificados anteriormente';
+
+      const inpTemas = document.createElement('input');
+      inpTemas.type = 'text';
+      inpTemas.placeholder = 'preencher...';
+      inpTemas.value = capCursosOutrosTemas || '';
+      inpTemas.addEventListener('input', ()=>{ capCursosOutrosTemas = inpTemas.value; });
+
+      card.appendChild(lblDesc);
+      card.appendChild(fixed);
+      card.appendChild(inpTemas);
+
+      const grid = document.createElement('div');
+      grid.className = 'cap-grid4';
+
+      const fVU = document.createElement('div');
+      const lVU = document.createElement('label');
+      lVU.textContent = 'Valor unitário';
+      const iVU = document.createElement('input');
+      iVU.type = 'text';
+      iVU.value = 'A definir';
+      iVU.disabled = true;
+      fVU.appendChild(lVU);
+      fVU.appendChild(iVU);
+
+      const fN = document.createElement('div');
+      const lN = document.createElement('label');
+      lN.textContent = 'Inscrições';
+      const iN = document.createElement('input');
+      iN.type = 'text';
+      iN.value = 'A definir';
+      iN.disabled = true;
+      fN.appendChild(lN);
+      fN.appendChild(iN);
+
+      const fVT = document.createElement('div');
+      const lVT = document.createElement('label');
+      lVT.textContent = 'Valor total';
+      const iVT = document.createElement('input');
+      iVT.type = 'text';
+      iVT.inputMode = 'decimal';
+      iVT.autocomplete = 'off';
+      iVT.pattern = '[0-9.,-]*';
+      iVT.placeholder = 'preencher...';
+      iVT.value = (capCursosOutrosTotal ?? '');
+      iVT.addEventListener('input', ()=>{
+        capCursosOutrosTotal = iVT.value;
+        capCursosUpdateTotalNote();
+      });
+      fVT.appendChild(lVT);
+      fVT.appendChild(iVT);
+
+      const fP = document.createElement('div');
+      const lP = document.createElement('label');
+      lP.textContent = 'Prazo';
+      const iP = document.createElement('input');
+      iP.type = 'text';
+      iP.value = capPrazoNoDecorrer();
+      iP.disabled = true;
+      fP.appendChild(lP);
+      fP.appendChild(iP);
+
+      grid.appendChild(fVU);
+      grid.appendChild(fN);
+      grid.appendChild(fVT);
+      grid.appendChild(fP);
+
+      card.appendChild(grid);
+      list.appendChild(card);
+    }
+
+    sub.appendChild(list);
+
+    const btns = document.createElement('div');
+    btns.className = 'btn-row';
+    btns.style.marginTop = '10px';
+
+    const totalNote = document.createElement('div');
+    totalNote.className = 'cap-muted';
+    totalNote.id = 'capCursosTotalNote';
+    totalNote.style.marginLeft = 'auto';
+    totalNote.textContent = `Total estimado (cursos): ${fmtBRL(capCursosTotalGeral())}`;
+
+    btns.appendChild(totalNote);
+    sub.appendChild(btns);
+
+    wrap.appendChild(sub);
+  }
+  // ============================================
 
   function renderCapItemsSelector(){
     if(!capItemsBoxEl) return;
@@ -525,17 +1558,39 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     warn.textContent = '';
     box.appendChild(warn);
 
-    capItemsBoxEl.appendChild(box);
+   // container da tabela de eventos (aparece quando marcar "Eventos")
+   const eventosWrap = document.createElement('div');
+   eventosWrap.id = 'capEventosSection';
+   box.appendChild(eventosWrap);
+
+   // container da tabela de cursos (aparece quando marcar "Cursos")
+   const cursosWrap = document.createElement('div');
+   cursosWrap.id = 'capCursosSection';
+   box.appendChild(cursosWrap);
+
+   capItemsBoxEl.appendChild(box);
 
     function onCapChange(){
       capKeepEventos = !!capChkEventos?.checked;
       capKeepCursos  = !!capChkCursos?.checked;
       ensureCapacitacaoItems();
+      // se acabou de ligar Eventos, garante 1 linha inicial obrigatória
+      capEnsureAtLeastOneRow();
+      renderCapEventosSection();
+      // se acabou de ligar Cursos, garante 1 linha inicial obrigatória
+      capCursosEnsureAtLeastOneRow();
+      renderCapCursosSection();
       updateSubmitState();
     }
 
     capChkEventos.addEventListener('change', onCapChange);
     capChkCursos.addEventListener('change', onCapChange);
+     
+    // render inicial
+    capEnsureAtLeastOneRow();
+    renderCapEventosSection();
+    capCursosEnsureAtLeastOneRow();
+    renderCapCursosSection();
 
   }
 
@@ -1047,12 +2102,13 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     colVU.className='col';
     const lblVU=document.createElement('label');
     lblVU.textContent='Estimativa de valor unitário (R$)';
-    lblVU.appendChild(helpIcon('Use ponto como separador decimal.'));
+    lblVU.appendChild(helpIcon('Use vírgula ou ponto como separador decimal (ex.: 850,00).'));
     const inpVU=document.createElement('input');
-    inpVU.type='number';
-    inpVU.min='0';
-    inpVU.step='0.01';
+    inpVU.type='text';
     inpVU.inputMode='decimal';
+    inpVU.autocomplete='off';
+    inpVU.placeholder='Ex.: 850,00';
+    inpVU.pattern='[0-9.,-]*';
     inpVU.name=`items[${idx}][valorUnitario]`;
     inpVU.id=`item-${idx}-valorUnitario`;
     inpVU.required=true;
@@ -1106,9 +2162,11 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     row2.appendChild(colVT);
 
     function recalc(){
-      const q=parseFloat(inpQt.value||'0');
-      const vu=parseFloat(inpVU.value||'0');
-      const vt=(isFinite(q)&&isFinite(vu))?(q*vu):0;
+      const q = parseInt(inpQt.value||'0', 10);
+      const vu = parseDecimalBR(inpVU.value||'0');
+      const okQ = isFinite(q) ? q : 0;
+      const okVU = isFinite(vu) ? vu : 0;
+      const vt = okQ * okVU;
       inpVT.value=(Math.round(vt*100)/100).toFixed(2);
     }
     inpQt.addEventListener('input', recalc);
@@ -1244,7 +2302,14 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     updateItemButtons();
   }
 
-  pcaAnoEl?.addEventListener('input', rebuildPrazosOptions);
+  pcaAnoEl?.addEventListener('input', ()=>{
+    rebuildPrazosOptions();
+    if(__IS_CAP__){
+      // atualiza prazo “No decorrer de AAAA” e opções de mês/ano na tabela
+      renderCapEventosSection();
+      renderCapCursosSection();
+    }
+  });
 
   function syncObjToFirstItem(){
     if(__IS_CAP__) return;
@@ -1315,6 +2380,115 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       grauPrioridade:f.grauPrioridade.value||"",
       protocolo:f.protocolo.value||""
     };
+ 
+    // envia dados do modo e (quando marcado) a tabela de eventos
+    if(__IS_CAP__){
+      header.tipo = __TIPO__ || "capacitacao";
+      if(capEventosIsOn()){
+
+        // regra de UI: não permitir envio com 0 eventos
+        capEnsureAtLeastOneRow();
+        if((capEventosRows || []).length < 1){
+          throw new Error('Na tabela de Eventos/Congressos/Seminários, é obrigatório informar ao menos 1 evento.');
+        }
+
+        const rowsClean = (capEventosRows || []).map((r, idx)=>({
+          descricao: (r?.descricao || "").toString().trim(),
+          valorUnitario: (r?.valorUnitario ?? ""),
+          inscricoesPrevistas: (r?.inscricoesPrevistas ?? ""),
+          prazoEstimado: (r?.prazoEstimado || "").toString().trim(),
+          __idx: idx
+        })).filter(r=>{
+          const vu = parseDecimalBR(r.valorUnitario ?? "");
+          const n  = parseInt((r.inscricoesPrevistas ?? "").toString(), 10);
+          const okVu = isFinite(vu) ? vu : 0;
+          const okN  = isFinite(n) ? n : 0;
+          const hasAny = !!(r.descricao || r.prazoEstimado || okVu > 0 || okN > 0);
+          if(!hasAny) return false; // remove linhas totalmente vazias
+          return true;
+        });
+
+        if(rowsClean.length < 1){
+          throw new Error('Na tabela de Eventos/Congressos/Seminários, é obrigatório informar ao menos 1 evento.');
+        }
+
+        // validação amigável: se houver linha com dado mas sem descrição, erro (backend também valida)
+        for(let i=0;i<rowsClean.length;i++){
+          const rr = rowsClean[i];
+          const vu = parseDecimalBR(rr.valorUnitario ?? "");
+          const n  = parseInt((rr.inscricoesPrevistas ?? "").toString(), 10);
+          const okVu = isFinite(vu) ? vu : 0;
+          const okN  = isFinite(n) ? n : 0;
+          const hasAny = !!(rr.descricao || rr.prazoEstimado || okVu > 0 || okN > 0);
+          if(hasAny && !rr.descricao){
+            throw new Error(`Na tabela de Eventos/Congressos/Seminários, a descrição é obrigatória na linha ${rr.__idx+1}.`);
+          }
+        }
+
+        header.capEventos = {
+          rows: rowsClean.map(r=>({
+            descricao: (r.descricao || "").toString(),
+            valorUnitario: parseDecimalBR(r.valorUnitario ?? ""),
+            inscricoesPrevistas: parseInt((r.inscricoesPrevistas ?? "").toString(), 10) || 0,
+            prazoEstimado: (r.prazoEstimado || "").toString()
+          })),
+          outrosTemas: (capEventosOutrosTemas || "").toString(),
+          outrosValorTotal: parseDecimalBR(capEventosOutrosTotal ?? ""),
+          outrosPrazo: capPrazoNoDecorrer()
+        };
+      }
+
+      if(capCursosIsOn()){
+        capCursosEnsureAtLeastOneRow();
+        if((capCursosRows || []).length < 1){
+          throw new Error('Na tabela de Cursos, é obrigatório informar ao menos 1 curso.');
+        }
+
+        const rowsClean = (capCursosRows || []).map((r, idx)=>({
+          descricao: (r?.descricao || "").toString().trim(),
+          valorUnitario: (r?.valorUnitario ?? ""),
+          inscricoesPrevistas: (r?.inscricoesPrevistas ?? ""),
+          prazoEstimado: (r?.prazoEstimado || "").toString().trim(),
+          __idx: idx
+        })).filter(r=>{
+          const vu = parseDecimalBR(r.valorUnitario ?? "");
+          const n  = parseInt((r.inscricoesPrevistas ?? "").toString(), 10);
+          const okVu = isFinite(vu) ? vu : 0;
+          const okN  = isFinite(n) ? n : 0;
+          const hasAny = !!(r.descricao || r.prazoEstimado || okVu > 0 || okN > 0);
+          if(!hasAny) return false;
+          return true;
+        });
+
+        if(rowsClean.length < 1){
+          throw new Error('Na tabela de Cursos, é obrigatório informar ao menos 1 curso.');
+        }
+
+        for(let i=0;i<rowsClean.length;i++){
+          const rr = rowsClean[i];
+          const vu = parseDecimalBR(rr.valorUnitario ?? "");
+          const n  = parseInt((rr.inscricoesPrevistas ?? "").toString(), 10);
+          const okVu = isFinite(vu) ? vu : 0;
+          const okN  = isFinite(n) ? n : 0;
+          const hasAny = !!(rr.descricao || rr.prazoEstimado || okVu > 0 || okN > 0);
+          if(hasAny && !rr.descricao){
+            throw new Error(`Na tabela de Cursos, a descrição é obrigatória na linha ${rr.__idx+1}.`);
+          }
+        }
+
+        header.capCursos = {
+          rows: rowsClean.map(r=>({
+            descricao: (r.descricao || "").toString(),
+            valorUnitario: parseDecimalBR(r.valorUnitario ?? ""),
+            inscricoesPrevistas: parseInt((r.inscricoesPrevistas ?? "").toString(), 10) || 0,
+            prazoEstimado: (r.prazoEstimado || "").toString()
+          })),
+          outrosTemas: (capCursosOutrosTemas || "").toString(),
+          outrosValorTotal: parseDecimalBR(capCursosOutrosTotal ?? ""),
+          outrosPrazo: capPrazoNoDecorrer()
+        };
+      }
+    }
 
     if(__REAJUSTE_PCA_ATIVO__){
       const j = document.getElementById('justificativaInclusaoItem');
@@ -1325,10 +2499,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     const itemNodes = isSingleItemLocked() ? children.slice(0,1) : children;
 
     const items = itemNodes.map(div=>{
-      const num = (x)=>{
-        const v=parseFloat(x||'0');
-        return isFinite(v)?v:0;
-      };
+      const num = (x)=> parseDecimalBR(x||'0');
 
       const dep = getFieldValue(div, 'select[name$="[haDependencia]"], input[type="hidden"][name$="[haDependencia]"]');
       const ren = getFieldValue(div, 'select[name$="[renovacaoContrato]"], input[type="hidden"][name$="[renovacaoContrato]"]');
@@ -1341,12 +2512,45 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
         haDependencia: dep || "",
         dependenciaQual: depQual || "",
         renovacaoContrato: ren || "",
-        quantidade: Math.trunc(num(getFieldValue(div, 'input[name$="[quantidade]"]'))),
+        quantidade: Math.trunc(parseInt(getFieldValue(div, 'input[name$="[quantidade]"]')||'0',10) || 0),
         unidadeMedida: getFieldValue(div, 'select[name$="[unidadeMedida]"]'),
         valorUnitario: num(getFieldValue(div, 'input[name$="[valorUnitario]"]')),
         valorTotal: num(getFieldValue(div, 'input[name$="[valorTotal]"]'))
       };
     });
+
+    // Se for capacitação e Eventos estiver marcado, ajusta o item sintético de eventos
+    // para refletir o total da tabela (mantendo compatibilidade com o backend atual).
+    if(__IS_CAP__ && capEventosIsOn()){
+      const tot = capEventosTotalGeral();
+      if(isFinite(tot) && tot > 0){
+        for(const it of items){
+          const d = (it.descricao || "").toString().toLowerCase();
+          if(d.includes("eventos") || d.includes("congressos") || d.includes("seminários") || d.includes("seminarios")){
+            it.quantidade = 1;
+            it.unidadeMedida = "Unitário";
+            it.valorUnitario = tot;
+            it.valorTotal = tot;
+          }
+        }
+      }
+    }
+
+    // Se for capacitação e Cursos estiver marcado, ajusta o item sintético de cursos
+    if(__IS_CAP__ && capCursosIsOn()){
+      const tot = capCursosTotalGeral();
+      if(isFinite(tot) && tot > 0){
+        for(const it of items){
+          const d = (it.descricao || "").toString().toLowerCase();
+          if(d.includes("cursos") || d.includes("treinamentos") || d.includes("treinamento")){
+            it.quantidade = 1;
+            it.unidadeMedida = "Unitário";
+            it.valorUnitario = tot;
+            it.valorTotal = tot;
+          }
+        }
+      }
+    }
 
     return { ...header, items };
   }
@@ -1359,6 +2563,16 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
     ensureOneItem();
 
+    let payload;
+    try{
+      payload = formToPayload();
+    }catch(e){
+      statusEl.textContent = 'Erro: ' + (e?.message || 'Dados inválidos na tabela de capacitação.');
+      smoothScrollTo(capItemsBoxEl);
+      updateSubmitState();
+      return;
+    }
+    
     if(__IS_CAP__){
       const kinds = capSelectedKinds();
       if(kinds.length === 0){
@@ -1375,8 +2589,6 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
         return;
       }
     }
-
-    const payload=formToPayload();
 
     const peTxt = (payload.alinhamentoPE || '').trim();
     if(!peTxt){
@@ -1566,6 +2778,8 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       setObjetoDefaultIfAllowed();
       renderCapItemsSelector();
       ensureCapacitacaoItems();
+      renderCapEventosSection();
+      renderCapCursosSection();
       applyConseqCapacitacao();
       if(objetoUmItemBoxEl) objetoUmItemBoxEl.style.display = 'none';
       // No modo capacitação, o usuário não preenche a seção "Itens"

@@ -52,7 +52,7 @@ from app.utils.docx_tools import (
 logger = logging.getLogger(__name__)
 
 KIND = "dfd"
-DFD_VERSION = "2.5.0"
+DFD_VERSION = "2.6.0"
 REQUIRED_ROLES = ("compras",)
 ELEVATED_ROLES = ("admin", "coordenador")
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
@@ -252,7 +252,104 @@ ALLOWED_SIMNAO = {"Sim", "Não"}
 REGEX_DATA_PRETENDIDA = re.compile(
     r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$"
 )
+REGEX_NO_DECORRER = re.compile(r"^No decorrer de (\d{4})$", flags=re.IGNORECASE)
 
+
+class CapEventoRow(BaseModel):
+    """
+    Linha normal (editável) da tabela de Eventos/Congressos/Seminários.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    descricao: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
+    valor_unitario: float = Field(..., alias="valorUnitario", ge=0.0)
+    inscricoes_previstas: int = Field(..., alias="inscricoesPrevistas", ge=0)
+    prazo_estimado: str = Field(..., alias="prazoEstimado", min_length=0)
+
+    @field_validator("prazo_estimado")
+    @classmethod
+    def _valid_prazo_row(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            # permite vazio (UI pode deixar em branco); validação de coerência ocorre em DfdIn
+            return ""
+        if not REGEX_DATA_PRETENDIDA.match(v):
+            raise ValueError("Prazo estimado (eventos) deve usar o formato 'mês de AAAA' (em minúsculas).")
+        return v
+
+
+class CapEventosTable(BaseModel):
+    """
+    Payload da tabela de eventos.
+    - rows: linhas normais
+    - outrosTemas: texto livre
+    - outrosValorTotal: valor (manual)
+    - outrosPrazo: fixo 'No decorrer de AAAA'
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    rows: List[CapEventoRow] = Field(default_factory=list)
+    outros_temas: str = Field(default="", alias="outrosTemas", max_length=MAX_TEXTO_LONGO)
+    outros_valor_total: float = Field(default=0.0, alias="outrosValorTotal", ge=0.0)
+    outros_prazo: str = Field(default="", alias="outrosPrazo")
+
+    @field_validator("outros_prazo")
+    @classmethod
+    def _valid_outros_prazo(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            return ""
+        if not REGEX_NO_DECORRER.match(v):
+            raise ValueError("Prazo (Outros eventos) deve ser 'No decorrer de AAAA'.")
+        return v
+
+
+class CapCursoRow(BaseModel):
+    """
+    Linha normal (editável) da tabela de Cursos/Treinamentos.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    descricao: str = Field(..., min_length=1, max_length=MAX_TEXTO_LONGO)
+    valor_unitario: float = Field(..., alias="valorUnitario", ge=0.0)
+    inscricoes_previstas: int = Field(..., alias="inscricoesPrevistas", ge=0)
+    prazo_estimado: str = Field(..., alias="prazoEstimado", min_length=0)
+
+    @field_validator("prazo_estimado")
+    @classmethod
+    def _valid_prazo_row(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            return ""
+        if not REGEX_DATA_PRETENDIDA.match(v):
+            raise ValueError("Prazo estimado (cursos) deve usar o formato 'mês de AAAA' (em minúsculas).")
+        return v
+
+
+class CapCursosTable(BaseModel):
+    """
+    Payload da tabela de cursos.
+    - rows: linhas normais
+    - outrosTemas: texto livre
+    - outrosValorTotal: valor (manual)
+    - outrosPrazo: fixo 'No decorrer de AAAA'
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    rows: List[CapCursoRow] = Field(default_factory=list)
+    outros_temas: str = Field(default="", alias="outrosTemas", max_length=MAX_TEXTO_LONGO)
+    outros_valor_total: float = Field(default=0.0, alias="outrosValorTotal", ge=0.0)
+    outros_prazo: str = Field(default="", alias="outrosPrazo")
+
+    @field_validator("outros_prazo")
+    @classmethod
+    def _valid_outros_prazo(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            return ""
+        if not REGEX_NO_DECORRER.match(v):
+            raise ValueError("Prazo (Outros cursos) deve ser 'No decorrer de AAAA'.")
+        return v
 
 class Item(BaseModel):
     """
@@ -341,9 +438,18 @@ class DfdIn(BaseModel):
     - Exceção no item: 'haDependencia' (normaliza para "Não").
     - Campo condicional (período de reajuste do PCA):
         * 'justificativaInclusaoItem' (1 por DFD) só existe/é obrigatório quando `DFD_REAJUSTE_PCA_ACTIVE` estiver ativo.
+        
+    Extensões (capacitacao)
+    ----------------------
+    - tipo: "capacitacao" ou "padrao"
+    - capEventos: tabela detalhada de Eventos/Congressos/Seminários
     """
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
+ 
+    tipo: Optional[str] = Field(default=None, alias="tipo")
+    cap_eventos: Optional[CapEventosTable] = Field(default=None, alias="capEventos")
+    cap_cursos: Optional[CapCursosTable] = Field(default=None, alias="capCursos")
+    
     modelo_slug: str = Field(..., alias="modeloSlug", min_length=1)
     numero: str = Field(..., min_length=1, max_length=MAX_NUMERO_LEN)
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
@@ -436,6 +542,58 @@ class DfdIn(BaseModel):
         ano_prazo = m.group(2)
         if ano_prazo != (self.pca_ano or "").strip():
             raise ValueError(f"'Prazos envolvidos' deve estar no ano do PCA ({self.pca_ano}).")
+
+        # coerência da tabela de eventos (quando presente)
+        if (self.tipo or "").strip().lower() == "capacitacao" and self.cap_eventos is not None:
+            ano = (self.pca_ano or "").strip()
+
+            # regra: se capEventos foi enviado, deve haver ao menos 1 evento “real”
+            # (a linha "Outros..." é fixa na UI e não entra em rows)
+            if not (self.cap_eventos.rows or []) or len(self.cap_eventos.rows) < 1:
+                raise ValueError(
+                    "Na tabela de Eventos/Congressos/Seminários, é obrigatório informar ao menos 1 evento."
+                )
+                
+            # valida outrosPrazo = "No decorrer de <ano>"
+            op = (self.cap_eventos.outros_prazo or "").strip()
+            if op:
+                mm = REGEX_NO_DECORRER.match(op)
+                if not mm or (mm.group(1) != ano):
+                    raise ValueError(f"Prazo (Outros eventos) deve ser 'No decorrer de {ano}'.")
+
+            # valida prazos por linha: mês de AAAA, no mesmo ano do PCA
+            for i, r in enumerate(self.cap_eventos.rows or [], start=1):
+                pr = (r.prazo_estimado or "").strip()
+                if not pr:
+                    continue
+                mx = REGEX_DATA_PRETENDIDA.match(pr)
+                if not mx:
+                    raise ValueError(f"Prazo estimado (eventos) inválido na linha {i}.")
+                if mx.group(2) != ano:
+                    raise ValueError(f"Prazo estimado (eventos) deve estar no ano do PCA ({ano}) na linha {i}.")
+
+        # coerência da tabela de cursos (quando presente)
+        if (self.tipo or "").strip().lower() == "capacitacao" and self.cap_cursos is not None:
+            ano = (self.pca_ano or "").strip()
+
+            if not (self.cap_cursos.rows or []) or len(self.cap_cursos.rows) < 1:
+                raise ValueError("Na tabela de Cursos, é obrigatório informar ao menos 1 curso.")
+
+            op = (self.cap_cursos.outros_prazo or "").strip()
+            if op:
+                mm = REGEX_NO_DECORRER.match(op)
+                if not mm or (mm.group(1) != ano):
+                    raise ValueError(f"Prazo (Outros cursos) deve ser 'No decorrer de {ano}'.")
+
+            for i, r in enumerate(self.cap_cursos.rows or [], start=1):
+                pr = (r.prazo_estimado or "").strip()
+                if not pr:
+                    continue
+                mx = REGEX_DATA_PRETENDIDA.match(pr)
+                if not mx:
+                    raise ValueError(f"Prazo estimado (cursos) inválido na linha {i}.")
+                if mx.group(2) != ano:
+                    raise ValueError(f"Prazo estimado (cursos) deve estar no ano do PCA ({ano}) na linha {i}.")
         return self
 
 
@@ -494,6 +652,39 @@ FIELD_INFO: Dict[str, Dict[str, Any]] = {
     "valorTotal": {"label": "Estimativa de valor total (auto)"},
 }
 
+CAP_EVENTOS_FIELD_LABELS: Dict[str, str] = {
+    "descricao": "Descrição (Eventos/Congressos/Seminários)",
+    "valorUnitario": "Valor unitário estimado (Eventos/Congressos/Seminários)",
+    "inscricoesPrevistas": "Número de inscrições previstas (Eventos/Congressos/Seminários)",
+    "prazoEstimado": "Prazo estimado (Eventos/Congressos/Seminários)",
+    "outrosTemas": "Outros temas (Eventos/Congressos/Seminários)",
+    "outrosValorTotal": "Outros — Valor total (Eventos/Congressos/Seminários)",
+    "outrosPrazo": "Outros — Prazo (Eventos/Congressos/Seminários)",
+   
+    # chaves snake_case (Pydantic usa field names nos locs)
+    "valor_unitario": "Valor unitário estimado (Eventos/Congressos/Seminários)",
+    "inscricoes_previstas": "Número de inscrições previstas (Eventos/Congressos/Seminários)",
+    "prazo_estimado": "Prazo estimado (Eventos/Congressos/Seminários)",
+    "outros_temas": "Outros temas (Eventos/Congressos/Seminários)",
+    "outros_valor_total": "Outros — Valor total (Eventos/Congressos/Seminários)",
+    "outros_prazo": "Outros — Prazo (Eventos/Congressos/Seminários)",
+}
+
+CAP_CURSOS_FIELD_LABELS: Dict[str, str] = {
+    "descricao": "Descrição (Cursos)",
+    "valorUnitario": "Valor unitário estimado (Cursos)",
+    "inscricoesPrevistas": "Número de inscrições previstas (Cursos)",
+    "prazoEstimado": "Prazo estimado (Cursos)",
+    "outrosTemas": "Outros temas (Cursos)",
+    "outrosValorTotal": "Outros — Valor total (Cursos)",
+    "outrosPrazo": "Outros — Prazo (Cursos)",
+    "valor_unitario": "Valor unitário estimado (Cursos)",
+    "inscricoes_previstas": "Número de inscrições previstas (Cursos)",
+    "prazo_estimado": "Prazo estimado (Cursos)",
+    "outros_temas": "Outros temas (Cursos)",
+    "outros_valor_total": "Outros — Valor total (Cursos)",
+    "outros_prazo": "Outros — Prazo (Cursos)",
+}
 
 def _format_validation_errors(ve: ValidationError) -> List[str]:
     """
@@ -502,34 +693,83 @@ def _format_validation_errors(ve: ValidationError) -> List[str]:
     msgs: List[str] = []
     for err in ve.errors():
         loc = err.get("loc") or ()
-        field_key = str(loc[-1]) if loc else "campo"
-        info = FIELD_INFO.get(field_key) or FIELD_INFO.get(field_key.replace("modelo_slug", "modeloSlug"), {})
-        label = info.get("label", field_key)
+        
+        # Se o loc termina em índice (int), o "campo" geralmente é o elemento anterior
+        if loc:
+            if isinstance(loc[-1], int) and len(loc) >= 2:
+                field_key = str(loc[-2])
+            else:
+                field_key = str(loc[-1])
+        else:
+            field_key = "campo"
+            
+        # === Contexto especial: tabela capEventos ===
+        # Evita usar labels dos "items" (ex.: descricao) para erros dentro de capEventos
+        is_cap_eventos = ("capEventos" in loc) or ("cap_eventos" in loc)
+        # === Contexto especial: tabela capCursos ===
+        # Evita usar labels dos "items" (ex.: descricao) para erros dentro de capCursos
+        is_cap_cursos = ("capCursos" in loc) or ("cap_cursos" in loc)
+        cap_row_num: Optional[int] = None
+        if is_cap_eventos or is_cap_cursos:
+            # tenta achar o índice de linha associado a rows: ('cap_eventos','rows',<idx>,...) ou ('cap_cursos','rows',<idx>,...)
+            try:
+                loc_list = list(loc)
+                if "rows" in loc_list:
+                    j = loc_list.index("rows")
+                    if j + 1 < len(loc_list) and isinstance(loc_list[j + 1], int):
+                        cap_row_num = loc_list[j + 1] + 1
+            except Exception:
+                cap_row_num = None
+
+            # fallback: primeiro int no loc
+            if cap_row_num is None:
+                for part in loc:
+                    if isinstance(part, int):
+                        cap_row_num = part + 1
+                        break
+            if is_cap_eventos:
+                label = CAP_EVENTOS_FIELD_LABELS.get(field_key, field_key)
+            else:
+                label = CAP_CURSOS_FIELD_LABELS.get(field_key, field_key)
+        else:
+            info = FIELD_INFO.get(field_key) or FIELD_INFO.get(field_key.replace("modelo_slug", "modeloSlug"), {})
+            label = info.get("label", field_key)
 
         typ = err.get("type", "")
         ctx = err.get("ctx") or {}
         msg = err.get("msg", "")
 
+        def with_cap_prefix(base: str) -> str:
+            if is_cap_eventos and cap_row_num is not None:
+                return f"Tabela de Eventos/Congressos/Seminários (linha {cap_row_num}): {base}"
+            if is_cap_eventos:
+                return f"Tabela de Eventos/Congressos/Seminários: {base}"
+            if is_cap_cursos and cap_row_num is not None:
+                return f"Tabela de Cursos (linha {cap_row_num}): {base}"
+            if is_cap_cursos:
+                return f"Tabela de Cursos: {base}"
+            return base
+
         if typ == "string_too_long" and "max_length" in ctx:
             limit = ctx["max_length"]
-            msgs.append(f"Campo '{label}' excedeu o limite de {limit} caracteres.")
+            msgs.append(with_cap_prefix(f"Campo '{label}' excedeu o limite de {limit} caracteres."))
         elif typ == "string_too_short" and "min_length" in ctx:
             minimum = ctx["min_length"]
             if minimum == 1:
-                msgs.append(f"Campo '{label}' é obrigatório.")
+                msgs.append(with_cap_prefix(f"Campo '{label}' é obrigatório."))
             else:
-                msgs.append(f"Campo '{label}' deve ter pelo menos {minimum} caractere(s).")
+                msgs.append(with_cap_prefix(f"Campo '{label}' deve ter pelo menos {minimum} caractere(s)."))
         elif typ == "string_pattern_mismatch" and "pattern" in ctx:
             if field_key in ("pcaAno", "pca_ano"):
                 msgs.append(f"Campo '{label}' deve conter 4 dígitos (ex.: 2025).")
             else:
-                msgs.append(f"Campo '{label}' não está no formato esperado.")
+                msgs.append(with_cap_prefix(f"Campo '{label}' não está no formato esperado."))
         elif typ == "string_type":
-            msgs.append(f"Campo '{label}' deve ser texto.")
+            msgs.append(with_cap_prefix(f"Campo '{label}' deve ser texto."))
         elif typ == "missing":
-            msgs.append(f"Campo '{label}' é obrigatório.")
+            msgs.append(with_cap_prefix(f"Campo '{label}' é obrigatório."))
         else:
-            msgs.append(f"Campo '{label}': {msg}")
+            msgs.append(with_cap_prefix(f"Campo '{label}': {msg}"))
     return msgs
 
 
@@ -625,6 +865,78 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
     3) Atualiza submissão com os caminhos/nome dos arquivos e audita `completed`.
     4) Em caso de erro, marca `error` e audita `failed`.
     """
+    def _cap_eventos_total(raw_obj: Dict[str, Any]) -> float:
+        ce = raw_obj.get("capEventos") or {}
+        rows = ce.get("rows") or []
+        total = 0.0
+        for r in rows:
+            try:
+                vu = float(r.get("valorUnitario") or 0.0)
+                n = int(r.get("inscricoesPrevistas") or 0)
+            except Exception:
+                vu, n = 0.0, 0
+            total += float(round(vu * n, 2))
+        try:
+            outros = float(ce.get("outrosValorTotal") or 0.0)
+        except Exception:
+            outros = 0.0
+        total += outros
+        return float(round(total, 2))
+
+    def _looks_like_eventos_item(desc: str) -> bool:
+        d = (desc or "").casefold()
+        return ("eventos" in d) or ("congressos" in d) or ("seminários" in d) or ("seminarios" in d)
+
+    def _make_eventos_synthetic_item(total: float) -> Dict[str, Any]:
+        """
+        Cria um item sintético válido (Item) para representar Eventos/Congressos/Seminários.
+        Usado quando a tabela capEventos veio preenchida, mas nenhum item correspondente
+        foi enviado no payload (ou não foi reconhecido).
+        """
+        return {
+            "descricao": "Eventos/Congressos/Seminários",
+            "haDependencia": "Não",
+            "dependenciaQual": "",
+            "renovacaoContrato": "Não",
+            "quantidade": 1,
+            "unidadeMedida": "Unitário",
+            "valorUnitario": float(round(total or 0.0, 2)),
+            # valorTotal será recalculado pelo modelo Item
+        }
+
+    def _cap_cursos_total(raw_obj: Dict[str, Any]) -> float:
+        cc = raw_obj.get("capCursos") or {}
+        rows = cc.get("rows") or []
+        total = 0.0
+        for r in rows:
+            try:
+                vu = float(r.get("valorUnitario") or 0.0)
+                n = int(r.get("inscricoesPrevistas") or 0)
+            except Exception:
+                vu, n = 0.0, 0
+            total += float(round(vu * n, 2))
+        try:
+            outros = float(cc.get("outrosValorTotal") or 0.0)
+        except Exception:
+            outros = 0.0
+        total += outros
+        return float(round(total, 2))
+
+    def _looks_like_cursos_item(desc: str) -> bool:
+        d = (desc or "").casefold()
+        return ("curso" in d) or ("cursos" in d) or ("treinamento" in d) or ("treinamentos" in d)
+
+    def _make_cursos_synthetic_item(total: float) -> Dict[str, Any]:
+        return {
+            "descricao": "Cursos/Treinamentos",
+            "haDependencia": "Não",
+            "dependenciaQual": "",
+            "renovacaoContrato": "Não",
+            "quantidade": 1,
+            "unidadeMedida": "Unitário",
+            "valorUnitario": float(round(total or 0.0, 2)),
+        }
+
     try:
         update_submission(sid, status="running")
         add_audit(KIND, "running", actor, {"sid": sid})
@@ -662,6 +974,57 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         assunto_final = f"DFD - PCA {pca_ano} - {assunto_bruto}"
 
         itens_in = list(raw.get("items") or [])
+
+        # === CAPACITAÇÃO (robusto) ===
+        # Se for capacitação e capEventos vier preenchido:
+        # - calcula o total pela tabela
+        # - ajusta o item de eventos se existir
+        # - se não existir, cria um item sintético (para não zerar total_geral e manter template consistente)
+        tipo = (raw.get("tipo") or "").strip().lower()
+        cap_eventos_present = bool(raw.get("capEventos"))
+        cap_eventos_total = _cap_eventos_total(raw) if (tipo == "capacitacao" and cap_eventos_present) else 0.0
+        
+        if tipo == "capacitacao" and cap_eventos_present:
+            eventos_item_found = False
+
+            # tenta ajustar item existente (se vier)
+            if itens_in:
+                for it in itens_in:
+                    if _looks_like_eventos_item(it.get("descricao") or ""):
+                        it["quantidade"] = 1
+                        it["unidadeMedida"] = "Unitário"
+                        it["valorUnitario"] = float(round(cap_eventos_total, 2))
+                        eventos_item_found = True
+                        # valorTotal será recalculado pelo Item como quantidade * valorUnitario
+
+            # se não achou item correspondente, injeta um sintético
+            if not eventos_item_found:
+                itens_in.append(_make_eventos_synthetic_item(cap_eventos_total))
+
+        # === CAPACITAÇÃO: Cursos (robusto) ===
+        # Se for capacitação e capCursos vier preenchido:
+        # - calcula o total pela tabela
+        # - ajusta o item de cursos se existir
+        # - se não existir, cria um item sintético
+        cap_cursos_present = bool(raw.get("capCursos"))
+        cap_cursos_total = _cap_cursos_total(raw) if (tipo == "capacitacao" and cap_cursos_present) else 0.0
+        
+        if tipo == "capacitacao" and cap_cursos_present:
+            cursos_item_found = False
+
+            # tenta ajustar item existente (se vier)
+            if itens_in:
+                for it in itens_in:
+                    if _looks_like_cursos_item(it.get("descricao") or ""):
+                        it["quantidade"] = 1
+                        it["unidadeMedida"] = "Unitário"
+                        it["valorUnitario"] = float(round(cap_cursos_total, 2))
+                        cursos_item_found = True
+
+            # se não achou item correspondente, injeta um sintético
+            if not cursos_item_found:
+                itens_in.append(_make_cursos_synthetic_item(cap_cursos_total))
+
         itens_out: List[Dict[str, Any]] = []
         total_geral = 0.0
         for i, it in enumerate(itens_in, start=1):
@@ -694,6 +1057,60 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
             "itens": itens_out,
             "total_geral": round(total_geral, 2),
         }
+
+        # Contexto adicional para templates (capacitacao): tabela de eventos
+        if tipo == "capacitacao" and cap_eventos_present:
+            ce = raw.get("capEventos") or {}
+            rows_in = ce.get("rows") or []
+            rows_out = []
+            for r in rows_in:
+                try:
+                    vu = float(r.get("valorUnitario") or 0.0)
+                    n = int(r.get("inscricoesPrevistas") or 0)
+                except Exception:
+                    vu, n = 0.0, 0
+                rows_out.append({
+                    "descricao": r.get("descricao") or "",
+                    "valor_unitario": round(vu, 2),
+                    "inscricoes_previstas": n,
+                    "valor_total": round(vu * n, 2),
+                    "prazo_estimado": r.get("prazoEstimado") or "",
+                })
+
+            ctx.update({
+                "cap_eventos_rows": rows_out,
+                "cap_eventos_outros_temas": (ce.get("outrosTemas") or ""),
+                "cap_eventos_outros_valor_total": round(float(ce.get("outrosValorTotal") or 0.0), 2),
+                "cap_eventos_outros_prazo": (ce.get("outrosPrazo") or ""),
+                "cap_eventos_total": float(round(cap_eventos_total, 2)),
+            })
+
+        # Contexto adicional para templates (capacitacao): tabela de cursos
+        if tipo == "capacitacao" and cap_cursos_present:
+            cc = raw.get("capCursos") or {}
+            rows_in = cc.get("rows") or []
+            rows_out = []
+            for r in rows_in:
+                try:
+                    vu = float(r.get("valorUnitario") or 0.0)
+                    n = int(r.get("inscricoesPrevistas") or 0)
+                except Exception:
+                    vu, n = 0.0, 0
+                rows_out.append({
+                    "descricao": r.get("descricao") or "",
+                    "valor_unitario": round(vu, 2),
+                    "inscricoes_previstas": n,
+                    "valor_total": round(vu * n, 2),
+                    "prazo_estimado": r.get("prazoEstimado") or "",
+                })
+
+            ctx.update({
+                "cap_cursos_rows": rows_out,
+                "cap_cursos_outros_temas": (cc.get("outrosTemas") or ""),
+                "cap_cursos_outros_valor_total": round(float(cc.get("outrosValorTotal") or 0.0), 2),
+                "cap_cursos_outros_prazo": (cc.get("outrosPrazo") or ""),
+                "cap_cursos_total": float(round(cap_cursos_total, 2)),
+            })
 
         try:
             placeholders = get_docx_placeholders(tpl_path)
@@ -782,7 +1199,108 @@ async def submit_dfd(
     # Fora do período, não persistimos a justificativa mesmo que venha no payload.
     justificativa_final = justificativa_in if reajuste_ativo else None
 
+    # Remove linhas totalmente vazias (evita 422 quando usuário clica "Adicionar evento" e deixa em branco),
+    # mas mantém validação rígida quando a linha tem algum dado preenchido.
+    cap_eventos_in = body.get("capEventos") or None
+    tipo_in = (body.get("tipo") or "").strip().lower()
+    if tipo_in == "capacitacao" and isinstance(cap_eventos_in, dict):
+        rows_in = cap_eventos_in.get("rows") or []
+        if isinstance(rows_in, list):
+            cleaned_rows = []
+            for i, r in enumerate(rows_in, start=1):
+                if not isinstance(r, dict):
+                    continue
+                desc = (r.get("descricao") or "").strip()
+                prazo = (r.get("prazoEstimado") or "").strip()
+
+                # valores numéricos podem vir como "", None, 0, etc.
+                vu_raw = r.get("valorUnitario")
+                n_raw = r.get("inscricoesPrevistas")
+                try:
+                    vu = float(str(vu_raw).replace(",", ".").strip()) if str(vu_raw).strip() != "" else 0.0
+                except Exception:
+                    vu = 0.0
+                try:
+                    n = int(str(n_raw).strip()) if str(n_raw).strip() != "" else 0
+                except Exception:
+                    n = 0
+
+                has_any = bool(desc or prazo or vu > 0 or n > 0)
+
+                # Linha totalmente vazia => ignora (não envia ao Pydantic)
+                if not has_any:
+                    continue
+
+                # Se o usuário preencheu algo na linha, a descrição deve existir (mensagem mais amigável)
+                if not desc:
+                    return err_json(
+                        422,
+                        code="validation_error",
+                        message=f"Na tabela de Eventos/Congressos/Seminários, a descrição é obrigatória na linha {i}.",
+                        details={"field": "capEventos.rows.descricao", "row": i},
+                    )
+
+                rr = dict(r)
+                rr["descricao"] = desc
+                rr["prazoEstimado"] = prazo
+                rr["valorUnitario"] = float(vu)
+                rr["inscricoesPrevistas"] = int(n)
+                cleaned_rows.append(rr)
+
+            cap_eventos_in = dict(cap_eventos_in)
+            cap_eventos_in["rows"] = cleaned_rows
+
+    # Remove linhas totalmente vazias de capCursos (mesma lógica de capEventos)
+    cap_cursos_in = body.get("capCursos") or None
+    if tipo_in == "capacitacao" and isinstance(cap_cursos_in, dict):
+        rows_in = cap_cursos_in.get("rows") or []
+        if isinstance(rows_in, list):
+            cleaned_rows = []
+            for i, r in enumerate(rows_in, start=1):
+                if not isinstance(r, dict):
+                    continue
+                desc = (r.get("descricao") or "").strip()
+                prazo = (r.get("prazoEstimado") or "").strip()
+
+                # valores numéricos podem vir como "", None, 0, etc.
+                vu_raw = r.get("valorUnitario")
+                n_raw = r.get("inscricoesPrevistas")
+                try:
+                    vu = float(str(vu_raw).replace(",", ".").strip()) if str(vu_raw).strip() != "" else 0.0
+                except Exception:
+                    vu = 0.0
+                try:
+                    n = int(str(n_raw).strip()) if str(n_raw).strip() != "" else 0
+                except Exception:
+                    n = 0
+
+                has_any = bool(desc or prazo or vu > 0 or n > 0)
+
+                # Linha totalmente vazia => ignora (não envia ao Pydantic)
+                if not has_any:
+                    continue
+
+                # Se o usuário preencheu algo na linha, a descrição deve existir (mensagem mais amigável)
+                if not desc:
+                    return err_json(
+                        422,
+                        code="validation_error",
+                        message=f"Na tabela de Cursos, a descrição é obrigatória na linha {i}.",
+                        details={"field": "capCursos.rows.descricao", "row": i},
+                    )
+
+                rr = dict(r)
+                rr["descricao"] = desc
+                rr["prazoEstimado"] = prazo
+                rr["valorUnitario"] = float(vu)
+                rr["inscricoesPrevistas"] = int(n)
+                cleaned_rows.append(rr)
+
+            cap_cursos_in = dict(cap_cursos_in)
+            cap_cursos_in["rows"] = cleaned_rows
+
     raw = {
+        "tipo": (body.get("tipo") or "").strip().lower() or None,
         "modeloSlug": (body.get("modeloSlug") or "").strip(),
         "numero": (body.get("numero") or "").strip(),
         "assunto": (body.get("assunto") or "").strip(),
@@ -798,6 +1316,8 @@ async def submit_dfd(
         "consequenciaNaoAquisicao": (body.get("consequenciaNaoAquisicao") or "").strip(),
         "grauPrioridade": (body.get("grauPrioridade") or "").strip(),
         "items": body.get("items") or [],
+        "capEventos": cap_eventos_in,
+        "capCursos": cap_cursos_in,
     }
 
     # mensagens rápidas para os 3 campos mais “críticos” da UI (mantém UX boa)
