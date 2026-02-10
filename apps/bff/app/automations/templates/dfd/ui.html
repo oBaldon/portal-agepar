@@ -562,7 +562,7 @@ textarea.bigtext{ min-height: 280px; }
       <div class="actions" style="margin-top:16px">
         <span class="status" id="status" role="status" aria-live="polite"></span>
         <div class="btn-row">
-          <button type="submit" class="btn" id="submitBtn" disabled aria-disabled="true" title="Informe o Protocolo e selecione ao menos 1 objetivo estratégico para gerar o DFD">Gerar DFD</button>
+          <button type="submit" class="btn" id="submitBtn" disabled aria-disabled="true" aria-describedby="status">Gerar DFD</button>
         </div>
       </div>
     </form>
@@ -612,6 +612,22 @@ textarea.bigtext{ min-height: 280px; }
   const statusEl = document.getElementById('status');
   const subsEl = document.getElementById('subs');
   const submitBtn = document.getElementById('submitBtn');
+
+  // ===== Mensagens de ajuda (não depender de tooltip/title) =====
+  let __LAST_HINT__ = '';
+  function __statusLocked__(){
+    const cur = (statusEl?.textContent || '').trim();
+    // não sobrescrever mensagens de submit/erro/sucesso
+    return /^(Enviando\.\.\.|Erro:|Fila criada|Pronto!|Falha|Não foi possível|Carregando configuração)/i.test(cur);
+  }
+  function setSubmitHint(msg){
+    if(!statusEl) return;
+    if(__statusLocked__()) return;
+    const next = (msg || '').toString();
+    if(next === __LAST_HINT__) return;
+    __LAST_HINT__ = next;
+    statusEl.textContent = next;
+  }
   const modeloSel = document.getElementById('modeloSlug');
   const pcaAnoEl = document.getElementById('pcaAno');
   const itemsEl = document.getElementById('items');
@@ -661,7 +677,8 @@ textarea.bigtext{ min-height: 280px; }
       const decSep = (lastComma > lastDot) ? ',' : '.';
       const thouSep = (decSep === ',') ? '.' : ',';
 
-      s = s.replaceAll(thouSep, '');
+      // compat: replaceAll pode não existir em alguns ambientes
+      s = s.split(thouSep).join('');
       if(decSep === ',') s = s.replace(',', '.'); // troca só o separador decimal
     }
     // Só vírgula
@@ -840,24 +857,28 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
   let capCursosOutrosTemas = "";
   let capCursosOutrosTotal = ""; // string/number
 
-  function capEnsureAtLeastOneRow(){
+  function capEmptyRow(){
+    return { descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' };
+  }
+
+  // seed=false: só garante array
+  // seed=true: se estiver vazio, cria 1 linha inicial
+  function capEnsureAtLeastOneRow(seed=false){
     if(!__IS_CAP__) return;
-    if(!capEventosIsOn()) return;
     if(!Array.isArray(capEventosRows)) capEventosRows = [];
-    if(capEventosRows.length < 1){
-      capEventosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+    if(seed && capEventosRows.length === 0){
+      capEventosRows.push(capEmptyRow());
     }
   }
 
-  function capCursosEnsureAtLeastOneRow(){
+  function capCursosEnsureAtLeastOneRow(seed=false){
     if(!__IS_CAP__) return;
-    if(!capCursosIsOn()) return;
     if(!Array.isArray(capCursosRows)) capCursosRows = [];
-    if(capCursosRows.length < 1){
-      capCursosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+    if(seed && capCursosRows.length === 0){
+      capCursosRows.push(capEmptyRow());
     }
   }
- 
+                            
   function capEventosIsOn(){
     const ev = (capChkEventos ? capChkEventos.checked : capKeepEventos);
     return !!ev;
@@ -866,6 +887,94 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
   function capCursosIsOn(){
     const cu = (capChkCursos ? capChkCursos.checked : capKeepCursos);
     return !!cu;
+  }
+
+  // ===== CAP: validador unificado (sem mudar regra) =====
+  function __capNormRow__(r, idx){
+    const descricao = (r?.descricao || "").toString().trim();
+    const prazoEstimado = (r?.prazoEstimado || "").toString().trim();
+    const valorUnitario = (r?.valorUnitario ?? "");
+    const inscricoesPrevistas = (r?.inscricoesPrevistas ?? "");
+    const vu = parseDecimalBR(valorUnitario ?? "");
+    const n  = parseInt(String(inscricoesPrevistas ?? ""), 10);
+    const okVu = isFinite(vu) ? vu : 0;
+    const okN  = isFinite(n)  ? n  : 0;
+    const hasAny = !!(descricao || prazoEstimado || okVu > 0 || okN > 0);
+    return { descricao, prazoEstimado, valorUnitario, inscricoesPrevistas, __idx: idx, __vu: okVu, __n: okN, __hasAny: hasAny };
+  }
+
+  function capValidateTable({ label, outrosCaption, rows, outrosTemas, outrosTotal }){
+    const temasTxt = (outrosTemas || "").toString().trim();
+    const outrosTemasOk = temasTxt.length > 0;
+    const outrosNum = parseDecimalBR(outrosTotal ?? "");
+    const outrosValorOk = (isFinite(outrosNum) ? outrosNum : 0) > 0;
+
+    // Regra: se preencher a descrição de "Outros...", o valor total também é obrigatório.
+    if(outrosTemasOk && !outrosValorOk){
+      return { ok:false, msg:`Na tabela de ${label}, ao preencher "${outrosCaption}", informe também o valor total.` };
+    }
+
+    const norm = (Array.isArray(rows) ? rows : []).map(__capNormRow__);
+    const rowsClean = norm.filter(r => r.__hasAny); // remove linhas totalmente vazias
+
+    const hasAny = (rowsClean.length > 0) || outrosTemasOk || outrosValorOk;
+    if(!hasAny){
+      return { ok:false, msg:`Na tabela de ${label}, informe ao menos 1 linha OU preencha "${outrosCaption}" (temas e/ou valor total).` };
+    }
+
+    // Regras por linha:
+    // 1) se houver qualquer dado na linha, descrição é obrigatória
+    // 2) se preencher descrição, valor unitário e inscrições devem ser > 0
+    for(const rr of rowsClean){
+      if(rr.__hasAny && !rr.descricao){
+        return { ok:false, msg:`Na tabela de ${label}, a descrição é obrigatória na linha ${rr.__idx + 1}.` };
+      }
+      if(rr.descricao && (rr.__vu <= 0 || rr.__n <= 0)){
+        return { ok:false, msg:`Na tabela de ${label}, ao preencher a descrição, informe também valor unitário e inscrições (para total > 0) na linha ${rr.__idx + 1}.` };
+      }
+      if(rr.__hasAny && !rr.prazoEstimado){
+        return { ok:false, msg:`Na tabela de ${label}, selecione o prazo na linha ${rr.__idx + 1}.` };
+      }
+    }
+
+    return { ok:true, rowsClean, outrosTemas: temasTxt, outrosValorTotal: (isFinite(outrosNum) ? outrosNum : 0) };
+  }
+
+  function capEventosValidate(){
+    return capValidateTable({
+      label: 'Eventos/Congressos/Seminários',
+      outrosCaption: 'Outros…',
+      rows: capEventosRows,
+      outrosTemas: capEventosOutrosTemas,
+      outrosTotal: capEventosOutrosTotal
+    });
+  }
+  function capCursosValidate(){
+    return capValidateTable({
+      label: 'Cursos',
+      outrosCaption: 'Outros cursos/treinamentos…',
+      rows: capCursosRows,
+      outrosTemas: capCursosOutrosTemas,
+      outrosTotal: capCursosOutrosTotal
+    });
+  }
+  function capEventosHasAnyData(){ return capEventosValidate().ok; }
+  function capCursosHasAnyData(){ return capCursosValidate().ok; }
+
+  function capMakeTablePayload({ label, outrosCaption, rows, outrosTemas, outrosTotal, outrosPrazo }){
+    const v = capValidateTable({ label, outrosCaption, rows, outrosTemas, outrosTotal });
+    if(!v.ok) throw new Error(v.msg);
+    return {
+      rows: v.rowsClean.map(r => ({
+        descricao: (r.descricao || "").toString(),
+        valorUnitario: parseDecimalBR(r.valorUnitario ?? ""),
+        inscricoesPrevistas: parseInt(String(r.inscricoesPrevistas ?? ""), 10) || 0,
+        prazoEstimado: (r.prazoEstimado || "").toString()
+      })),
+      outrosTemas: (v.outrosTemas || "").toString(),
+      outrosValorTotal: parseDecimalBR(outrosTotal ?? ""),
+      outrosPrazo: outrosPrazo
+    };
   }
  
   function capEventosRowTotal(row){
@@ -915,8 +1024,9 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
   function capPrazoNoDecorrer(){
     const ano = capAnoTxt();
-    return ano ? `No decorrer de ${ano}` : `No decorrer de <ano do PCA>`;
+    return ano ? `No decorrer de ${ano}` : '';
   }
+
 
   function renderCapEventosSection(){
     const wrap = document.getElementById('capEventosSection');
@@ -935,7 +1045,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
     const note = document.createElement('div');
     note.className = 'cap-enunciado';
-    note.textContent = 'Adicione eventos conforme necessário. A 1ª linha é obrigatória (não removível) e a última linha (“Outros…”) é fixa.';
+    note.textContent = 'Adicione eventos conforme necessário. Você pode deixar a lista sem eventos específicos e preencher apenas “Outros…”. A linha “Outros…” é fixa.';
     sub.appendChild(note);
 
     const meses = mesesDoAno(capAnoTxt());
@@ -943,6 +1053,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     const list = document.createElement('div');
     list.className = 'cap-formlist';
 
+    if(!Array.isArray(capEventosRows)) capEventosRows = [];
     capEventosRows.forEach((row, idx)=>{
       const card = document.createElement('div');
       card.className = 'cap-formrow';
@@ -958,6 +1069,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
         capEventosRows[idx].descricao = ta.value;
         ta.style.height = "auto";
         ta.style.height = (ta.scrollHeight + 2) + "px";
+        updateSubmitState();
       });
       ta.style.height = "auto";
       ta.style.height = (ta.scrollHeight + 2) + "px";
@@ -1030,7 +1142,13 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       }else{
         selP.disabled = true;
       }
-      selP.value = row.prazoEstimado ?? '';
+      const desired = row.prazoEstimado ?? '';
+      selP.value = desired;
+      // se não existir nas opções (ano mudou), o browser cai para ''.
+      // então sincroniza o state para não mandar prazo antigo no payload.
+      if (selP.value !== desired) {
+        capEventosRows[idx].prazoEstimado = selP.value; // normalmente ''
+      }
       fP.appendChild(lP);
       fP.appendChild(selP);
 
@@ -1044,6 +1162,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       function updateRowTotal(){
         out.value = fmtBRL(capEventosRowTotal(capEventosRows[idx]));
         capEventosUpdateTotalNote();
+        updateSubmitState();
       }
 
       iVU.addEventListener('input', ()=>{
@@ -1056,6 +1175,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       });
       selP.addEventListener('change', ()=>{
         capEventosRows[idx].prazoEstimado = selP.value;
+        updateSubmitState();
       });
 
       // ===== Footer (Remover / Adicionar no último) =====
@@ -1070,16 +1190,12 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       rm.className = 'btn small danger';
       rm.textContent = 'Remover';
 
-      const nonRemovable = (idx === 0);
-      rm.disabled = nonRemovable || (capEventosRows.length <= 1);
-      rm.title = nonRemovable
-        ? 'Este evento é obrigatório e não pode ser removido.'
-        : (capEventosRows.length <= 1 ? 'Deve existir ao menos 1 evento.' : '');
+      // Agora é permitido ficar com 0 eventos específicos (somente “Outros…”)
+      rm.disabled = false;
+      rm.title = 'Remover este evento.';
 
       rm.addEventListener('click', ()=>{
-        if(idx === 0 || capEventosRows.length <= 1) return;
         capEventosRows.splice(idx, 1);
-        capEnsureAtLeastOneRow();
         renderCapEventosSection();
       });
 
@@ -1091,7 +1207,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       if(idx === capEventosRows.length - 1){
         const add = document.createElement('button');
         add.type = 'button';
-        add.className = 'btn secondary small';
+        add.className = 'btn small';
         add.textContent = 'Adicionar evento';
         add.addEventListener('click', ()=>{
           capEventosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
@@ -1106,6 +1222,29 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
       list.appendChild(card);
     });
+
+    // Se não houver eventos específicos, oferece botão para adicionar o primeiro
+    if(capEventosRows.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'note';
+      empty.style.marginTop = '8px';
+      empty.textContent = 'Nenhum evento específico adicionado (opcional).';
+      list.appendChild(empty);
+
+      const addWrap = document.createElement('div');
+      addWrap.className = 'btn-row';
+      addWrap.style.marginTop = '10px';
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'btn small';
+      add.textContent = 'Adicionar evento';
+      add.addEventListener('click', ()=>{
+        capEventosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+        renderCapEventosSection();
+      });
+      addWrap.appendChild(add);
+      list.appendChild(addWrap);
+    }
 
     // ===== Card fixo "Outros..." =====
     {
@@ -1123,7 +1262,10 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       inpTemas.type = 'text';
       inpTemas.placeholder = 'preencher...';
       inpTemas.value = capEventosOutrosTemas || '';
-      inpTemas.addEventListener('input', ()=>{ capEventosOutrosTemas = inpTemas.value; });
+      inpTemas.addEventListener('input', ()=>{
+        capEventosOutrosTemas = inpTemas.value;
+        updateSubmitState();
+      });
 
       card.appendChild(lblDesc);
       card.appendChild(fixed);
@@ -1165,6 +1307,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       iVT.addEventListener('input', ()=>{
         capEventosOutrosTotal = iVT.value;
         capEventosUpdateTotalNote();
+        updateSubmitState();
       });
       fVT.appendChild(lVT);
       fVT.appendChild(iVT);
@@ -1174,7 +1317,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       lP.textContent = 'Prazo';
       const iP = document.createElement('input');
       iP.type = 'text';
-      iP.value = capPrazoNoDecorrer();
+      iP.value = capPrazoNoDecorrer() || 'No decorrer de <ano do PCA>';
       iP.disabled = true;
       fP.appendChild(lP);
       fP.appendChild(iP);
@@ -1205,6 +1348,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     sub.appendChild(btns);
 
     wrap.appendChild(sub);
+    updateSubmitState();
   }
   // ============================================
 
@@ -1226,7 +1370,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
     const note = document.createElement('div');
     note.className = 'cap-enunciado';
-    note.textContent = 'Adicione cursos conforme necessário. A 1ª linha é obrigatória (não removível) e a última linha ("Outros…") é fixa.';
+    note.textContent = 'Adicione cursos conforme necessário. Você pode deixar a lista sem cursos específicos e preencher apenas “Outros…”. A linha “Outros…” é fixa.';
     sub.appendChild(note);
 
     const meses = mesesDoAno(capAnoTxt());
@@ -1234,6 +1378,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     const list = document.createElement('div');
     list.className = 'cap-formlist';
 
+    if(!Array.isArray(capCursosRows)) capCursosRows = [];
     capCursosRows.forEach((row, idx)=>{
       const card = document.createElement('div');
       card.className = 'cap-formrow';
@@ -1248,6 +1393,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
         capCursosRows[idx].descricao = ta.value;
         ta.style.height = "auto";
         ta.style.height = (ta.scrollHeight + 2) + "px";
+        updateSubmitState();
       });
       ta.style.height = "auto";
       ta.style.height = (ta.scrollHeight + 2) + "px";
@@ -1314,7 +1460,11 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       }else{
         selP.disabled = true;
       }
-      selP.value = row.prazoEstimado ?? '';
+      const desired = row.prazoEstimado ?? '';
+      selP.value = desired;
+      if (selP.value !== desired) {
+        capCursosRows[idx].prazoEstimado = selP.value;
+      }
       fP.appendChild(lP);
       fP.appendChild(selP);
 
@@ -1328,6 +1478,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       function updateRowTotal(){
         out.value = fmtBRL(capCursosRowTotal(capCursosRows[idx]));
         capCursosUpdateTotalNote();
+        updateSubmitState();
       }
 
       iVU.addEventListener('input', ()=>{
@@ -1340,6 +1491,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       });
       selP.addEventListener('change', ()=>{
         capCursosRows[idx].prazoEstimado = selP.value;
+        updateSubmitState();
       });
 
       const footer = document.createElement('div');
@@ -1353,16 +1505,11 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       rm.className = 'btn small danger';
       rm.textContent = 'Remover';
 
-      const nonRemovable = (idx === 0);
-      rm.disabled = nonRemovable || (capCursosRows.length <= 1);
-      rm.title = nonRemovable
-        ? 'Este curso é obrigatório e não pode ser removido.'
-        : (capCursosRows.length <= 1 ? 'Deve existir ao menos 1 curso.' : '');
+      rm.disabled = false;
+      rm.title = 'Remover este curso.';
 
       rm.addEventListener('click', ()=>{
-        if(idx === 0 || capCursosRows.length <= 1) return;
         capCursosRows.splice(idx, 1);
-        capCursosEnsureAtLeastOneRow();
         renderCapCursosSection();
       });
 
@@ -1374,7 +1521,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       if(idx === capCursosRows.length - 1){
         const add = document.createElement('button');
         add.type = 'button';
-        add.className = 'btn secondary small';
+        add.className = 'btn small';
         add.textContent = 'Adicionar curso';
         add.addEventListener('click', ()=>{
           capCursosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
@@ -1389,6 +1536,28 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
       list.appendChild(card);
     });
+
+    if(capCursosRows.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'note';
+      empty.style.marginTop = '8px';
+      empty.textContent = 'Nenhum curso específico adicionado (opcional).';
+      list.appendChild(empty);
+
+      const addWrap = document.createElement('div');
+      addWrap.className = 'btn-row';
+      addWrap.style.marginTop = '10px';
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'btn small';
+      add.textContent = 'Adicionar curso';
+      add.addEventListener('click', ()=>{
+        capCursosRows.push({ descricao:'', valorUnitario:'', inscricoesPrevistas:'', prazoEstimado:'' });
+        renderCapCursosSection();
+      });
+      addWrap.appendChild(add);
+      list.appendChild(addWrap);
+    }
 
     // ===== Card fixo "Outros..." =====
     {
@@ -1406,7 +1575,10 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       inpTemas.type = 'text';
       inpTemas.placeholder = 'preencher...';
       inpTemas.value = capCursosOutrosTemas || '';
-      inpTemas.addEventListener('input', ()=>{ capCursosOutrosTemas = inpTemas.value; });
+      inpTemas.addEventListener('input', ()=>{
+        capCursosOutrosTemas = inpTemas.value;
+        updateSubmitState();
+      });
 
       card.appendChild(lblDesc);
       card.appendChild(fixed);
@@ -1448,6 +1620,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       iVT.addEventListener('input', ()=>{
         capCursosOutrosTotal = iVT.value;
         capCursosUpdateTotalNote();
+        updateSubmitState();
       });
       fVT.appendChild(lVT);
       fVT.appendChild(iVT);
@@ -1457,7 +1630,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       lP.textContent = 'Prazo';
       const iP = document.createElement('input');
       iP.type = 'text';
-      iP.value = capPrazoNoDecorrer();
+      iP.value = capPrazoNoDecorrer() || 'No decorrer de <ano do PCA>';
       iP.disabled = true;
       fP.appendChild(lP);
       fP.appendChild(iP);
@@ -1487,6 +1660,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     sub.appendChild(btns);
 
     wrap.appendChild(sub);
+    updateSubmitState();
   }
   // ============================================
 
@@ -1558,38 +1732,34 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     warn.textContent = '';
     box.appendChild(warn);
 
-   // container da tabela de eventos (aparece quando marcar "Eventos")
-   const eventosWrap = document.createElement('div');
-   eventosWrap.id = 'capEventosSection';
-   box.appendChild(eventosWrap);
+    // container da tabela de eventos (aparece quando marcar "Eventos")
+    const eventosWrap = document.createElement('div');
+    eventosWrap.id = 'capEventosSection';
+    box.appendChild(eventosWrap);
 
-   // container da tabela de cursos (aparece quando marcar "Cursos")
-   const cursosWrap = document.createElement('div');
-   cursosWrap.id = 'capCursosSection';
-   box.appendChild(cursosWrap);
+    // container da tabela de cursos (aparece quando marcar "Cursos")
+    const cursosWrap = document.createElement('div');
+    cursosWrap.id = 'capCursosSection';
+    box.appendChild(cursosWrap);
 
-   capItemsBoxEl.appendChild(box);
+    capItemsBoxEl.appendChild(box);
 
     function onCapChange(){
       capKeepEventos = !!capChkEventos?.checked;
       capKeepCursos  = !!capChkCursos?.checked;
+
       ensureCapacitacaoItems();
-      // se acabou de ligar Eventos, garante 1 linha inicial obrigatória
-      capEnsureAtLeastOneRow();
       renderCapEventosSection();
-      // se acabou de ligar Cursos, garante 1 linha inicial obrigatória
-      capCursosEnsureAtLeastOneRow();
       renderCapCursosSection();
       updateSubmitState();
     }
+
 
     capChkEventos.addEventListener('change', onCapChange);
     capChkCursos.addEventListener('change', onCapChange);
      
     // render inicial
-    capEnsureAtLeastOneRow();
     renderCapEventosSection();
-    capCursosEnsureAtLeastOneRow();
     renderCapCursosSection();
 
   }
@@ -1660,6 +1830,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     ta.id = 'justificativaInclusaoItem';
     ta.placeholder = 'Descreva a justificativa (uma por DFD).';
     ta.required = true;
+    ta.addEventListener('input', updateSubmitState);
 
     reajustePcaBox.appendChild(banner);
     reajustePcaBox.appendChild(lbl);
@@ -1990,7 +2161,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
     if(preset && typeof preset.descricao === 'string') txtDesc.value = preset.descricao;
     if(preset && preset.lockDescricao){
-      txtDesc.readOnly = true;
+      txtDesc.disabled = true;
       txtDesc.classList.add('readonly');
       txtDesc.tabIndex = 0;
     }
@@ -2262,8 +2433,6 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
     const d = safeDiretoria();
     const kinds = capSelectedKinds();
 
-    capWarn(kinds.length === 0 ? 'Selecione ao menos um item (Eventos e/ou Cursos).' : '');
-
     // chave = diretoria + seleção (porque as descrições mudam com a diretoria)
     const key = `${d}::${kinds.join(',')}`;
     if(key === __CAP_RENDER_KEY__ && itemsEl.children.length > 0){
@@ -2309,6 +2478,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       renderCapEventosSection();
       renderCapCursosSection();
     }
+    updateSubmitState();
   });
 
   function syncObjToFirstItem(){
@@ -2343,19 +2513,63 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
   function updateSubmitState(){
     const hasProto = (protocoloEl?.value || '').trim().length > 0;
     const hasPE = (alinhamentoEl?.value || '').trim().length > 0;
-    const hasCapItem = !__IS_CAP__ || capSelectedKinds().length > 0;
-    const enabled = __CONFIG_LOADED__ && hasProto && hasPE && hasCapItem;
+
+    const hasAno = isValidAno((pcaAnoEl?.value || '').trim());
+    const hasPrazo = ((f.prazosEnvolvidos?.value || '').trim().length > 0);
+
+    // CAP: valida e também escreve mensagem em capWarn (sem depender de title)
+    let capOk = true;
+    if(__IS_CAP__){
+      const kinds = capSelectedKinds();
+      if(kinds.length === 0){
+        capWarn('Selecione ao menos um item (Eventos e/ou Cursos).');
+        capOk = false;
+      }else{
+        // valida primeiro Eventos (se marcado), depois Cursos (se marcado)
+        if(capEventosIsOn()){
+          const v = capEventosValidate();
+          if(!v.ok){ capWarn(v.msg); capOk = false; }
+        }
+        if(capOk && capCursosIsOn()){
+          const v = capCursosValidate();
+          if(!v.ok){ capWarn(v.msg); capOk = false; }
+        }
+        if(capOk) capWarn('');
+      }
+    }else{
+      capWarn('');
+    }
+
+    const hasReajusteJust =
+      !__REAJUSTE_PCA_ATIVO__ ||
+      ((document.getElementById('justificativaInclusaoItem')?.value || '').trim().length > 0);
+
+    const enabled =
+      __CONFIG_LOADED__ &&
+      hasProto &&
+      hasPE &&
+      hasAno &&
+      hasPrazo &&
+      capOk &&
+      hasReajusteJust;
 
     submitBtn.disabled = !enabled;
     submitBtn.setAttribute('aria-disabled', String(!enabled));
 
-    if(enabled){ submitBtn.title = ''; return; }
-    if(!__CONFIG_LOADED__){ submitBtn.title = 'Carregando configuração do período...'; return; }
-    if(__IS_CAP__ && !hasCapItem){ submitBtn.title = 'Selecione ao menos 1 item de capacitação (Eventos e/ou Cursos).'; return; }
-    if(!hasProto && !hasPE){ submitBtn.title = 'Informe o Protocolo e selecione ao menos 1 objetivo estratégico.'; return; }
-    if(!hasProto){ submitBtn.title = 'Informe o Protocolo para gerar o DFD.'; return; }
-    if(!hasPE){ submitBtn.title = 'Selecione ao menos 1 objetivo estratégico para gerar o DFD.'; return; }
+    // Mensagem global (status) — mantém erros/resultados do submit sem sobrescrever
+    if(enabled){ setSubmitHint(''); return; }
+    if(!__CONFIG_LOADED__){ setSubmitHint('Carregando configuração do período...'); return; }
+    if(!hasAno){ setSubmitHint('Informe o ano do PCA com 4 dígitos (ex.: 2027).'); return; }
+    if(!hasPrazo){ setSubmitHint('Selecione/complete o prazo (depende do ano do PCA).'); return; }
+    if(__REAJUSTE_PCA_ATIVO__ && !hasReajusteJust){ setSubmitHint('Preencha a justificativa do reajuste do PCA.'); return; }
+    if(!hasProto && !hasPE){ setSubmitHint('Informe o Protocolo e selecione ao menos 1 objetivo estratégico.'); return; }
+    if(!hasProto){ setSubmitHint('Informe o Protocolo para gerar o DFD.'); return; }
+    if(!hasPE){ setSubmitHint('Selecione ao menos 1 objetivo estratégico para gerar o DFD.'); return; }
+    // Se o bloqueio for CAP, a mensagem detalhada já está no capWarn.
+    if(__IS_CAP__ && !capOk){ setSubmitHint('Há pendências na capacitação (veja a mensagem em vermelho).'); return; }
+    setSubmitHint('');
   }
+
 
   protocoloEl?.addEventListener('input', updateSubmitState);
 
@@ -2386,107 +2600,27 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       header.tipo = __TIPO__ || "capacitacao";
       if(capEventosIsOn()){
 
-        // regra de UI: não permitir envio com 0 eventos
         capEnsureAtLeastOneRow();
-        if((capEventosRows || []).length < 1){
-          throw new Error('Na tabela de Eventos/Congressos/Seminários, é obrigatório informar ao menos 1 evento.');
-        }
-
-        const rowsClean = (capEventosRows || []).map((r, idx)=>({
-          descricao: (r?.descricao || "").toString().trim(),
-          valorUnitario: (r?.valorUnitario ?? ""),
-          inscricoesPrevistas: (r?.inscricoesPrevistas ?? ""),
-          prazoEstimado: (r?.prazoEstimado || "").toString().trim(),
-          __idx: idx
-        })).filter(r=>{
-          const vu = parseDecimalBR(r.valorUnitario ?? "");
-          const n  = parseInt((r.inscricoesPrevistas ?? "").toString(), 10);
-          const okVu = isFinite(vu) ? vu : 0;
-          const okN  = isFinite(n) ? n : 0;
-          const hasAny = !!(r.descricao || r.prazoEstimado || okVu > 0 || okN > 0);
-          if(!hasAny) return false; // remove linhas totalmente vazias
-          return true;
-        });
-
-        if(rowsClean.length < 1){
-          throw new Error('Na tabela de Eventos/Congressos/Seminários, é obrigatório informar ao menos 1 evento.');
-        }
-
-        // validação amigável: se houver linha com dado mas sem descrição, erro (backend também valida)
-        for(let i=0;i<rowsClean.length;i++){
-          const rr = rowsClean[i];
-          const vu = parseDecimalBR(rr.valorUnitario ?? "");
-          const n  = parseInt((rr.inscricoesPrevistas ?? "").toString(), 10);
-          const okVu = isFinite(vu) ? vu : 0;
-          const okN  = isFinite(n) ? n : 0;
-          const hasAny = !!(rr.descricao || rr.prazoEstimado || okVu > 0 || okN > 0);
-          if(hasAny && !rr.descricao){
-            throw new Error(`Na tabela de Eventos/Congressos/Seminários, a descrição é obrigatória na linha ${rr.__idx+1}.`);
-          }
-        }
-
-        header.capEventos = {
-          rows: rowsClean.map(r=>({
-            descricao: (r.descricao || "").toString(),
-            valorUnitario: parseDecimalBR(r.valorUnitario ?? ""),
-            inscricoesPrevistas: parseInt((r.inscricoesPrevistas ?? "").toString(), 10) || 0,
-            prazoEstimado: (r.prazoEstimado || "").toString()
-          })),
-          outrosTemas: (capEventosOutrosTemas || "").toString(),
-          outrosValorTotal: parseDecimalBR(capEventosOutrosTotal ?? ""),
+        header.capEventos = capMakeTablePayload({
+          label: 'Eventos/Congressos/Seminários',
+          outrosCaption: 'Outros…',
+          rows: capEventosRows,
+          outrosTemas: capEventosOutrosTemas,
+          outrosTotal: capEventosOutrosTotal,
           outrosPrazo: capPrazoNoDecorrer()
-        };
+        });
       }
 
-      if(capCursosIsOn()){
+      if (capCursosIsOn()) {
         capCursosEnsureAtLeastOneRow();
-        if((capCursosRows || []).length < 1){
-          throw new Error('Na tabela de Cursos, é obrigatório informar ao menos 1 curso.');
-        }
-
-        const rowsClean = (capCursosRows || []).map((r, idx)=>({
-          descricao: (r?.descricao || "").toString().trim(),
-          valorUnitario: (r?.valorUnitario ?? ""),
-          inscricoesPrevistas: (r?.inscricoesPrevistas ?? ""),
-          prazoEstimado: (r?.prazoEstimado || "").toString().trim(),
-          __idx: idx
-        })).filter(r=>{
-          const vu = parseDecimalBR(r.valorUnitario ?? "");
-          const n  = parseInt((r.inscricoesPrevistas ?? "").toString(), 10);
-          const okVu = isFinite(vu) ? vu : 0;
-          const okN  = isFinite(n) ? n : 0;
-          const hasAny = !!(r.descricao || r.prazoEstimado || okVu > 0 || okN > 0);
-          if(!hasAny) return false;
-          return true;
-        });
-
-        if(rowsClean.length < 1){
-          throw new Error('Na tabela de Cursos, é obrigatório informar ao menos 1 curso.');
-        }
-
-        for(let i=0;i<rowsClean.length;i++){
-          const rr = rowsClean[i];
-          const vu = parseDecimalBR(rr.valorUnitario ?? "");
-          const n  = parseInt((rr.inscricoesPrevistas ?? "").toString(), 10);
-          const okVu = isFinite(vu) ? vu : 0;
-          const okN  = isFinite(n) ? n : 0;
-          const hasAny = !!(rr.descricao || rr.prazoEstimado || okVu > 0 || okN > 0);
-          if(hasAny && !rr.descricao){
-            throw new Error(`Na tabela de Cursos, a descrição é obrigatória na linha ${rr.__idx+1}.`);
-          }
-        }
-
-        header.capCursos = {
-          rows: rowsClean.map(r=>({
-            descricao: (r.descricao || "").toString(),
-            valorUnitario: parseDecimalBR(r.valorUnitario ?? ""),
-            inscricoesPrevistas: parseInt((r.inscricoesPrevistas ?? "").toString(), 10) || 0,
-            prazoEstimado: (r.prazoEstimado || "").toString()
-          })),
-          outrosTemas: (capCursosOutrosTemas || "").toString(),
-          outrosValorTotal: parseDecimalBR(capCursosOutrosTotal ?? ""),
+        header.capCursos = capMakeTablePayload({
+          label: 'Cursos',
+          outrosCaption: 'Outros cursos/treinamentos…',
+          rows: capCursosRows,
+          outrosTemas: capCursosOutrosTemas,
+          outrosTotal: capCursosOutrosTotal,
           outrosPrazo: capPrazoNoDecorrer()
-        };
+        });
       }
     }
 
@@ -2756,6 +2890,18 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
       peLoadObjetivos(isFinite(pN)?pN:0);
     });
 
+    peObjetivoEl?.addEventListener('change', ()=>{
+      peSetMsg('');
+      const v = (peObjetivoEl.value || '').trim();
+      if(!v) return;           // ignorar placeholder
+      peAddSelected();         // adiciona automaticamente
+      peObjetivoEl.value = ''; // volta pro placeholder pra facilitar adicionar outro
+      peObjetivoEl.focus();
+    });
+
+    // Oculta a "linha" do botão Adicionar (evita redundância com auto-add)
+    peAddBtn?.parentElement?.classList.add('hidden');
+
     peAddBtn?.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
@@ -2773,6 +2919,7 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
     applyPrazosTip();
     rebuildPrazosOptions();
+    prazosSel?.addEventListener('change', updateSubmitState);
 
     if(__IS_CAP__){
       setObjetoDefaultIfAllowed();

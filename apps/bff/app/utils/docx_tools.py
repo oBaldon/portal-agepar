@@ -411,6 +411,15 @@ def _tbl(rows: list[list[ET.Element]], *, borders: bool = True, col_widths: list
     """
     tbl = ET.Element(_w("tbl"))
     tblpr = ET.SubElement(tbl, _w("tblPr"))
+
+    # Padroniza posicionamento para TODAS as tabelas (auto e fixed):
+    # - evita herança de indent/estilo que pode "puxar" a tabela pra fora da página
+    tblind = ET.SubElement(tblpr, _w("tblInd"))
+    tblind.set(_w("type"), "dxa")
+    tblind.set(_w("w"), "0")
+    jc = ET.SubElement(tblpr, _w("jc"))
+    jc.set(_w("val"), "left")
+
     tblw = ET.SubElement(tblpr, _w("tblW"))
     if col_widths:
         # Em DOCX, o Word pode ignorar <w:tblGrid> sozinho e "estourar" a página.
@@ -421,15 +430,6 @@ def _tbl(rows: list[list[ET.Element]], *, borders: bool = True, col_widths: list
         tblw.set(_w("w"), str(sum(col_widths)))
         layout = ET.SubElement(tblpr, _w("tblLayout"))
         layout.set(_w("type"), "fixed")
-
-        # Evita "vazar pra esquerda" por indent/herança de estilo:
-        # - indent 0
-        # - alinhamento explícito
-        tblind = ET.SubElement(tblpr, _w("tblInd"))
-        tblind.set(_w("type"), "dxa")
-        tblind.set(_w("w"), "0")
-        jc = ET.SubElement(tblpr, _w("jc"))
-        jc.set(_w("val"), "left")
     else:
         tblw.set(_w("type"), "auto")
         tblw.set(_w("w"), "0")

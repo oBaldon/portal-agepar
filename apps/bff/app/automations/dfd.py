@@ -150,6 +150,108 @@ def _safe_comp(txt: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", str(txt)).strip("_")
 
 
+def parse_decimal_br(value: Any) -> float:
+    """
+    Faz parsing de número decimal aceitando múltiplos formatos:
+    - US: 1234.56
+    - BR: 1.234,56 (último separador é decimal)
+    - Formatado: R$ 1.234,56
+    
+    Detecta o último separador como decimal; os anteriores são ignorados.
+    
+    Parâmetros
+    ----------
+    value : Any
+        Valor a converter (str, float, int, etc.)
+    
+    Retorna
+    -------
+    float
+        Valor parseado, ou 0.0 se inválido/vazio.
+    """
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except Exception:
+            return 0.0
+
+    s = str(value).strip()
+    if not s:
+        return 0.0
+
+    # Mantém apenas dígitos, separadores e espaços; depois remove espaços (ex.: "1 234,56")
+    s = re.sub(r"[^0-9,.\s]", "", s).replace(" ", "").strip()
+    if not s:
+        return 0.0
+
+    # Sem separador => inteiro
+    if "," not in s and "." not in s:
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+
+    # Último separador é decimal; anteriores são milhares
+    last_sep_idx = max(s.rfind(","), s.rfind("."))
+    int_part_raw = s[:last_sep_idx]
+    frac_part_raw = s[last_sep_idx + 1 :]
+
+    int_part = re.sub(r"[.,]", "", int_part_raw)
+    frac_part = re.sub(r"[.,]", "", frac_part_raw)
+
+    if not int_part:
+        int_part = "0"
+
+    # Se não há fração depois do separador, trata como inteiro
+    if not frac_part:
+        try:
+            return float(int_part)
+        except ValueError:
+            return 0.0
+
+    try:
+        return float(f"{int_part}.{frac_part}")
+    except ValueError:
+        return 0.0
+
+
+def parse_int_br(value: Any) -> int:
+    """
+    Faz parsing de inteiro aceitando formatos comuns:
+    - "1234" => 1234
+    - "1.234" / "1,234" => 1234
+    - "1.234,00" / "1,234.00" => 1234  (ignora decimais quando houver)
+    """
+    if value is None:
+        return 0
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+
+    s = str(value).strip()
+    if not s:
+        return 0
+
+    s = re.sub(r"[^0-9,.\s]", "", s).replace(" ", "").strip()
+    if not s:
+        return 0
+
+    # Se tem ambos, assume último como decimal e usa só a parte inteira
+    if "," in s and "." in s:
+        last_sep_idx = max(s.rfind(","), s.rfind("."))
+        int_part = re.sub(r"[.,]", "", s[:last_sep_idx])
+        return int(int_part) if int_part else 0
+
+    # Apenas um tipo de separador: trata como milhar e remove tudo que não for dígito
+    digits = re.sub(r"\D", "", s)
+    return int(digits) if digits else 0
+
+
 def _list_models() -> List[Dict[str, Any]]:
     """
     Lista subpastas de `MODELS_DIR` que contenham `model.docx`.
@@ -172,12 +274,30 @@ def _list_models() -> List[Dict[str, Any]]:
 def _get_model_path(slug: str) -> Optional[str]:
     """
     Retorna o caminho absoluto de `<slug>/model.docx` quando existir.
+    
+    Sanitização
+    -----------
+    - Remove whitespace do slug
+    - Bloqueia path traversal (.., /, \\, null bytes)
+    - Valida que o caminho resolvido não escapa de MODELS_DIR
     """
-    d = pathlib.Path(MODELS_DIR) / slug
+    slug = (slug or "").strip()
+    if not slug:
+        return None
+    
+    # Bloqueia traversal e separadores
+    if any(x in slug for x in ("..", "/", "\\", "\x00")):
+        return None
+    
+    base = pathlib.Path(MODELS_DIR).resolve()
+    d = (base / slug).resolve()
+    
+    # Garante que d está dentro de base (previne symlink/traversal)
+    if base != d and base not in d.parents:
+        return None
+    
     docx = d / "model.docx"
-    if docx.exists():
-        return str(docx)
-    return None
+    return str(docx) if docx.exists() else None
 
 
 def _has_any_role(user: Dict[str, Any], *roles: str) -> bool:
@@ -250,7 +370,8 @@ ALLOWED_PRIORIDADE = {
 }
 ALLOWED_SIMNAO = {"Sim", "Não"}
 REGEX_DATA_PRETENDIDA = re.compile(
-    r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$"
+    r"^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})$",
+    flags=re.IGNORECASE,
 )
 REGEX_NO_DECORRER = re.compile(r"^No decorrer de (\d{4})$", flags=re.IGNORECASE)
 
@@ -269,13 +390,13 @@ class CapEventoRow(BaseModel):
     @field_validator("prazo_estimado")
     @classmethod
     def _valid_prazo_row(cls, v: str) -> str:
+        """Valida e normaliza prazo estimado para minúsculas."""
         v = (v or "").strip()
         if not v:
-            # permite vazio (UI pode deixar em branco); validação de coerência ocorre em DfdIn
             return ""
         if not REGEX_DATA_PRETENDIDA.match(v):
-            raise ValueError("Prazo estimado (eventos) deve usar o formato 'mês de AAAA' (em minúsculas).")
-        return v
+            raise ValueError("Prazo estimado (eventos) deve usar o formato 'mês de AAAA'.")
+        return v.lower()
 
 
 class CapEventosTable(BaseModel):
@@ -299,9 +420,10 @@ class CapEventosTable(BaseModel):
         v = (v or "").strip()
         if not v:
             return ""
-        if not REGEX_NO_DECORRER.match(v):
+        mm = REGEX_NO_DECORRER.match(v)
+        if not mm:
             raise ValueError("Prazo (Outros eventos) deve ser 'No decorrer de AAAA'.")
-        return v
+        return f"No decorrer de {mm.group(1)}"
 
 
 class CapCursoRow(BaseModel):
@@ -322,8 +444,8 @@ class CapCursoRow(BaseModel):
         if not v:
             return ""
         if not REGEX_DATA_PRETENDIDA.match(v):
-            raise ValueError("Prazo estimado (cursos) deve usar o formato 'mês de AAAA' (em minúsculas).")
-        return v
+            raise ValueError("Prazo estimado (cursos) deve usar o formato 'mês de AAAA'.")
+        return v.lower()
 
 
 class CapCursosTable(BaseModel):
@@ -347,9 +469,10 @@ class CapCursosTable(BaseModel):
         v = (v or "").strip()
         if not v:
             return ""
-        if not REGEX_NO_DECORRER.match(v):
+        mm = REGEX_NO_DECORRER.match(v)
+        if not mm:
             raise ValueError("Prazo (Outros cursos) deve ser 'No decorrer de AAAA'.")
-        return v
+        return f"No decorrer de {mm.group(1)}"
 
 class Item(BaseModel):
     """
@@ -450,6 +573,19 @@ class DfdIn(BaseModel):
     cap_eventos: Optional[CapEventosTable] = Field(default=None, alias="capEventos")
     cap_cursos: Optional[CapCursosTable] = Field(default=None, alias="capCursos")
     
+    @field_validator("tipo")
+    @classmethod
+    def _valid_tipo(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Aceita somente 'capacitacao' ou 'padrao' (case-insensitive).
+        """
+        if v is None:
+            return None
+        vv = (v or "").strip().lower()
+        if vv in ("capacitacao", "padrao"):
+            return vv
+        raise ValueError("Tipo inválido. Use 'capacitacao' ou 'padrao'.")
+    
     modelo_slug: str = Field(..., alias="modeloSlug", min_length=1)
     numero: str = Field(..., min_length=1, max_length=MAX_NUMERO_LEN)
     assunto: str = Field(..., min_length=1, max_length=MAX_ASSUNTO_LEN)
@@ -529,12 +665,13 @@ class DfdIn(BaseModel):
             raise ValueError("Campo 'Prazos envolvidos' é obrigatório.")
         if not REGEX_DATA_PRETENDIDA.match(v.strip()):
             raise ValueError("Use o formato 'mês de AAAA' (em minúsculas).")
-        return v
+        return v.lower()
 
     @model_validator(mode="after")
     def _valid_relacoes(self):
         """
         Garante coerência entre `prazos_envolvidos` e `pca_ano`.
+        Também valida mode capacitacao: exige ao menos uma tabela (cap_eventos e/ou cap_cursos).
         """
         m = REGEX_DATA_PRETENDIDA.match((self.prazos_envolvidos or "").strip())
         if not m:
@@ -543,16 +680,25 @@ class DfdIn(BaseModel):
         if ano_prazo != (self.pca_ano or "").strip():
             raise ValueError(f"'Prazos envolvidos' deve estar no ano do PCA ({self.pca_ano}).")
 
+        # Valida modo capacitacao: exige ao menos uma tabela (impede bypass do frontend)
+        if (self.tipo or "").strip().lower() == "capacitacao":
+            if self.cap_eventos is None and self.cap_cursos is None:
+                raise ValueError("No modo capacitação, informe ao menos um item (capEventos e/ou capCursos).")
+
         # coerência da tabela de eventos (quando presente)
         if (self.tipo or "").strip().lower() == "capacitacao" and self.cap_eventos is not None:
             ano = (self.pca_ano or "").strip()
 
-            # regra: se capEventos foi enviado, deve haver ao menos 1 evento “real”
-            # (a linha "Outros..." é fixa na UI e não entra em rows)
-            if not (self.cap_eventos.rows or []) or len(self.cap_eventos.rows) < 1:
+            # regra: se capEventos foi enviado, deve haver ao menos 1 evento OU "Outros…" preenchido
+            # (linhas vazias são removidas pelo backend; "Outros..." é sempre permitido)
+            has_rows = bool(self.cap_eventos.rows and len(self.cap_eventos.rows) > 0)
+            has_outros = bool((self.cap_eventos.outros_temas or "").strip()) or float(self.cap_eventos.outros_valor_total or 0.0) > 0.0
+
+            if not (has_rows or has_outros):
                 raise ValueError(
-                    "Na tabela de Eventos/Congressos/Seminários, é obrigatório informar ao menos 1 evento."
+                    "Na tabela de Eventos/Congressos/Seminários, informe ao menos 1 evento OU preencha 'Outros…' (temas e/ou valor total)."
                 )
+
                 
             # valida outrosPrazo = "No decorrer de <ano>"
             op = (self.cap_eventos.outros_prazo or "").strip()
@@ -576,8 +722,13 @@ class DfdIn(BaseModel):
         if (self.tipo or "").strip().lower() == "capacitacao" and self.cap_cursos is not None:
             ano = (self.pca_ano or "").strip()
 
-            if not (self.cap_cursos.rows or []) or len(self.cap_cursos.rows) < 1:
-                raise ValueError("Na tabela de Cursos, é obrigatório informar ao menos 1 curso.")
+            has_rows = bool(self.cap_cursos.rows and len(self.cap_cursos.rows) > 0)
+            has_outros = bool((self.cap_cursos.outros_temas or "").strip()) or float(self.cap_cursos.outros_valor_total or 0.0) > 0.0
+
+            if not (has_rows or has_outros):
+                raise ValueError(
+                    "Na tabela de Cursos, informe ao menos 1 curso OU preencha 'Outros…' (temas e/ou valor total)."
+                )
 
             op = (self.cap_cursos.outros_prazo or "").strip()
             if op:
@@ -966,7 +1117,8 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
         os.makedirs(out_dir, exist_ok=True)
 
         numero_safe = _safe_comp(raw["numero"])
-        base = f"dfd_{raw['modeloSlug'].lower()}_{numero_safe}"
+        slug_safe = _safe_comp(raw["modeloSlug"].lower())
+        base = f"dfd_{slug_safe}_{numero_safe}"
         today_iso = datetime.utcnow().date().isoformat()
 
         assunto_bruto = (raw.get("assunto") or "").strip()
@@ -1032,8 +1184,12 @@ def _process_submission(sid: str, body: DfdIn, actor: Dict[str, Any]) -> None:
                 item = Item(**it)
                 item_dict = item.model_dump()
             except ValidationError as ve:
-                update_submission(sid, status="error", error=f"Item {i}: {ve.errors()}")
-                add_audit(KIND, "failed", actor, {"sid": sid, "error": f"item {i} invalid"})
+                error_msg = f"Item {i}: {ve.errors()}"
+                try:
+                    update_submission(sid, status="error", error=error_msg)
+                    add_audit(KIND, "failed", actor, {"sid": sid, "error": f"item {i} invalid"})
+                except Exception as audit_err:
+                    logger.exception("[DFD] Erro ao auditar falha de item %d: %s", i, audit_err)
                 return
             total_geral += float(item_dict.get("valorTotal") or 0.0)
             itens_out.append(item_dict)
@@ -1216,14 +1372,8 @@ async def submit_dfd(
                 # valores numéricos podem vir como "", None, 0, etc.
                 vu_raw = r.get("valorUnitario")
                 n_raw = r.get("inscricoesPrevistas")
-                try:
-                    vu = float(str(vu_raw).replace(",", ".").strip()) if str(vu_raw).strip() != "" else 0.0
-                except Exception:
-                    vu = 0.0
-                try:
-                    n = int(str(n_raw).strip()) if str(n_raw).strip() != "" else 0
-                except Exception:
-                    n = 0
+                vu = parse_decimal_br(vu_raw)
+                n = parse_int_br(n_raw)
 
                 has_any = bool(desc or prazo or vu > 0 or n > 0)
 
@@ -1265,14 +1415,8 @@ async def submit_dfd(
                 # valores numéricos podem vir como "", None, 0, etc.
                 vu_raw = r.get("valorUnitario")
                 n_raw = r.get("inscricoesPrevistas")
-                try:
-                    vu = float(str(vu_raw).replace(",", ".").strip()) if str(vu_raw).strip() != "" else 0.0
-                except Exception:
-                    vu = 0.0
-                try:
-                    n = int(str(n_raw).strip()) if str(n_raw).strip() != "" else 0
-                except Exception:
-                    n = 0
+                vu = parse_decimal_br(vu_raw)
+                n = parse_int_br(n_raw)
 
                 has_any = bool(desc or prazo or vu > 0 or n > 0)
 
