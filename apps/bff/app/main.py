@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import psycopg
 from fastapi import FastAPI, Request, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -31,7 +32,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.automations.dfd import DFD_VERSION as DFD_VER
 from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
-from app.db import init_db
+from app.db import init_db, DATABASE_URL
 from app.automations.form2json import router as form2json_router
 from app.automations.dfd import router as dfd_router
 from app.automations.controle import router as controle_router
@@ -46,6 +47,11 @@ from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
 from app.auth.sessions import router as auth_sessions_router
 from app.auth.rbac import require_password_changed
+from app.auth.vacation_balance import (
+    ensure_user_vacation_columns,
+    ensure_vacation_balance,
+    current_year,
+)
 
 ENV = os.getenv("ENV", "dev")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -113,6 +119,15 @@ def _startup() -> None:
     """
     init_db()
     logger.info("DB initialized (Postgres)")
+    try:
+        if not DATABASE_URL:
+            raise RuntimeError("DATABASE_URL não configurada")
+        with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+            ensure_user_vacation_columns(conn)
+        logger.info("Users vacation columns ensured (saldo_ferias/saldo_ferias_ano)")
+    except Exception as e:
+        logger.error("Failed ensuring users vacation columns: %s", e)
+        raise
     logger.info("DFD engine version: %s", DFD_VER)
     logger.info("FERIAS engine version: %s", FERIAS_VER)
 
@@ -227,7 +242,35 @@ if AUTH_LEGACY_MOCK:
             "unidades": [u.strip() for u in (unidades or "AGEPAR").split(",") if u.strip()],
             "auth_mode": "mock",
             "is_superuser": bool(superuser),
+            # saldo_ferias será normalizado também em /api/me; aqui já setamos default simples
+            "saldo_ferias": 30,
+            "saldo_ferias_ano": current_year(),
         }
+
+        # Se CPF/e-mail existirem no BD, vincula a sessão mock ao usuário real
+        # e puxa o saldo real (evita sempre cair em 30).
+        try:
+            if DATABASE_URL:
+                with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+                    with conn.cursor() as cur:
+                        uid = None
+                        em = (user.get("email") or "").strip().lower() or None
+                        cp = (user.get("cpf") or "").strip() or None
+                        if em:
+                            cur.execute("SELECT id FROM users WHERE email = %s", (em,))
+                            r = cur.fetchone()
+                            uid = r[0] if r else None
+                        if (not uid) and cp:
+                            cur.execute("SELECT id FROM users WHERE cpf = %s", (cp,))
+                            r = cur.fetchone()
+                            uid = r[0] if r else None
+                        if uid:
+                            uid_s = str(uid)
+                            user["id"] = uid_s
+                            user["saldo_ferias"] = int(ensure_vacation_balance(conn, uid_s))
+        except Exception as e:
+            logger.warning("[LEGACY_MOCK] failed to bind session to DB user: %s", e)
+
         request.session["user"] = user
         logger.info("[LEGACY_MOCK] Sessão criada para %s (roles=%s)", user["nome"], ",".join(user["roles"]))
         return user
@@ -245,6 +288,97 @@ def get_me(request: Request) -> Dict[str, Any]:
     user = _get_user_from_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="not authenticated")
+
+    # --- Modo MOCK (sem user_id em banco): normaliza em memória ---
+    if (user.get("auth_mode") == "mock") and not user.get("id"):
+        y = current_year()
+        saldo = user.get("saldo_ferias")
+        ano = user.get("saldo_ferias_ano")
+
+        if not isinstance(saldo, int):
+            saldo = 30
+        if not isinstance(ano, int):
+            ano = y
+
+        if ano < y:
+            saldo = int(saldo) + (30 * (y - int(ano)))
+            ano = y
+
+        user["saldo_ferias"] = int(saldo)
+        user["saldo_ferias_ano"] = int(ano)
+        request.session["user"] = user
+        return user
+
+    # --- Modo REAL (local/oidc): garante saldo no banco e espelha na sessão ---
+    user_id = user.get("id")
+
+    # Fallback: se o user payload não tiver id, tenta recuperar via auth_sessions
+    if not user_id:
+        db_sess_id = None
+        try:
+            db_sess_id = request.session.get("db_session_id")
+        except Exception:
+            db_sess_id = None
+
+        if db_sess_id and DATABASE_URL:
+            try:
+                with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            SELECT user_id
+                            FROM auth_sessions
+                            WHERE id = %s::uuid
+                              AND revoked_at IS NULL
+                              AND expires_at > now()
+                            """,
+                            (str(db_sess_id),),
+                        )
+                        row = cur.fetchone()
+                        if row and row[0]:
+                            user_id = str(row[0])
+            except Exception as e:
+                logger.error("Failed resolving user_id from auth_sessions: %s", e)
+ 
+    # Fallback extra: tenta resolver pelo CPF/e-mail (útil se db_session_id estiver ausente
+    # ou se o payload de sessão não estiver com id ainda).
+    if not user_id and DATABASE_URL:
+        try:
+            cpf = (user.get("cpf") or "").strip() or None
+            email = (user.get("email") or "").strip().lower() or None
+            if cpf or email:
+                with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+                    with conn.cursor() as cur:
+                        if email:
+                            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                            row = cur.fetchone()
+                            if row and row[0]:
+                                user_id = str(row[0])
+                        if (not user_id) and cpf:
+                            cur.execute("SELECT id FROM users WHERE cpf = %s", (cpf,))
+                            row = cur.fetchone()
+                            if row and row[0]:
+                                user_id = str(row[0])
+            if user_id:
+                user["id"] = user_id
+        except Exception as e:
+            logger.error("Failed resolving user_id from users by cpf/email: %s", e)
+
+    # Se ainda não conseguimos user_id, devolve o payload como está (sem quebrar)
+    if not user_id:
+        return user
+
+    try:
+        with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+            saldo = ensure_vacation_balance(conn, user_id)
+        user["saldo_ferias"] = int(saldo)
+        # Garante que o id fique gravado na sessão para próximas chamadas
+        if not user.get("id"):
+            user["id"] = str(user_id)
+        request.session["user"] = user
+    except Exception as e:
+        # Não derruba /api/me por causa de saldo; apenas loga e devolve sessão atual
+        logger.error("Failed ensuring vacation balance for user_id=%s: %s", user_id, e)
     return user
 
 @APP.get("/catalog/dev")

@@ -65,6 +65,10 @@ from .password_policy import (
     evaluate_password,
     compare_new_password_and_confirm,
 )
+from .vacation_balance import (
+    ensure_user_vacation_columns,
+    ensure_vacation_balance,
+)
 
 router = APIRouter()
 
@@ -538,6 +542,14 @@ def login_user(payload: LoginIn, request: Request):
             _insert_login_attempt(conn, str(user_id), identifier_norm, False, "bad_credentials", ip, ua)
             raise HTTPException(status_code=401, detail="Credenciais inválidas.")
 
+        # --- Saldo de férias (garante crédito anual + default 30) ---
+        try:
+            saldo_ferias = ensure_vacation_balance(conn, user_id)
+        except psycopg.errors.UndefinedColumn:
+            # BD antigo (volume existente) sem colunas ainda: cria colunas e tenta novamente
+            ensure_user_vacation_columns(conn)
+            saldo_ferias = ensure_vacation_balance(conn, user_id)        
+
         sess_id = uuid.uuid4()
         ttl = timedelta(days=REMEMBER_ME_TTL_DAYS) if payload.remember_me else timedelta(hours=SESSION_TTL_HOURS)
         expires = _now() + ttl
@@ -565,9 +577,15 @@ def login_user(payload: LoginIn, request: Request):
             "auth_mode": "local",
             "is_superuser": bool(is_superuser),
             "must_change_password": bool(must_change_password),
+            "saldo_ferias": int(saldo_ferias),
         }
         request.session.clear()
-        request.session["user"] = user_payload
+        # Importante: manter o id no objeto de sessão para que /api/me consiga
+        # atualizar o saldo consultando o BD sem depender apenas do db_session_id.
+        session_user = dict(user_payload)
+        session_user["id"] = str(user_id)
+        request.session["user"] = session_user
+
         request.session["db_session_id"] = str(sess_id)
 
         _insert_login_attempt(conn, str(user_id), identifier_norm, True, "ok", ip, ua)
@@ -582,8 +600,8 @@ def login_user(payload: LoginIn, request: Request):
             ip=ip,
             ua=ua,
         )
-
-        return LoginOut(**user_payload)
+        
+        return LoginOut(**user_payload) 
 
 
 class ChangePasswordIn(BaseModel):
@@ -738,6 +756,12 @@ def change_password(payload: ChangePasswordIn, request: Request):
             roles = sorted(set(roles + ["admin"]))
         if not roles:
             roles = ["user"]
+        # saldo de férias também no retorno da troca de senha (consistência)
+        try:
+            saldo_ferias = ensure_vacation_balance(conn, user_id)
+        except psycopg.errors.UndefinedColumn:
+            ensure_user_vacation_columns(conn)
+            saldo_ferias = ensure_vacation_balance(conn, user_id)
 
         user_payload = {
             "cpf": u_cpf,
@@ -748,10 +772,14 @@ def change_password(payload: ChangePasswordIn, request: Request):
             "auth_mode": "local",
             "is_superuser": bool(is_superuser),
             "must_change_password": False,
+            "saldo_ferias": int(saldo_ferias),
         }
 
         request.session.clear()
-        request.session["user"] = user_payload
+        session_user = dict(user_payload)
+        session_user["id"] = str(user_id)
+        request.session["user"] = session_user
+
         request.session["db_session_id"] = str(new_sess_id)
 
         return LoginOut(**user_payload)

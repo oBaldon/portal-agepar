@@ -61,6 +61,13 @@
       <div class="col" style="max-width:200px"><label>Dependentes (qtde)</label><input id="dependentes_qtde" type="number" min="0" step="1"/></div>
     </div>
     <div class="row">
+      <div class="col" style="max-width:240px">
+        <label>Saldo de férias (dias)</label>
+        <input id="saldo_ferias" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex.: 30"/>
+        <div class="note">Mínimo 0. Ao salvar, o sistema registra o ano de referência automaticamente.</div>
+      </div>
+    </div>
+    <div class="row">
       <div class="col" style="max-width:220px">
         <label><input type="checkbox" id="form_nivel_medio"/> Concluiu nível médio</label>
       </div>
@@ -396,6 +403,7 @@
     byId("ramal").value = u.ramal||"";
     byId("endereco").value = u.endereco||"";
     byId("dependentes_qtde").value = (u.dependentes_qtde ?? "");
+    byId("saldo_ferias").value = (u.saldo_ferias ?? 30);
     byId("form_nivel_medio").checked = !!u.formacao_nivel_medio;
     // emprego
     byId("tipo_vinculo").value = e.tipo_vinculo || "efetivo";
@@ -512,6 +520,13 @@
     const status = byId("status").value;
     const motivo = byId("motivo_inatividade").value || null;
     const tipo = byId("tipo_vinculo").value;
+
+    // Saldo de férias (UX validation: mínimo 0)
+    const saldoFerias = asIntOrNull(byId("saldo_ferias").value);
+    if (saldoFerias !== null && saldoFerias < 0){
+      toast("Saldo de férias deve ser >= 0.", "err");
+      return;
+    }
     const payload = {
       nome_completo: byId("nome_completo").value.trim(),
       cpf: onlyDigits(byId("cpf").value) || null,
@@ -524,6 +539,7 @@
       ramal: byId("ramal").value.trim() || null,
       endereco: byId("endereco").value.trim() || null,
       dependentes_qtde: asIntOrNull(byId("dependentes_qtde").value),
+      saldo_ferias: saldoFerias,
       formacao: {
         nivel_medio: !!byId("form_nivel_medio").checked,
         graduacoes: collectList(byId("grad_list"), d => ({

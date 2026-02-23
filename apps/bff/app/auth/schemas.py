@@ -141,6 +141,8 @@ class LoginUser(BaseModel):
         Sinalizador de superusuário (bypass de RBAC em algumas regras).
     must_change_password : bool
         Indica se o usuário precisa trocar a senha antes de acessar áreas protegidas.
+    saldo_ferias : int
+        Saldo de férias do usuário (em dias). Default 30 quando não preenchido.
     """
     cpf: Optional[str] = None
     nome: str
@@ -150,6 +152,8 @@ class LoginUser(BaseModel):
     auth_mode: str
     is_superuser: bool = False
     must_change_password: bool = False
+    saldo_ferias: int = Field(default=30, ge=0, description="Saldo de férias (em dias).")
+
 
 
 class LoginSession(BaseModel):

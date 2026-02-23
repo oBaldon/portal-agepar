@@ -144,7 +144,7 @@
       </div>
       <div class="col">
         <label for="saldo">Saldo disponível no exercício (dias)</label>
-        <input id="saldo" type="number" min="1" max="30" value="30" />
+        <input id="saldo" type="number" min="0" step="1" inputmode="numeric" placeholder="ex.: 30" />
       </div>
     </div>
 
@@ -328,6 +328,7 @@
 
   let hasFeriasRole = false;
   let cardSeq = 0;
+  let saldoFromMe = null; // saldo_ferias vindo do /api/me (banco)
 
   // === AUTO-REFRESH ===
   const RUN_STATES = new Set(['queued','running']);
@@ -338,8 +339,44 @@
   const POLL_TIMEOUT_MS   = 5 * 60 * 1000;
 
   const getLeadDays = () => (tipoFeriasEl.value === 'saldo' ? 10 : 30);
-  const getSaldoMax = () => (tipoFeriasEl.value === 'saldo' ? 20 : 30);
+  const getSaldoMaxFallback = () => (tipoFeriasEl.value === 'saldo' ? 20 : 30);
+  // Se houver saldo vindo do banco, ele vira o teto do campo (saldo disponível).
+  // Caso contrário, mantém o fallback antigo (20/30).
+  const getSaldoMax = () => {
+    const base = getSaldoMaxFallback();
+    if (typeof saldoFromMe === 'number' && isFinite(saldoFromMe)) {
+      return Math.max(0, Math.floor(saldoFromMe));
+    }
+    return base;
+  };
   const minStartYMD = () => ymdAddStr(todayYMDLocal(), getLeadDays());
+
+  // ---------------------- Autofill (1º período) ----------------------
+  // Preenche automaticamente o "Fim" do 1º período com base no saldo (inclusive).
+  // Só mantém o autofill ativo enquanto o usuário não editar manualmente o campo "Fim".
+  function autofillFirstPeriodEndFromSaldo(){
+    const first = periodosEl.firstElementChild;
+    if (!first) return;
+    const ini = first.querySelector('input[type="date"]:first-of-type');
+    const fim = first.querySelector('input[type="date"]:last-of-type');
+    if (!ini || !fim) return;
+    if (!ini.value) return;
+
+    const max = getSaldoMax();
+    let saldoVal = parseInt(saldoEl.value || String(max), 10);
+    saldoVal = clampInt(saldoVal, 0, max);
+    // só faz sentido autofill quando há ao menos 10 dias (regra mínima por período)
+    if (!(saldoVal >= 10)) return;
+
+    const lockedByUser = fim.value && fim.dataset.autofill === "0";
+    if (lockedByUser) return;
+
+    const end = ymdAddStr(ini.value, saldoVal - 1);
+    if (end) {
+      fim.value = end;
+      fim.dataset.autofill = "1";
+    }
+  }
 
   // ---------------------- UI Período ----------------------
   function buildPeriodoCard(){
@@ -375,6 +412,11 @@
 
     actions.appendChild(removeBtn); actions.appendChild(addBtn);
 
+    function isFirstPeriodo(){
+      // não depende do idx (pois idx pode mudar quando remove/reordena)
+      return periodosEl.firstElementChild === card;
+    }
+
     function applyMinAttrs(){
       const minStart = minStartYMD();
       ini.min = minStart;
@@ -382,6 +424,24 @@
     }
 
     function recalc(){
+      // Autofill só no 1º período: ao escolher início, preencher fim com base no saldo.
+      // Só sobrescreve se o usuário não tiver mexido manualmente no fim (dataset.autofill !== "0").
+      if (isFirstPeriodo() && ini.value) {
+        const max = getSaldoMax();
+        let saldoVal = parseInt(saldoEl.value || String(max), 10);
+        saldoVal = clampInt(saldoVal, 0, max);
+        if (saldoVal >= 10) {
+          const shouldAutofill = (!fim.value) || (fim.dataset.autofill === "1");
+          if (shouldAutofill) {
+            const end = ymdAddStr(ini.value, saldoVal - 1);
+            if (end) {
+              fim.value = end;
+              fim.dataset.autofill = "1";
+            }
+          }
+        }
+      }
+
       applyMinAttrs();
 
       const minStart = minStartYMD();
@@ -412,7 +472,11 @@
     }
 
     ini.addEventListener('input', recalc);
-    fim.addEventListener('input', recalc);
+    // Se o usuário editar o "fim" manualmente, desativa o autofill (não sobrescreve mais).
+    fim.addEventListener('input', () => {
+      fim.dataset.autofill = "0";
+      recalc();
+    });
 
     removeBtn.onclick = ()=>{
       if(periodosEl.children.length<=1){
@@ -553,7 +617,7 @@
   function computeTotais(){
     const saldoMax = getSaldoMax();
     let saldoVal = parseInt($("#saldo").value||String(saldoMax),10);
-    saldoVal = clampInt(saldoVal, 1, saldoMax);
+    saldoVal = clampInt(saldoVal, 0, saldoMax);
     if(String(saldoVal) !== ($("#saldo").value||'')) $("#saldo").value = String(saldoVal);
 
     const ps = collectPeriodos();
@@ -856,6 +920,15 @@
         if(n) $("#nome").value = n;
         const roles = (me && (me.roles || [])) || [];
         hasFeriasRole = roles.includes('ferias');
+
+        // Preenche saldo a partir do banco (me.saldo_ferias), mantendo editável.
+        const sf = me && me.saldo_ferias;
+        const nSf = Number(sf);
+        if (Number.isFinite(nSf)) {
+          saldoFromMe = Math.max(0, Math.floor(nSf));
+          if (!$("#saldo").value) $("#saldo").value = String(saldoFromMe);
+        }
+
         if (!hasFeriasRole) {
           const th = $("#thDownloads");
           if (th) th.innerHTML = 'Downloads <span class="note">(requer role "ferias")</span>';
@@ -873,8 +946,12 @@
     function applyTipoRules(){
       const max = getSaldoMax();
       $("#saldo").max = String(max);
-      if(!$("#saldo").value) $("#saldo").value = String(max);
-      else $("#saldo").value = String(Math.max(1, Math.min(max, parseInt($("#saldo").value,10)||max)));
+      // default: saldo do banco quando existir; senão usa o fallback antigo (20/30)
+      const def = (typeof saldoFromMe === 'number' && isFinite(saldoFromMe))
+        ? String(Math.max(0, Math.floor(saldoFromMe)))
+        : String(max);
+      if(!$("#saldo").value) $("#saldo").value = def;
+      else $("#saldo").value = String(Math.max(0, Math.min(max, parseInt($("#saldo").value,10)||0)));
 
       $("#leadDaysText").textContent = String(getLeadDays());
 
@@ -894,8 +971,15 @@
     $("#tipoFerias").addEventListener('change', applyTipoRules);
     $("#saldo").addEventListener('input', ()=>{
       const max = getSaldoMax();
-      const v = Math.max(1, Math.min(max, parseInt($("#saldo").value||String(max),10)));
+      const v = Math.max(0, Math.min(max, parseInt($("#saldo").value||String(max),10)));
       if(String(v)!==$("#saldo").value) $("#saldo").value = String(v);
+
+      // Se o 1º período estiver em modo autofill, atualiza o fim conforme o novo saldo.
+      autofillFirstPeriodEndFromSaldo();
+      // Revalida e recalcula (dispara recalc do 1º início, se existir)
+      const firstIni = periodosEl.querySelector('.item input[type="date"]');
+      if (firstIni) firstIni.dispatchEvent(new Event('input', { bubbles:true }));
+
       updateAddButtons();
       computeTotais();
     });

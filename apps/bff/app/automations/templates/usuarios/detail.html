@@ -248,6 +248,13 @@
     rows.push(row("Ramal", u.ramal));
     rows.push(row("Endereço", u.endereco));
     rows.push(row("Dependentes (qtde)", u.dependentes_qtde));
+    // Saldo de férias (exibir sempre)
+    const saldoFerias = (u.saldo_ferias === null || u.saldo_ferias === undefined) ? 30 : u.saldo_ferias;
+    rows.push(row("Saldo de férias", `${saldoFerias} dia(s)`));
+    // Ano de referência (opcional / auditoria interna)
+    if (u.saldo_ferias_ano !== null && u.saldo_ferias_ano !== undefined) {
+      rows.push(row("Ano de referência (saldo)", u.saldo_ferias_ano, true));
+    }
     rows.push(row("Formação: nível médio", u.formacao_nivel_medio ? "Sim" : "Não"));
     rows.push(row("Status (users.status)", u.status_usuario));
 

@@ -487,6 +487,9 @@ class UserCreateIn(BaseModel):
     telefone_principal: Optional[str] = None
     ramal: Optional[str] = None
     endereco: Optional[str] = None
+    saldo_ferias: Optional[int] = Field(
+        default=None, ge=0, description="Saldo de férias (dias). Se omitido, usa default do banco (30)."
+    )
     dependentes_qtde: Optional[int] = Field(default=0, ge=0)
     formacao: Optional[FormacaoIn] = None
     tipo_vinculo: TipoVinculo
@@ -519,7 +522,10 @@ class UserUpdateIn(BaseModel):
     email_institucional: Optional[str] = None
     telefone_principal: Optional[str] = None
     ramal: Optional[str] = None
-    endereco: Optional[str] = None
+    endereco: Optional[str] = None,
+    saldo_ferias: Optional[int] = Field(
+        default=None, ge=0, description="Saldo de férias (dias). Ao editar, atualiza saldo_ferias_ano para o ano atual."
+    )
     dependentes_qtde: Optional[int] = Field(default=None, ge=0)
     formacao: Optional[FormacaoIn] = None
     tipo_vinculo: Optional[TipoVinculo] = None
@@ -726,6 +732,7 @@ def list_users(
         u.telefone_principal,
         u.ramal,
         u.endereco,
+        u.saldo_ferias,
         u.dependentes_qtde,
         u.formacao_nivel_medio,
         u.status          AS status_usuario,
@@ -876,6 +883,19 @@ def create_user(payload: UserCreateIn, request: Request):
         user_id = row.get("id")
         if not user_id:
             raise HTTPException(status_code=500, detail="Falha ao criar usuário (sem id).")
+
+        # Se RH informou saldo manualmente, persiste e "carimba" o ano atual
+        # (evita recreditar no mesmo ano por saldo_ferias_ano desatualizado).
+        if payload.saldo_ferias is not None:
+            cur.execute(
+                """
+                UPDATE users
+                   SET saldo_ferias = %s,
+                       saldo_ferias_ano = EXTRACT(YEAR FROM now())::int
+                 WHERE id::text = %s
+                """,
+                (int(payload.saldo_ferias), user_id),
+            )
 
         if payload.formacao:
             for g in (payload.formacao.graduacoes or []):
@@ -1038,6 +1058,7 @@ def create_user(payload: UserCreateIn, request: Request):
                     "user_id": user_id,
                     "cpf": cpf_digits,
                     "email": payload.email_principal,
+                    "saldo_ferias": int(payload.saldo_ferias) if payload.saldo_ferias is not None else None,
                     "tipo_vinculo": payload.tipo_vinculo,
                     "status_vinculo": payload.status,
                     "motivo_inatividade": payload.motivo_inatividade,
@@ -1138,6 +1159,11 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
             add_set("ramal", payload.ramal)
         if "endereco" in payload_dict:
             add_set("endereco", payload.endereco)
+        if "saldo_ferias" in payload_dict and payload.saldo_ferias is not None:
+            add_set("saldo_ferias", int(payload.saldo_ferias))
+            # “Carimba” o ano atual quando RH faz ajuste manual.
+            # (Sem placeholder -> não adiciona params)
+            sets.append("saldo_ferias_ano = EXTRACT(YEAR FROM now())::int")
         if "dependentes_qtde" in payload_dict:
             add_set("dependentes_qtde", payload.dependentes_qtde)
         if payload.formacao is not None and payload.formacao.nivel_medio is not None:
@@ -1452,6 +1478,8 @@ def _snapshot_full(user_id: str) -> Dict[str, Any]:
               u.telefone_principal,
               u.ramal,
               u.endereco,
+              u.saldo_ferias,
+              u.saldo_ferias_ano,
               u.dependentes_qtde,
               u.formacao_nivel_medio,
               u.status          AS status_usuario

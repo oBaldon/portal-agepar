@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS users (
   source TEXT NOT NULL DEFAULT 'local' CHECK (source IN ('local','eprotocolo')),
   is_superuser BOOLEAN NOT NULL DEFAULT FALSE,
   attrs JSONB NOT NULL DEFAULT '{}'::jsonb,
+  saldo_ferias INTEGER NOT NULL DEFAULT 30,
+  saldo_ferias_ano INTEGER NOT NULL DEFAULT EXTRACT(YEAR FROM now())::int,
   last_login_at TIMESTAMPTZ,
   verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -52,6 +54,8 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS endereco             TEXT,
   ADD COLUMN IF NOT EXISTS dependentes_qtde     INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS formacao_nivel_medio BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS saldo_ferias         INTEGER NOT NULL DEFAULT 30,
+  ADD COLUMN IF NOT EXISTS saldo_ferias_ano     INTEGER NOT NULL DEFAULT EXTRACT(YEAR FROM now())::int,
   ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Unicidade: substituir índices antigos por constraints canônicas

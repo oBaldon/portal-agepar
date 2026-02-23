@@ -125,6 +125,11 @@ export type User = {
    * Retornado por /api/auth/login e /api/me.
    */
   must_change_password?: boolean;
+  /**
+   * Saldo de férias do usuário (em dias). Default no servidor: 30 quando ausente.
+   * Usado futuramente na tela de requisição de férias.
+   */
+  saldo_ferias?: number;
 };
 
 /* =============================================================================
