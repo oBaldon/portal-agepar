@@ -125,6 +125,8 @@ class LoginUser(BaseModel):
 
     Campos
     ------
+    id : Optional[uuid.UUID]
+        ID do usuário no banco. Pode estar ausente em sessões mock/legadas.
     cpf : Optional[str]
         CPF do usuário, quando disponível.
     nome : str
@@ -143,7 +145,10 @@ class LoginUser(BaseModel):
         Indica se o usuário precisa trocar a senha antes de acessar áreas protegidas.
     saldo_ferias : int
         Saldo de férias do usuário (em dias). Default 30 quando não preenchido.
+    saldo_ferias_ano : Optional[int]
+        Ano de referência do saldo de férias (quando disponível).
     """
+    id: Optional[uuid.UUID] = None
     cpf: Optional[str] = None
     nome: str
     email: Optional[str] = None
@@ -153,6 +158,7 @@ class LoginUser(BaseModel):
     is_superuser: bool = False
     must_change_password: bool = False
     saldo_ferias: int = Field(default=30, ge=0, description="Saldo de férias (em dias).")
+    saldo_ferias_ano: Optional[int] = Field(default=None, ge=1900, le=3000, description="Ano de referência do saldo.")
 
 
 

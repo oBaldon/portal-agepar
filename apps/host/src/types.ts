@@ -112,6 +112,8 @@ export type Catalog = {
 
 /** Usuário autenticado (via sessão). */
 export type User = {
+  /** ID do usuário no banco (presente em sessões reais; pode estar ausente no mock). */
+  id?: string;
   cpf: string | null;
   nome: string;
   email: string | null;
