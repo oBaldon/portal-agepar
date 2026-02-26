@@ -231,6 +231,22 @@
       "order": 5
     },
     {
+      "name": "ponto_saldo",
+      "displayName": "Saldo de Horas (PDF)",
+      "version": "0.1.0",
+      "categoryId": "util",
+      "description": "Lê o espelho de ponto em PDF, calcula horas faltantes/sobrando e sugere distribuição nos dias úteis restantes do mês (considerando feriados/ponto facultativo conforme o PDF).",
+      "ui": { "type": "iframe", "url": "/api/automations/ponto_saldo/ui" },
+      "navigation": [
+        { "label": "Saldo de Horas (PDF)", "path": "/ponto-saldo", "icon": "Clock" }
+      ],
+      "routes": [
+        { "path": "/ponto-saldo", "kind": "iframe" }
+      ],
+      "tags": ["utilitário", "ponto", "horas", "pdf"],
+      "order": 6
+    },
+    {
       "name": "whoisonline",
       "displayName": "Admin — Usuários Online",
       "version": "0.1.0",

@@ -32,6 +32,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.automations.dfd import DFD_VERSION as DFD_VER
 from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
+from app.automations.ponto_saldo import router as ponto_saldo_router, PONTO_SALDO_VERSION as PONTO_SALDO_VER
 from app.db import init_db, DATABASE_URL
 from app.automations.profile import router as profile_router
 from app.automations.form2json import router as form2json_router
@@ -131,6 +132,7 @@ def _startup() -> None:
         raise
     logger.info("DFD engine version: %s", DFD_VER)
     logger.info("FERIAS engine version: %s", FERIAS_VER)
+    logger.info("PONTO_SALDO engine version: %s", PONTO_SALDO_VER)
 
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
     """
@@ -484,6 +486,7 @@ def automations_index() -> Dict[str, Any]:
             {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
             {"kind": "fileshare", "version": "0.1.0", "title": "Área Comunitária — Arquivos Temporários"},
             {"kind": "support", "version": "1.0.0", "title": "Suporte & Feedback"},
+            {"kind": "ponto_saldo", "version": PONTO_SALDO_VER, "title": "Saldo de Horas (PDF)"},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
             {"kind": "whoisonline", "version": "0.1.0", "title": "Quem está online (Superuser)"},
             {"kind": "usuarios", "version": "1.0.0", "title": "Admin — Gestão de Usuários"},
@@ -497,6 +500,7 @@ APP.include_router(ferias_router,          dependencies=[Depends(require_passwor
 APP.include_router(controle_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(controle_ferias_router, dependencies=[Depends(require_password_changed)])
 APP.include_router(support_router,         dependencies=[Depends(require_password_changed)])
+APP.include_router(ponto_saldo_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(accounts_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])
