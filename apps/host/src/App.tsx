@@ -227,10 +227,21 @@ export default function App() {
           <div className="ml-auto flex items-center gap-3">
             {user ? (
               <>
-                <span className="hidden sm:inline text-sm text-slate-600">Olá, {user.nome}</span>
-                <div className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs font-semibold text-slate-700">
-                  {initials}
-                </div>
+                <Link
+                  to="/conta/perfil"
+                  className="flex items-center gap-3 group"
+                  title="Editar meu perfil"
+                >
+                  <span className="hidden sm:inline text-sm text-slate-600 group-hover:text-slate-900">
+                    Olá, {user.nome}
+                  </span>
+                  <div
+                    className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs font-semibold text-slate-700
+                               group-hover:ring-2 group-hover:ring-sky-200"
+                  >
+                    {initials}
+                  </div>
+                </Link>
                 <Link
                   to="/conta/sessoes"
                   className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
@@ -338,6 +349,18 @@ export default function App() {
               </RequireRoles>
             ) : (
               <div className="p-6">Carregando…</div>
+            )
+          }
+        />
+
+        {/* Meu Perfil (self-service) */}
+        <Route
+          path="/conta/perfil"
+          element={
+            user ? (
+              <IframeBlock src="/api/automations/profile/ui" />
+            ) : (
+              <Navigate to="/login" replace />
             )
           }
         />

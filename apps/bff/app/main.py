@@ -33,6 +33,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.automations.dfd import DFD_VERSION as DFD_VER
 from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
 from app.db import init_db, DATABASE_URL
+from app.automations.profile import router as profile_router
 from app.automations.form2json import router as form2json_router
 from app.automations.dfd import router as dfd_router
 from app.automations.controle import router as controle_router
@@ -477,6 +478,7 @@ def automations_index() -> Dict[str, Any]:
     return {
         "items": [
             {"kind": "form2json", "version": "1.0.0", "title": "Formulário para JSON"},
+            {"kind": "profile", "version": "0.1.0", "title": "Meu Perfil"},
             {"kind": "dfd", "version": DFD_VER, "title": "DFD — Documento de Formalização da Demanda"},
             {"kind": "ferias", "version": FERIAS_VER, "title": "Férias — Requerimento + Substituição"},
             {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
@@ -498,6 +500,7 @@ APP.include_router(support_router,         dependencies=[Depends(require_passwor
 APP.include_router(accounts_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])
+APP.include_router(profile_router,         dependencies=[Depends(require_password_changed)])
 
 """
 Nota de segurança (produção)

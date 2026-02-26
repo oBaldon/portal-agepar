@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Meu Perfil · v0.1.0</title>
+<style>
+  :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --ok:#059669; --err:#b91c1c; --bd:#e2e8f0; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  .muted { color:var(--muted); }
+  .btn { background:var(--pri); color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 16px; text-decoration:none; display:inline-block; cursor:pointer; }
+  .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+  .btn.small { padding:8px 12px; font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; box-shadow:0 1px 2px rgba(0,0,0,.04); padding:16px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .col { flex:1; min-width:220px; }
+  label { display:block; font-size:12px; color: var(--muted); margin:12px 0 6px; }
+  input:not([type="checkbox"]), textarea, select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; font:inherit; background:#fff; }
+  input[readonly], select[disabled], textarea[readonly] { background:#f1f5f9; color:#334155; }
+  .note { font-size:12px; color:var(--muted); }
+  .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
+  .list { border:1px dashed var(--bd); padding:10px; border-radius:10px; background:#fff; }
+  .item { border:1px solid var(--bd); border-radius:10px; padding:10px; margin:10px 0; background:#fff; }
+  .actions { display:flex; gap:12px; justify-content:flex-end; flex-wrap:wrap; margin-top:12px; }
+  .toast { position:fixed; right:16px; bottom:16px; padding:10px 12px; border-radius:10px; color:#fff; background:var(--pri); box-shadow:0 8px 20px rgba(2,6,23,.25); z-index:50 }
+  .toast.ok{ background:var(--ok) } .toast.err{ background:var(--err) }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>Meu Perfil <span class="muted">· v0.1.0</span></h1>
+      <div class="note">Você pode editar seus dados pessoais. Campos de identidade e vínculo são gerenciados pelo RH/Admin.</div>
+    </div>
+    <div>
+      <a class="btn secondary small" id="btn_fechar" href="#">Fechar</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:16px;margin:0 0 8px">Núcleo</h2>
+
+    <div class="row">
+      <div class="col"><label>Nome completo</label><input id="nome_completo"/></div>
+      <div class="col">
+        <label>CPF</label>
+        <input id="cpf" inputmode="numeric" minlength="11" maxlength="14" readonly/>
+        <div class="note">Somente leitura.</div>
+      </div>
+      <div class="col"><label>RG</label><input id="rg"/></div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>ID funcional</label>
+        <input id="id_funcional" inputmode="numeric" readonly/>
+        <div class="note">Somente leitura.</div>
+      </div>
+      <div class="col"><label>Data de nascimento</label><input id="data_nascimento" type="date"/></div>
+      <div class="col"><label>E-mail principal</label><input id="email_principal"/></div>
+    </div>
+
+    <div class="row">
+      <div class="col"><label>E-mail institucional</label><input id="email_institucional"/></div>
+      <div class="col"><label>Telefone principal</label><input id="telefone_principal"/></div>
+      <div class="col"><label>Ramal</label><input id="ramal"/></div>
+    </div>
+
+    <div class="row">
+      <div class="col" style="flex:2"><label>Endereço</label><input id="endereco"/></div>
+      <div class="col" style="max-width:200px"><label>Dependentes (qtde)</label><input id="dependentes_qtde" type="number" min="0" step="1"/></div>
+    </div>
+
+    <div class="row">
+      <div class="col" style="max-width:240px">
+        <label>Saldo de férias (dias)</label>
+        <input id="saldo_ferias" type="number" readonly placeholder="—"/>
+        <div class="note">Somente leitura neste modo.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col" style="max-width:220px">
+        <label><input type="checkbox" id="form_nivel_medio"/> Concluiu nível médio</label>
+      </div>
+    </div>
+
+    <!-- ===== As seções abaixo são RH/Admin. No self-profile ficam ocultas para não sugerir edição indevida. -->
+    <div class="hr"></div>
+
+    <div id="sec_rh_only" style="display:none">
+      <h2 style="font-size:16px;margin:0 0 8px">Emprego</h2>
+      <div class="note">Seção disponível apenas para RH/Admin.</div>
+      <div class="hr"></div>
+      <h2 style="font-size:16px;margin:0 0 8px">Formação</h2>
+      <div class="note">Seção disponível apenas para RH/Admin.</div>
+    </div>
+
+    <div class="actions">
+      <a class="btn secondary" id="cancelar" href="#">Cancelar</a>
+      <button class="btn" id="salvar" type="button">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+  const API_BASE = "/api/automations/profile";
+  const byId = id => document.getElementById(id);
+
+  function toast(msg, kind="ok", ms=3500){
+    const el = byId("toast");
+    el.textContent = msg;
+    el.className = "toast " + kind;
+    el.hidden = false;
+    clearTimeout(el._t);
+    el._t = setTimeout(()=> el.hidden = true, ms);
+  }
+
+  function asIntOrNull(v){
+    if (v === "" || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  async function readError(res){
+    try{
+      const j = await res.json();
+      if (j && typeof j === "object"){
+        if (typeof j.detail === "string") return j.detail;
+        return JSON.stringify(j);
+      }
+    }catch(e){}
+    try{ return await res.text(); }catch(e){}
+    return "Erro desconhecido";
+  }
+
+  function fill(d){
+    const u = (d && d.user) ? d.user : {};
+    byId("nome_completo").value = u.nome_completo || "";
+    byId("cpf").value = u.cpf || "";
+    byId("rg").value = u.rg || "";
+    byId("id_funcional").value = (u.id_funcional ?? "");
+    byId("data_nascimento").value = u.data_nascimento || "";
+    byId("email_principal").value = u.email_principal || "";
+    byId("email_institucional").value = u.email_institucional || "";
+    byId("telefone_principal").value = u.telefone_principal || "";
+    byId("ramal").value = u.ramal || "";
+    byId("endereco").value = u.endereco || "";
+    byId("dependentes_qtde").value = (u.dependentes_qtde ?? "");
+    byId("saldo_ferias").value = (u.saldo_ferias ?? "");
+    byId("form_nivel_medio").checked = !!u.formacao_nivel_medio;
+  }
+
+  async function loadMe(){
+    try{
+      const res = await fetch(`${API_BASE}/me`, { credentials:"include" });
+      if (!res.ok){
+        const msg = await readError(res);
+        throw new Error(`HTTP ${res.status}: ${msg}`);
+      }
+      const d = await res.json();
+      fill(d);
+    }catch(e){
+      toast("Falha ao carregar: " + (e?.message || "erro"), "err");
+    }
+  }
+
+  async function onSave(){
+    // Payload compatível com ProfileUpdateIn (whitelist)
+    const payload = {
+      nome_completo: (byId("nome_completo").value || "").trim() || null,
+      rg: (byId("rg").value || "").trim() || null,
+      data_nascimento: byId("data_nascimento").value || null,
+      email_principal: (byId("email_principal").value || "").trim() || null,
+      email_institucional: (byId("email_institucional").value || "").trim() || null,
+      telefone_principal: (byId("telefone_principal").value || "").trim() || null,
+      ramal: (byId("ramal").value || "").trim() || null,
+      endereco: (byId("endereco").value || "").trim() || null,
+      dependentes_qtde: asIntOrNull(byId("dependentes_qtde").value),
+      formacao_nivel_medio: !!byId("form_nivel_medio").checked,
+    };
+
+    // remove nulls pra update parcial mais limpo
+    Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k]; });
+
+    try{
+      const res = await fetch(`${API_BASE}/me`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok){
+        const msg = await readError(res);
+        throw new Error(msg);
+      }
+
+      const d = await res.json().catch(()=>null);
+      if (d) fill(d);
+
+      toast("Alterações salvas.", "ok");
+    }catch(e){
+      toast("Falha ao salvar: " + (e?.message || "erro"), "err");
+    }
+  }
+
+  // Navegação: no iframe, o Host controla. Aqui fazemos "back".
+  function goBack(ev){
+    ev.preventDefault();
+    history.back();
+  }
+  byId("btn_fechar").addEventListener("click", goBack);
+  byId("cancelar").addEventListener("click", goBack);
+
+  byId("salvar").addEventListener("click", onSave);
+
+  // Boot
+  loadMe();
+</script>
+</body>
+</html>
