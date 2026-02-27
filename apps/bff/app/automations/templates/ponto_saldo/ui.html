@@ -64,8 +64,6 @@
       background:#fff;
     }
 
-    textarea{ min-height: 100px; resize: vertical; }
-
     .row{ display:flex; gap: 12px; }
     .col{ flex:1; min-width: 0; }
 
@@ -254,27 +252,80 @@
       flex-wrap:wrap;
     }
 
-    pre{
-      white-space:pre-wrap;
-      word-break:break-word;
-      background:#0b1220;
-      color:#e5e7eb;
-      border:1px solid #1f2a44;
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 12px;
-      max-height: 48vh;
-      overflow:auto;
-      margin: 8px 0 0;
-    }
-
-    details{ margin-top: 10px; }
-    summary{ cursor:pointer; color:#334155; font-size: 13px; }
-
     .mini{
       font-size:12px;
       color:var(--muted);
     }
+
+    /* Filtros */
+    .filters{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top: 8px;
+    }
+    .checkline{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 0;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .checkline input[type="checkbox"]{ width:auto; margin:0; }
+
+    /* Tabelas */
+    .table-wrap{
+      border:1px solid #e2e8f0;
+      border-radius: 12px;
+      background:#fff;
+      overflow:auto;
+      max-height: 48vh;
+    }
+    table{
+      width:100%;
+      border-collapse: collapse;
+      font-size:12px;
+    }
+    thead th{
+      position: sticky;
+      top: 0;
+      background:#f8fafc;
+      z-index:1;
+      text-align:left;
+      color:#334155;
+      border-bottom:1px solid #e2e8f0;
+      padding:10px 10px;
+      white-space: nowrap;
+    }
+    tbody td{
+      border-bottom:1px solid #f1f5f9;
+      padding:10px 10px;
+      vertical-align: top;
+    }
+    tbody tr:hover td{ background:#f8fafc; }
+
+    .num{ white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .muted{ color: var(--muted); }
+    .pill{
+      display:inline-block;
+      border:1px solid #e2e8f0;
+      background:#fff;
+      color:#334155;
+      font-size:11px;
+      padding:2px 8px;
+      border-radius: 999px;
+      margin-right:6px;
+      margin-bottom:4px;
+      white-space: nowrap;
+    }
+    .pill.warn{ border-color:#f59e0b; background:#fffbeb; color:#92400e; }
+    .pill.err{ border-color:#ef4444; background:#fef2f2; color:#991b1b; }
+    .pill.ok{ border-color:#22c55e; background:#f0fdf4; color:#166534; }
+
+    .row-warn td{ background:#fffbeb; }
+    .row-bad td{ background:#fef2f2; }
   </style>
 </head>
 
@@ -284,7 +335,6 @@
       <h1>Saldo de Horas (PDF)</h1>
       <div class="btn-row">
         <button class="btn secondary small" type="button" id="refreshBtn">Atualizar lista</button>
-        <a class="btn secondary small" href="./submissions" target="_blank" rel="noopener">Abrir JSON (submissions)</a>
       </div>
     </div>
 
@@ -324,18 +374,18 @@
             O creditado prioriza a coluna <strong>Resultado</strong>.
           </div>
         </div>
+
         <div id="privacyBanner" class="banner ok" style="margin-top:12px;">
           <div aria-hidden="true">🔒</div>
           <div>
             <strong>Privacidade:</strong> o PDF enviado é processado e descartado (não é armazenado).
-            A plataforma mantém apenas o <strong>resultado do cálculo</strong> desta submissão para você visualizar/baixar.
+            A plataforma mantém apenas o <strong>resultado do cálculo</strong> desta submissão para você visualizar.
           </div>
         </div>
       </form>
 
       <div id="resultBox" class="hidden" style="margin-top:14px;">
         <hr class="hr" />
-
         <div id="resultBanner" class="banner hidden"></div>
 
         <div class="row">
@@ -343,23 +393,27 @@
             <h2>Resumo</h2>
             <div class="kv" id="summary"></div>
 
-            <div class="btn-row" style="margin-top:10px;">
-              <button type="button" class="btn secondary small" id="downloadBtn" disabled>Baixar JSON</button>
-              <button type="button" class="btn secondary small" id="copyBtn" disabled>Copiar JSON</button>
+            <div class="filters">
+              <label class="checkline">
+                <input type="checkbox" id="onlyIssues" />
+                Mostrar apenas pendências/avisos
+              </label>
+              <label class="checkline">
+                <input type="checkbox" id="hideWeekend" checked />
+                Ocultar fim de semana
+              </label>
             </div>
 
-            <details>
-              <summary>Ver JSON do resultado</summary>
-              <pre id="out">{}</pre>
-            </details>
+            <h2 style="margin-top:14px;">Dias do mês</h2>
+            <div class="table-wrap" id="daysTableWrap" aria-label="Tabela de dias"></div>
           </div>
 
           <div class="col">
             <h2>Plano sugerido (a partir de hoje)</h2>
             <div class="mini" id="planHint">
-              Distribuição uniforme do saldo pelos dias úteis restantes no mês (sem arredondar minutos).
+              Distribuição uniforme do que falta/ajusta pelos dias úteis restantes no mês (sem arredondar minutos).
             </div>
-            <div id="planList" style="margin-top:10px;"></div>
+            <div class="table-wrap" id="planTableWrap" style="margin-top:10px;" aria-label="Tabela do plano"></div>
           </div>
         </div>
       </div>
@@ -380,14 +434,15 @@
   const resultBox = document.getElementById('resultBox');
   const resultBanner = document.getElementById('resultBanner');
   const summaryEl = document.getElementById('summary');
-  const outEl = document.getElementById('out');
-  const planList = document.getElementById('planList');
+
   const subsEl = document.getElementById('subs');
+  const planWrap = document.getElementById('planTableWrap');
+  const daysWrap = document.getElementById('daysTableWrap');
 
-  const downloadBtn = document.getElementById('downloadBtn');
-  const copyBtn = document.getElementById('copyBtn');
+  const onlyIssuesEl = document.getElementById('onlyIssues');
+  const hideWeekendEl = document.getElementById('hideWeekend');
 
-  let __LAST_SUB_ID__ = "";
+  let __LAST_ROW__ = null;
 
   function toObj(x){
     if(!x) return {};
@@ -400,7 +455,7 @@
 
   function hhmm(min){
     const s = min < 0 ? "-" : "";
-    min = Math.abs(min);
+    min = Math.abs(Number(min)||0);
     const hh = String(Math.floor(min/60)).padStart(2,"0");
     const mm = String(min%60).padStart(2,"0");
     return s + hh + ":" + mm;
@@ -415,9 +470,7 @@
     return { cls: "badge", label: s || "unknown" };
   }
 
-  function setStatus(msg){
-    statusEl.textContent = msg || "";
-  }
+  function setStatus(msg){ statusEl.textContent = msg || ""; }
 
   function enableSubmit(on){
     submitBtn.disabled = !on;
@@ -425,7 +478,6 @@
   }
 
   function setBanner(kind, msg){
-    // kind: "ok" | "warn" | "err" | ""
     resultBanner.classList.remove("hidden", "ok");
     resultBanner.classList.toggle("ok", kind === "ok");
     resultBanner.style.borderColor = (kind === "err") ? "#ef4444" : "";
@@ -456,58 +508,55 @@
 
     summaryEl.innerHTML = `
       <div class="k">Competência</div><div class="v">${period || "—"}</div>
-      <div class="k">Esperado (mês)</div><div class="v">${hhmm(t.expected_minutes||0)}</div>
-      <div class="k">Creditado (mês)</div><div class="v">${hhmm(t.credited_minutes||0)}</div>
-      <div class="k">Saldo líquido</div><div class="v">${hhmm(t.net_balance_minutes||0)}</div>
-      <div class="k">Faltante total</div><div class="v">${hhmm(t.missing_minutes_total||0)}</div>
-      <div class="k">Sobrante total</div><div class="v">${hhmm(t.extra_minutes_total||0)}</div>
-      <div class="k">Dias úteis disponíveis</div><div class="v">${avail}</div>
+      <div class="k">Esperado (mês)</div><div class="v num">${hhmm(t.expected_minutes||0)}</div>
+      <div class="k">Creditado (até agora)</div><div class="v num">${hhmm(t.credited_minutes||0)}</div>
+      <div class="k">Faltando p/ fechar</div><div class="v num">${hhmm(t.missing_minutes_total||0)}</div>
+      <div class="k">Sobrando p/ fechar</div><div class="v num">${hhmm(t.extra_minutes_total||0)}</div>
+      <div class="k">Saldo acumulado (até agora)</div><div class="v num">${hhmm(t.so_far_net_balance_minutes||0)}</div>
+      <div class="k">Dias úteis restantes</div><div class="v">${avail}</div>
     `;
   }
 
-  function renderPlan(result){
-    planList.innerHTML = "";
+  function renderPlanTable(result){
+    planWrap.innerHTML = "";
     const p = (result && result.planner) ? result.planner : {};
     const schedule = Array.isArray(p.schedule) ? p.schedule : [];
 
     if(!schedule.length){
-      const div = document.createElement("div");
-      div.className = "note";
-      div.textContent = "Sem dias úteis disponíveis para distribuir o saldo (a partir de hoje) ou saldo já zerado.";
-      planList.appendChild(div);
+      planWrap.innerHTML = `<div class="note" style="padding:12px;">Sem plano disponível (saldo já zerado ou sem dias úteis restantes).</div>`;
       return;
     }
 
-    schedule.slice(0, 31).forEach((it)=>{
-      const add = Number(it.suggested_adjust_minutes || 0);
-      const total = Number(it.suggested_total_for_day_minutes || 0);
-      const date = (it.date || "").toString();
+    const table = document.createElement("table");
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th class="num">Total sugerido</th>
+          <th class="num">Ajuste</th>
+          <th>Observação</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tb = table.querySelector("tbody");
 
-      const row = document.createElement("div");
-      row.className = "item";
-      row.style.paddingBottom = "12px";
+    schedule.forEach(it => {
+      const tr = document.createElement("tr");
+      const total = Number(it.suggested_total_for_day_minutes||0);
+      const adj = Number(it.suggested_adjust_minutes||0);
+      const adjTxt = (adj >= 0 ? "+" : "-") + hhmm(Math.abs(adj));
 
-      const meta = document.createElement("div");
-      meta.className = "meta";
-
-      const b = document.createElement("span");
-      b.className = "badge";
-      b.textContent = (add >= 0) ? ("+" + hhmm(add)) : ("-" + hhmm(Math.abs(add)));
-
-      const t = document.createElement("span");
-      t.textContent = `${date} — total sugerido: ${hhmm(total)}`;
-
-      meta.appendChild(b);
-      meta.appendChild(t);
-
-      const note = document.createElement("div");
-      note.className = "note";
-      note.textContent = (it.comment || "").toString() || "—";
-
-      row.appendChild(meta);
-      row.appendChild(note);
-      planList.appendChild(row);
+      tr.innerHTML = `
+        <td>${(it.date||"")}</td>
+        <td class="num">${hhmm(total)}</td>
+        <td class="num">${adjTxt}</td>
+        <td class="muted">${(it.comment||"")}</td>
+      `;
+      tb.appendChild(tr);
     });
+
+    planWrap.appendChild(table);
 
     const hm = (p.healthy_mode && Array.isArray(p.healthy_mode.warnings)) ? p.healthy_mode.warnings : [];
     if(hm.length){
@@ -515,63 +564,124 @@
       warn.className = "banner";
       warn.innerHTML = `<div aria-hidden="true">⚠️</div>
         <div><strong>Atenção:</strong> alguns dias ficaram acima do ajuste recomendado (ex.: 2h/dia). Você ainda pode seguir, mas pode ficar pesado.</div>`;
-      planList.prepend(warn);
+      planWrap.prepend(warn);
+    }
+  }
+
+  function pillList(arr){
+    const a = Array.isArray(arr) ? arr : [];
+    if(!a.length) return `<span class="pill muted">—</span>`;
+    return a.map(x => `<span class="pill">${String(x)}</span>`).join("");
+  }
+
+  function renderDaysTable(result){
+    daysWrap.innerHTML = "";
+    const days = Array.isArray(result?.days) ? result.days : [];
+    if(!days.length){
+      daysWrap.innerHTML = `<div class="note" style="padding:12px;">Nenhum dia encontrado no PDF.</div>`;
+      return;
+    }
+
+    const onlyIssues = !!onlyIssuesEl?.checked;
+    const hideWeekend = !!hideWeekendEl?.checked;
+
+    const filtered = days.filter(d => {
+      const dt = String(d.day_type||"");
+      const issues = Array.isArray(d.issues) ? d.issues : [];
+      if(hideWeekend && dt === "WEEKEND") return false;
+      if(onlyIssues && issues.length === 0) return false;
+      return true;
+    });
+
+    const table = document.createElement("table");
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th class="num">Esperado</th>
+          <th class="num">Creditado</th>
+          <th class="num">Saldo</th>
+          <th>Marcações</th>
+          <th>Pendências</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tb = table.querySelector("tbody");
+
+    filtered.forEach(d => {
+      const issues = Array.isArray(d.issues) ? d.issues : [];
+      const markers = Array.isArray(d.markers_from_pdf) ? d.markers_from_pdf : [];
+      const bal = Number(d.balance_minutes||0);
+
+      const tr = document.createElement("tr");
+      if(issues.includes("MISSING_DATA")) tr.classList.add("row-bad");
+      else if(issues.includes("PENDING")) tr.classList.add("row-warn");
+
+      tr.innerHTML = `
+        <td class="num">${d.date || ""} <span class="muted">(${d.weekday||""})</span></td>
+        <td>${d.day_type || ""}</td>
+        <td class="num">${hhmm(d.expected_minutes||0)}</td>
+        <td class="num">${hhmm(d.credited_minutes||0)}</td>
+        <td class="num">${(bal>=0?"+":"-") + hhmm(Math.abs(bal))}</td>
+        <td>${pillList(markers)}</td>
+        <td>${issues.length ? issues.map(x => {
+          const cls = x === "MISSING_DATA" ? "pill err" : (x === "PENDING" ? "pill warn" : "pill");
+          return `<span class="${cls}">${x}</span>`;
+        }).join("") : `<span class="pill ok">OK</span>`}</td>
+      `;
+      tb.appendChild(tr);
+    });
+
+    daysWrap.appendChild(table);
+
+    if(filtered.length !== days.length){
+      const hint = document.createElement("div");
+      hint.className = "note";
+      hint.style.padding = "10px 4px 0";
+      hint.textContent = `Exibindo ${filtered.length} de ${days.length} dias (filtros ativos).`;
+      daysWrap.appendChild(hint);
     }
   }
 
   function renderResultFromSubmissionRow(row){
     const r = toObj(row.result);
-    outEl.textContent = JSON.stringify(r, null, 2);
 
     setSummary(r);
-    renderPlan(r);
+    renderPlanTable(r);
+    renderDaysTable(r);
 
-    // insights -> banner
     clearBanner();
     const insights = Array.isArray(r.insights) ? r.insights : [];
     const hasErr = insights.some(x => String(x.severity||"").toUpperCase() === "ERROR");
     const hasWarn = insights.some(x => String(x.severity||"").toUpperCase() === "WARN");
 
     if(row.status === "done"){
-      setBanner("ok", "Processamento concluído. Confira o resumo e o plano sugerido.");
+      setBanner("ok", "Processamento concluído. Confira o resumo, o plano e a tabela de dias.");
     } else if(row.status === "error"){
-      setBanner("err", "Falha ao processar o PDF. Verifique o erro abaixo (submissão) e tente novamente.");
+      setBanner("err", "Falha ao processar o PDF. Verifique a submissão e tente novamente.");
     } else if(hasErr){
-      setBanner("err", "O resultado contém alertas críticos. Verifique os insights.");
+      setBanner("err", "O resultado contém alertas críticos. Verifique as pendências.");
     } else if(hasWarn){
-      setBanner("warn", "O resultado contém avisos. Verifique os insights.");
+      setBanner("warn", "O resultado contém avisos. Verifique as pendências.");
     }
-
-    // Botões utilitários
-    downloadBtn.disabled = !(row && row.status === "done" && row.id);
-    copyBtn.disabled = !(r && Object.keys(r).length);
 
     resultBox.classList.remove("hidden");
   }
 
-  async function downloadJSON(subId){
+  async function downloadXlsx(subId){
     try{
-      const resp = await fetch(`./submissions/${encodeURIComponent(subId)}/download?format=json`, { method:"POST" });
+      const resp = await fetch(`./submissions/${encodeURIComponent(subId)}/download?format=xlsx`, { method:"POST" });
       if(!resp.ok) throw new Error("HTTP " + resp.status);
       const blob = await resp.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `ponto_saldo_${subId}.json`;
+      a.download = `ponto_saldo_${subId}.xlsx`;
       a.click();
       URL.revokeObjectURL(a.href);
     }catch(e){
-      alert("Não foi possível baixar o JSON.");
-    }
-  }
-
-  function copyJSON(){
-    try{
-      const txt = outEl.textContent || "";
-      navigator.clipboard.writeText(txt);
-      setStatus("JSON copiado para a área de transferência.");
-      setTimeout(()=>setStatus(""), 2500);
-    }catch{
-      alert("Não foi possível copiar o JSON.");
+      alert("Não foi possível baixar o planilha.");
     }
   }
 
@@ -600,7 +710,7 @@
     note.className = "note";
     note.textContent = row.status === "error"
       ? ("Erro: " + (row.error || "desconhecido"))
-      : (row.status === "done" ? "Pronto para visualizar/baixar." : "Aguardando processamento...");
+      : (row.status === "done" ? "Pronto para visualizar." : "Aguardando processamento...");
 
     const actions = document.createElement("div");
     actions.className = "item-actions";
@@ -611,7 +721,7 @@
     viewBtn.textContent = "Ver resultado";
     viewBtn.disabled = !(row && (row.status === "done" || row.status === "error"));
     viewBtn.onclick = () => {
-      __LAST_SUB_ID__ = row.id || "";
+      __LAST_ROW__ = row;
       renderResultFromSubmissionRow(row);
       smoothScrollTo(resultBox);
     };
@@ -619,9 +729,9 @@
     const dlBtn = document.createElement("button");
     dlBtn.type = "button";
     dlBtn.className = "btn small";
-    dlBtn.textContent = "Baixar JSON";
+    dlBtn.textContent = "Baixar planilha";
     dlBtn.disabled = !(row && row.status === "done" && row.id);
-    dlBtn.onclick = () => downloadJSON(row.id);
+    dlBtn.onclick = () => downloadXlsx(row.id);
 
     actions.appendChild(viewBtn);
     actions.appendChild(dlBtn);
@@ -639,8 +749,7 @@
   }
 
   async function loadRecentSubmissions(){
-    // mantém o título "Submissões recentes" e re-renderiza cards
-    const keepHeader = subsEl.firstElementChild; // mini
+    const keepHeader = subsEl.firstElementChild;
     subsEl.innerHTML = "";
     if(keepHeader) subsEl.appendChild(keepHeader);
 
@@ -666,9 +775,7 @@
       return;
     }
 
-    items.forEach(row => {
-      subsEl.appendChild(renderSubmissionCard(row));
-    });
+    items.forEach(row => subsEl.appendChild(renderSubmissionCard(row)));
   }
 
   async function pollSubmission(id){
@@ -685,21 +792,23 @@
     return null;
   }
 
+  function rerenderTablesIfAny(){
+    if(__LAST_ROW__ && __LAST_ROW__.result){
+      const r = toObj(__LAST_ROW__.result);
+      renderDaysTable(r);
+    }
+  }
+
+  onlyIssuesEl?.addEventListener("change", rerenderTablesIfAny);
+  hideWeekendEl?.addEventListener("change", rerenderTablesIfAny);
+
   pdf.addEventListener("change", ()=>{
     const has = !!(pdf.files && pdf.files.length);
     enableSubmit(has);
     setStatus(has ? "" : "Selecione um PDF para processar.");
   });
 
-  downloadBtn.addEventListener("click", ()=>{
-    if(__LAST_SUB_ID__) downloadJSON(__LAST_SUB_ID__);
-  });
-
-  copyBtn.addEventListener("click", copyJSON);
-
-  refreshBtn.addEventListener("click", ()=>{
-    loadRecentSubmissions();
-  });
+  refreshBtn.addEventListener("click", loadRecentSubmissions);
 
   async function submit(e){
     e.preventDefault();
@@ -712,11 +821,10 @@
     setStatus("Enviando e processando...");
     clearBanner();
 
-    // esconde resultado anterior durante novo processamento
     resultBox.classList.add("hidden");
-    outEl.textContent = "{}";
-    planList.innerHTML = "";
     summaryEl.innerHTML = "";
+    planWrap.innerHTML = "";
+    daysWrap.innerHTML = "";
 
     const fd = new FormData();
     fd.append("pdf", pdf.files[0]);
@@ -739,8 +847,6 @@
     }
 
     const id = data.id;
-    __LAST_SUB_ID__ = id;
-
     setStatus("Fila criada. Aguardando processamento... (" + id + ")");
     await loadRecentSubmissions();
 
@@ -751,6 +857,7 @@
       return;
     }
 
+    __LAST_ROW__ = row;
     setStatus(row.status === "done" ? "Concluído." : "Falhou.");
     renderResultFromSubmissionRow(row);
     await loadRecentSubmissions();
@@ -760,7 +867,6 @@
 
   f.addEventListener("submit", submit);
 
-  // init
   (async function init(){
     enableSubmit(false);
     await loadRecentSubmissions();

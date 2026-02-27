@@ -79,6 +79,151 @@ def minutes_to_hhmm(value: int) -> str:
     hh = value // 60
     mm = value % 60
     return f"{sign}{hh:02d}:{mm:02d}"
+ 
+def _xlsx_from_result(result: Dict[str, Any]) -> bytes:
+    """
+    Gera um XLSX com 3 abas: Resumo, Plano, Dias.
+    """
+    try:
+        from openpyxl import Workbook  # type: ignore
+        from openpyxl.styles import Font, Alignment  # type: ignore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Dependência ausente: instale openpyxl no BFF.") from e
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    bold = Font(bold=True)
+    left = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    meta = result.get("meta") or {}
+    totals = result.get("totals") or {}
+    planner = result.get("planner") or {}
+    schedule = planner.get("schedule") or []
+    days = result.get("days") or []
+
+    def fmt_signed_minutes(v: int) -> str:
+        try:
+            n = int(v)
+        except Exception:
+            n = 0
+        return ("+" if n >= 0 else "-") + minutes_to_hhmm(abs(n))
+
+
+    # --- Aba: Resumo ---
+    ws = wb.create_sheet("Resumo")
+    ws.append(["Campo", "Valor"])
+    ws["A1"].font = bold
+    ws["B1"].font = bold
+
+    rows = [
+        ("Competência", meta.get("period", "")),
+        ("Gerado em", meta.get("generated_at", "")),
+        ("Esperado (mês)", minutes_to_hhmm(int(totals.get("expected_minutes") or 0))),
+        ("Creditado (até agora)", minutes_to_hhmm(int(totals.get("credited_minutes") or 0))),
+        ("Faltando p/ fechar", minutes_to_hhmm(int(totals.get("missing_minutes_total") or 0))),
+        ("Sobrando p/ fechar", minutes_to_hhmm(int(totals.get("extra_minutes_total") or 0))),
+        ("Saldo acumulado (até agora)", minutes_to_hhmm(int(totals.get("so_far_net_balance_minutes") or 0))),
+        ("Dias úteis restantes", int(planner.get("available_business_days") or 0)),
+    ]
+    for k, v in rows:
+        ws.append([k, v])
+
+    ws.freeze_panes = "A2"
+    ws.column_dimensions["A"].width = 34
+    ws.column_dimensions["B"].width = 44
+    for r in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=2):
+        for c in r:
+            c.alignment = left
+
+    # --- Aba: Plano ---
+    ws = wb.create_sheet("Plano")
+    ws.append(["Data", "Total sugerido", "Ajuste", "Observação"])
+    for cell in ws[1]:
+        cell.font = bold
+        cell.alignment = left
+
+    if isinstance(schedule, list):
+        for it in schedule:
+            total = int((it or {}).get("suggested_total_for_day_minutes") or 0)
+            adj = int((it or {}).get("suggested_adjust_minutes") or 0)
+            ws.append([
+                (it or {}).get("date", ""),
+                minutes_to_hhmm(total),
+                minutes_to_hhmm(adj),
+                (it or {}).get("comment", "") or "",
+            ])
+
+    ws.freeze_panes = "A2"
+    ws.column_dimensions["A"].width = 14
+    ws.column_dimensions["B"].width = 16
+    ws.column_dimensions["C"].width = 12
+    ws.column_dimensions["D"].width = 64
+    for r in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=4):
+        for c in r:
+            c.alignment = left
+
+    # --- Aba: Dias ---
+    ws = wb.create_sheet("Dias")
+    ws.append(["Data", "Tipo", "Esperado", "Creditado", "Saldo", "Marcações", "Status"])
+    for cell in ws[1]:
+        cell.font = bold
+        cell.alignment = left
+
+    if isinstance(days, list):
+        for d in days:
+            d = d or {}
+            markers = d.get("markers_from_pdf") or []
+            issues = d.get("issues") or []
+            day_type = (d.get("day_type") or "").strip()
+
+            # Para ficar igual ao exemplo: não listar fins de semana
+            if day_type == "WEEKEND":
+                continue
+
+            dt = (d.get("date") or "").strip()
+            wd = (d.get("weekday") or "").strip()
+            data_label = f"{dt} ({wd})" if (dt and wd) else (dt or "")
+
+            exp = int(d.get("expected_minutes") or 0)
+            cred = int(d.get("credited_minutes") or 0)
+            bal = int(d.get("balance_minutes") or 0)
+
+            markers_txt = ", ".join([str(x) for x in markers]) if markers else "—"
+            if not issues:
+                status_txt = "OK"
+            elif "MISSING_DATA" in issues:
+                status_txt = "FALTANDO DADOS"
+            elif "PENDING" in issues:
+                status_txt = "PENDENTE"
+            else:
+                status_txt = ", ".join([str(x) for x in issues])
+
+            ws.append([
+                data_label,
+                day_type,
+                minutes_to_hhmm(exp),
+                minutes_to_hhmm(cred),
+                fmt_signed_minutes(bal),
+                markers_txt,
+                status_txt,
+            ])
+
+    ws.freeze_panes = "A2"
+    ws.column_dimensions["A"].width = 18  # 2026-02-02 (MON)
+    ws.column_dimensions["B"].width = 18  # BUSINESS_DAY / HOLIDAY / PF
+    ws.column_dimensions["C"].width = 10  # 08:00
+    ws.column_dimensions["D"].width = 10  # 07:52
+    ws.column_dimensions["E"].width = 10  # +00:00 / -00:08
+    ws.column_dimensions["F"].width = 28  # marcações
+    ws.column_dimensions["G"].width = 16  # OK / PENDENTE / FALTANDO DADOS
+    for r in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=7):
+        for c in r:
+            c.alignment = left
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 def _current_user(req: Request) -> Optional[Dict[str, Any]]:
@@ -300,7 +445,7 @@ def parse_days(text: str) -> List[Dict[str, Any]]:
 # Regras do cálculo
 # ----------------------------
 DayType = Literal["BUSINESS_DAY", "WEEKEND", "HOLIDAY", "PONTO_FACULTATIVO"]
-CreditedSource = Literal["RESULT", "WORKED_PLUS_JUSTIFIED", "TEXT_ONLY_FULL_DAY", "ZERO"]
+CreditedSource = Literal["RESULT", "WORKED_PLUS_JUSTIFIED", "TEXT_ONLY_FULL_DAY", "LEAVE_DAY", "ZERO"]
 
 
 def compute_expected_minutes(day_iso: str, markers: List[str]) -> Tuple[int, DayType]:
@@ -359,23 +504,28 @@ def compute_credited_minutes(
 
 def build_planner(
     days: List[Dict[str, Any]],
-    remaining_required_minutes: int,
+    required_total_remaining_minutes: int,
     recommended_max_adjust_minutes_per_day: int = 120,
 ) -> Dict[str, Any]:
     """
     Plano uniforme a partir de HOJE (SP), sem arredondar minutos.
-    Aqui o "remaining_required_minutes" é o total de minutos que faltam no mês.
-    Distribuímos esse total pelos dias úteis restantes, gerando o TOTAL sugerido por dia.
+    Aqui o "required_total_remaining_minutes" é o TOTAL (em minutos) que precisa ser feito
+    nos dias úteis restantes para fechar o mês.
     """
     today = datetime.now(TZ_SP).date()
 
-    # dias disponíveis: >= hoje, expected=480 (dia útil) e não feriado/pf/licença
+    # dias disponíveis: >= hoje, expected=480 (dia útil).
+    # Se hoje já tem total (não está PENDING), não entra no planner.
     available: List[date] = []
     for d in days:
         di = date.fromisoformat(d["date"])
         if di < today:
             continue
         if d.get("expected_minutes") == MINUTES_PER_BUSINESS_DAY:
+            if di == today:
+                issues = d.get("issues") or []
+                if "PENDING" not in issues:
+                    continue
             available.append(di)
 
     n = len(available)
@@ -384,7 +534,7 @@ def build_planner(
     hm_warnings: List[str] = []
 
     if n == 0:
-        if remaining_required_minutes != 0:
+        if required_total_remaining_minutes != 0:
             warnings.append("Não há dias úteis disponíveis a partir de hoje dentro deste mês para distribuir o saldo.")
         return {
             "strategy": "UNIFORM",
@@ -401,10 +551,9 @@ def build_planner(
 
     # Distribuição exata do TOTAL que precisa ser feito no período restante.
     # Ex.: faltando 16:48 (1008 min) e restam 2 dias => 504 min/dia (08:24).
-    total = int(remaining_required_minutes)
+    total = int(required_total_remaining_minutes)
     if total < 0:
-        # Já excedeu o esperado do mês. Sugestão mínima: 00:00 por dia (clamp) e aviso.
-        warnings.append("Saldo do mês já está positivo acima do esperado; sugerindo 00:00 por dia útil restante (ajuste pode ficar irreal).")
+        warnings.append("Você já excedeu o esperado do mês. Sugestão: 00:00 nos dias úteis restantes.")
         total = 0
 
     base = total // n
@@ -608,14 +757,37 @@ def process_submission(sub_id: str, pdf_bytes: bytes, actor: Dict[str, Any]) -> 
                 }
             )
 
-        # "Faltando no mês" = esperado do mês - creditado até agora (dias futuros ainda 0).
-        remaining_required = expected_total - credited_total
-        missing_total = max(remaining_required, 0)
-        extra_total = max(-remaining_required, 0)
-        net_balance = credited_total - expected_total
+        # =========
+        # Totais para "fechar o mês" + saldo acumulado (sobrando) até agora
+        # =========
+        today = datetime.now(TZ_SP).date()
+        expected_month = expected_total
 
-        planner = build_planner(days=days_out, remaining_required_minutes=missing_total, recommended_max_adjust_minutes_per_day=120)
+        expected_so_far = 0
+        credited_so_far = 0
+        for d in days_out:
+            di = date.fromisoformat(d["date"])
+            issues = d.get("issues") or []
+            include = (di < today) or (di == today and ("PENDING" not in issues))
+            if include:
+                expected_so_far += int(d.get("expected_minutes") or 0)
+                credited_so_far += int(d.get("credited_minutes") or 0)
 
+        so_far_net = credited_so_far - expected_so_far
+        so_far_missing = max(-so_far_net, 0)
+        so_far_extra = max(so_far_net, 0)
+
+        required_remaining = expected_month - credited_so_far  # pode ser negativo
+        missing_total = max(required_remaining, 0)
+        extra_total = max(-required_remaining, 0)
+        net_balance = credited_so_far - expected_month
+
+        planner = build_planner(
+            days=days_out,
+            required_total_remaining_minutes=required_remaining,
+            recommended_max_adjust_minutes_per_day=120,
+        )
+        
         result: Dict[str, Any] = {
             "meta": {
                 "period": period_ym,
@@ -626,10 +798,17 @@ def process_submission(sub_id: str, pdf_bytes: bytes, actor: Dict[str, Any]) -> 
             },
             "totals": {
                 "expected_minutes": expected_total,
-                "credited_minutes": credited_total,
+                # "Creditado" aqui é até agora (base para fechar o mês)
+                "credited_minutes": credited_so_far,
                 "net_balance_minutes": net_balance,
                 "missing_minutes_total": missing_total,
                 "extra_minutes_total": extra_total,
+                # saldo acumulado (o "sobrando" que permite trabalhar menos no fim do mês)
+                "so_far_expected_minutes": expected_so_far,
+                "so_far_credited_minutes": credited_so_far,
+                "so_far_net_balance_minutes": so_far_net,
+                "so_far_missing_minutes_total": so_far_missing,
+                "so_far_extra_minutes_total": so_far_extra,
                 "pdf_footer_totals": {"worked_minutes": None, "justified_minutes": None, "result_minutes": None},
                 "consistency": {"footer_totals_found": False, "matches_footer_totals": None, "notes": []},
             },
@@ -726,7 +905,7 @@ def submission_get(submission_id: str, request: Request):
 
 
 @router.post("/submissions/{submission_id}/download")
-def submission_download(submission_id: str, format: Literal["json"] = "json"):
+def submission_download(submission_id: str, format: Literal["json", "xlsx"] = "json"):
     row = get_submission(submission_id)
     if not row or row.get("kind") != KIND:
         raise HTTPException(status_code=404, detail="submission not found")
@@ -734,11 +913,21 @@ def submission_download(submission_id: str, format: Literal["json"] = "json"):
     if row.get("status") != "done" or not row.get("result"):
         raise HTTPException(status_code=409, detail="submission not ready")
 
-    if format != "json":
-        raise HTTPException(status_code=400, detail="only json supported for now")
-
     result = row["result"]
-    buf = BytesIO(json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8"))
-    filename = f"ponto_saldo_{submission_id}.json"
+
+
+    if format == "json":
+        buf = BytesIO(json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8"))
+        filename = f"ponto_saldo_{submission_id}.json"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return StreamingResponse(buf, media_type="application/json; charset=utf-8", headers=headers)
+
+    # xlsx
+    xlsx_bytes = _xlsx_from_result(result)
+    filename = f"ponto_saldo_{submission_id}.xlsx"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    return StreamingResponse(buf, media_type="application/json; charset=utf-8", headers=headers)
+    return StreamingResponse(
+        BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
