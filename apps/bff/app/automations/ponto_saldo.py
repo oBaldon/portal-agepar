@@ -316,6 +316,7 @@ KEY_FERIADO = "FERIADO"
 KEY_ATESTADO = "ATESTADO"
 KEY_LICENCA = "LICENÇA"  # pode vir sem acento no texto extraído
 KEY_FERIAS = "FERIAS"    # no PDF costuma vir sem acento
+KEY_RECESSO = "RECESSO"  # conforme legenda do relatório
 
 MONTHS_PT = {
     "JANEIRO": 1,
@@ -404,10 +405,12 @@ def parse_days(text: str) -> List[Dict[str, Any]]:
         # "LICENÇA" pode virar "LICENCA" sem acento; usamos versão sem acento
         if "LICENCA" in compact or "LICEN" in compact:
             markers.append(KEY_LICENCA)
-
         # FÉRIAS pode vir como "FERIAS" (sem acento) e às vezes quebrado por linha
         if "FERIAS" in compact:
             markers.append(KEY_FERIAS)
+        # RECESSO (ex.: 02/01 - sexta RECESSO)
+        if "RECESSO" in compact:
+            markers.append(KEY_RECESSO)
 
         # Captura todos HH:MM (inclui negativos caso existam).
         hhmm_tokens = _HHMM_TOKEN_RE.findall(block)
@@ -452,6 +455,9 @@ def compute_expected_minutes(day_iso: str, markers: List[str]) -> Tuple[int, Day
     d = date.fromisoformat(day_iso)
     if d.weekday() >= 5:
         return 0, "WEEKEND"
+    # RECESSO: não conta como dia esperado (expected=0)
+    if KEY_RECESSO in markers:
+        return 0, "RECESSO"
     # FÉRIAS: não conta como dia esperado no mês (expected=0)
     if KEY_FERIAS in markers:
         return 0, "HOLIDAY"
@@ -470,6 +476,11 @@ def compute_credited_minutes(
     markers: List[str],
 ) -> Tuple[int, CreditedSource, List[str]]:
     notes: List[str] = []
+
+    # RECESSO: neutraliza (expected=0, credited=0)
+    if KEY_RECESSO in markers:
+        notes.append("Dia de RECESSO: expected=0 e credited=0 (não entra no total mensal).")
+        return 0, "LEAVE_DAY", notes
 
     # FÉRIAS: não credita horas; fica neutralizado via expected=0
     if KEY_FERIAS in markers:
