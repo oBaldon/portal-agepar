@@ -24,7 +24,7 @@ sem alterar suas permissões nem sua UI.
 import logging
 import pathlib
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -36,7 +36,7 @@ from app.db import _pg, add_audit
 logger = logging.getLogger(__name__)
 
 KIND = "profile"
-PROFILE_VERSION = "0.1.0"
+PROFILE_VERSION = "0.2.0"
 
 router = APIRouter(
     prefix="/api/automations/profile",
@@ -46,6 +46,17 @@ router = APIRouter(
 )
 
 _TEMPLATES_DIR = pathlib.Path(__file__).parent / "templates" / "profile"
+
+
+def _norm_date(v: Any) -> Optional[str]:
+    if v is None or v == "":
+        return None
+    if isinstance(v, date):
+        return v.isoformat()
+    try:
+        return str(v)
+    except Exception:
+        return None
 
 
 def _read_html(name: str) -> str:
@@ -89,6 +100,7 @@ class ProfileUpdateIn(BaseModel):
     endereco: Optional[str] = Field(default=None, max_length=400)
     dependentes_qtde: Optional[int] = Field(default=None, ge=0, le=99)
     formacao_nivel_medio: Optional[bool] = None
+    formacao: Optional["FormacaoUpdateIn"] = None
 
     @field_validator("data_nascimento")
     @classmethod
@@ -109,6 +121,86 @@ class ProfileUpdateIn(BaseModel):
             return None
         vv = v.strip()
         return vv if vv else None
+
+
+class GraduacaoIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    curso: str = Field(min_length=2, max_length=200)
+    instituicao: Optional[str] = Field(default=None, max_length=200)
+    conclusao_data: Optional[str] = Field(default=None, description="YYYY-MM-DD")
+
+    @field_validator("curso", "instituicao", mode="before")
+    @classmethod
+    def _strip_text(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            return v if v else None
+        return v
+
+    @field_validator("conclusao_data")
+    @classmethod
+    def _validate_conclusao(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        try:
+            date.fromisoformat(v)
+        except Exception as exc:
+            raise ValueError("conclusao_data deve estar no formato YYYY-MM-DD") from exc
+        return v
+
+
+class PosGraduacaoIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    curso: str = Field(min_length=2, max_length=200)
+    tipo: Optional[Literal["especializacao", "mestrado", "doutorado", "pos"]] = None
+    instituicao: Optional[str] = Field(default=None, max_length=200)
+    conclusao_data: Optional[str] = Field(default=None, description="YYYY-MM-DD")
+
+    @field_validator("curso", "instituicao", mode="before")
+    @classmethod
+    def _strip_text(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            return v if v else None
+        return v
+
+    @field_validator("tipo", mode="before")
+    @classmethod
+    def _lower_tipo(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip().lower()
+            return v if v else None
+        return v
+
+    @field_validator("conclusao_data")
+    @classmethod
+    def _validate_conclusao(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        try:
+            date.fromisoformat(v)
+        except Exception as exc:
+            raise ValueError("conclusao_data deve estar no formato YYYY-MM-DD") from exc
+        return v
+
+
+class FormacaoUpdateIn(BaseModel):
+    """
+    Atualização parcial de formação.
+    - Se `graduacoes` vier no payload, substitui (replace) a lista inteira.
+    - Se `pos_graduacoes` vier no payload, substitui (replace) a lista inteira.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    nivel_medio: Optional[bool] = None
+    graduacoes: Optional[List[GraduacaoIn]] = None
+    pos_graduacoes: Optional[List[PosGraduacaoIn]] = None
 
 
 def _snapshot_self(user_id: str) -> Dict[str, Any]:
@@ -148,11 +240,31 @@ def _snapshot_self(user_id: str) -> Dict[str, Any]:
         if not urow:
             raise HTTPException(status_code=404, detail="user_not_found")
 
+        # Educação (mesmas tabelas usadas na automação RH)
+        cur.execute(
+            "SELECT curso, instituicao, conclusao_data FROM user_education_graduacao WHERE user_id = %s ORDER BY id",
+            (user_id,),
+        )
+        graduacoes = [dict(r) for r in (cur.fetchall() or [])]
+        for g in graduacoes:
+            g["conclusao_data"] = _norm_date(g.get("conclusao_data"))
+
+        cur.execute(
+            "SELECT curso, tipo, instituicao, conclusao_data FROM user_education_posgrad WHERE user_id = %s ORDER BY id",
+            (user_id,),
+        )
+        pos_graduacoes = [dict(r) for r in (cur.fetchall() or [])]
+        for p in pos_graduacoes:
+            p["conclusao_data"] = _norm_date(p.get("conclusao_data"))
+
     # Estrutura compatível com a UI (mesmo que alguns blocos fiquem vazios)
     return {
         "user": urow,
         "employment": {},   # vínculo é RH/admin; perfil não edita aqui
-        "educacao": {},     # educação detalhada é RH/admin; perfil pode ser expandido depois
+        "educacao": {
+            "graduacoes": graduacoes,
+            "pos_graduacoes": pos_graduacoes,
+        },
     }
 
 
@@ -175,6 +287,12 @@ def _apply_profile_update(user_id: str, payload: ProfileUpdateIn, actor: Dict[st
     }
 
     data = payload.model_dump(exclude_unset=True)
+
+    # Se vier `formacao.nivel_medio`, aplica no mesmo campo do usuário
+    formacao_obj = payload.formacao if ("formacao" in getattr(payload, "model_fields_set", set())) else None
+    if formacao_obj and formacao_obj.nivel_medio is not None and "formacao_nivel_medio" not in data:
+        data["formacao_nivel_medio"] = bool(formacao_obj.nivel_medio)
+
     if not data:
         # nada para salvar
         return _snapshot_self(user_id)
@@ -198,21 +316,48 @@ def _apply_profile_update(user_id: str, payload: ProfileUpdateIn, actor: Dict[st
         params.append(v)
         changes[k] = v.isoformat() if isinstance(v, date) else v
 
-    if not set_parts:
-        return _snapshot_self(user_id)
-
-    params.append(user_id)
-
+    # Operações em uma única conexão (para evitar estados parciais)
     with _pg() as conn, conn.cursor() as cur:
-        cur.execute(
-            f"""
-            UPDATE users
-               SET {", ".join(set_parts)},
-                   updated_at = now()
-             WHERE id::text = %s
-            """,
-            tuple(params),
-        )
+        # conflito de e-mail (self não pode tomar e-mail de outro usuário)
+        if "email_principal" in data and data.get("email_principal"):
+            cur.execute(
+                "SELECT 1 FROM users WHERE email = %s AND id::text <> %s",
+                (data["email_principal"], user_id),
+            )
+            if cur.fetchone():
+                raise HTTPException(status_code=409, detail="E-mail já cadastrado para outro usuário.")
+
+        if set_parts:
+            params.append(user_id)
+            cur.execute(
+                f"""
+                UPDATE users
+                   SET {", ".join(set_parts)},
+                       updated_at = now()
+                 WHERE id::text = %s
+                """,
+                tuple(params),
+            )
+
+        # Educação (replace quando vier no payload)
+        if formacao_obj is not None:
+            if formacao_obj.graduacoes is not None:
+                cur.execute("DELETE FROM user_education_graduacao WHERE user_id = %s", (user_id,))
+                for g in (formacao_obj.graduacoes or []):
+                    cur.execute(
+                        "INSERT INTO user_education_graduacao (user_id, curso, instituicao, conclusao_data) VALUES (%s,%s,%s,%s)",
+                        (user_id, g.curso, g.instituicao, g.conclusao_data),
+                    )
+                changes["graduacoes_qtde"] = len(formacao_obj.graduacoes or [])
+
+            if formacao_obj.pos_graduacoes is not None:
+                cur.execute("DELETE FROM user_education_posgrad WHERE user_id = %s", (user_id,))
+                for p in (formacao_obj.pos_graduacoes or []):
+                    cur.execute(
+                        "INSERT INTO user_education_posgrad (user_id, curso, tipo, instituicao, conclusao_data) VALUES (%s,%s,%s,%s,%s)",
+                        (user_id, p.curso, p.tipo, p.instituicao, p.conclusao_data),
+                    )
+                changes["pos_graduacoes_qtde"] = len(formacao_obj.pos_graduacoes or [])
 
     try:
         add_audit(

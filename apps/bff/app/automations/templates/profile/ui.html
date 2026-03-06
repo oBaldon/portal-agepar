@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Meu Perfil · v0.1.0</title>
+<title>Meu Perfil · v0.2.0</title>
 <style>
   :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --ok:#059669; --err:#b91c1c; --bd:#e2e8f0; }
   * { box-sizing: border-box; }
@@ -35,7 +35,7 @@
 <div class="wrap">
   <div class="header">
     <div>
-      <h1>Meu Perfil <span class="muted">· v0.1.0</span></h1>
+      <h1>Meu Perfil <span class="muted">· v0.2.0</span></h1>
       <div class="note">Você pode editar seus dados pessoais. Campos de identidade e vínculo são gerenciados pelo RH/Admin.</div>
     </div>
     <div>
@@ -91,15 +91,26 @@
       </div>
     </div>
 
-    <!-- ===== As seções abaixo são RH/Admin. No self-profile ficam ocultas para não sugerir edição indevida. -->
     <div class="hr"></div>
 
-    <div id="sec_rh_only" style="display:none">
-      <h2 style="font-size:16px;margin:0 0 8px">Emprego</h2>
-      <div class="note">Seção disponível apenas para RH/Admin.</div>
-      <div class="hr"></div>
-      <h2 style="font-size:16px;margin:0 0 8px">Formação</h2>
-      <div class="note">Seção disponível apenas para RH/Admin.</div>
+    <h2 style="font-size:16px;margin:0 0 8px">Formação</h2>
+    <div class="note">Você pode adicionar/remover itens de formação. Vínculo e informações funcionais continuam sob gestão do RH/Admin.</div>
+
+    <div class="row" style="align-items:flex-start">
+      <div class="col">
+        <label>Graduações</label>
+        <div class="list" id="graduacoes_list"></div>
+        <div class="actions" style="justify-content:flex-start">
+          <button class="btn secondary small" id="add_graduacao" type="button">Adicionar graduação</button>
+        </div>
+      </div>
+      <div class="col">
+        <label>Pós-graduações</label>
+        <div class="list" id="pos_list"></div>
+        <div class="actions" style="justify-content:flex-start">
+          <button class="btn secondary small" id="add_pos" type="button">Adicionar pós</button>
+        </div>
+      </div>
     </div>
 
     <div class="actions">
@@ -114,6 +125,12 @@
 <script>
   const API_BASE = "/api/automations/profile";
   const byId = id => document.getElementById(id);
+
+  function esc(s){
+    return String(s ?? "").replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+    }[c]));
+  }
 
   function toast(msg, kind="ok", ms=3500){
     const el = byId("toast");
@@ -142,6 +159,101 @@
     return "Erro desconhecido";
   }
 
+  function mkGradItem(g={}){
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso" value="${esc(g.curso)}"/></div>
+        <div class="col"><label>Instituição</label><input data-k="instituicao" value="${esc(g.instituicao)}"/></div>
+        <div class="col" style="max-width:220px"><label>Conclusão</label><input type="date" data-k="conclusao_data" value="${esc(g.conclusao_data)}"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button class="btn secondary small" type="button" data-act="rm">Remover</button>
+      </div>
+    `;
+    el.querySelector('[data-act="rm"]').addEventListener("click", () => el.remove());
+    return el;
+  }
+
+  function mkPosItem(p={}){
+    const tipo = (p.tipo || "");
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
+      <div class="row">
+        <div class="col"><label>Curso</label><input data-k="curso" value="${esc(p.curso)}"/></div>
+        <div class="col">
+          <label>Tipo</label>
+          <select data-k="tipo">
+            <option value="" ${tipo===""?"selected":""}>—</option>
+            <option value="especializacao" ${tipo==="especializacao"?"selected":""}>Especialização</option>
+            <option value="mestrado" ${tipo==="mestrado"?"selected":""}>Mestrado</option>
+            <option value="doutorado" ${tipo==="doutorado"?"selected":""}>Doutorado</option>
+            <option value="pos" ${tipo==="pos"?"selected":""}>Pós</option>
+          </select>
+        </div>
+        <div class="col"><label>Instituição</label><input data-k="instituicao" value="${esc(p.instituicao)}"/></div>
+        <div class="col" style="max-width:220px"><label>Conclusão</label><input type="date" data-k="conclusao_data" value="${esc(p.conclusao_data)}"/></div>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <button class="btn secondary small" type="button" data-act="rm">Remover</button>
+      </div>
+    `;
+    el.querySelector('[data-act="rm"]').addEventListener("click", () => el.remove());
+    return el;
+  }
+
+  function setGraduacoes(items){
+    const box = byId("graduacoes_list");
+    box.innerHTML = "";
+    (items || []).forEach(g => box.appendChild(mkGradItem(g)));
+    if (!items || items.length === 0) box.appendChild(mkGradItem({}));
+  }
+
+  function setPos(items){
+    const box = byId("pos_list");
+    box.innerHTML = "";
+    (items || []).forEach(p => box.appendChild(mkPosItem(p)));
+    if (!items || items.length === 0) box.appendChild(mkPosItem({}));
+  }
+
+  function readGraduacoes(){
+    const box = byId("graduacoes_list");
+    const out = [];
+    [...box.querySelectorAll(".item")].forEach(it => {
+      const curso = (it.querySelector('[data-k="curso"]')?.value || "").trim();
+      const instituicao = (it.querySelector('[data-k="instituicao"]')?.value || "").trim();
+      const conclusao_data = (it.querySelector('[data-k="conclusao_data"]')?.value || "").trim();
+      if (!curso) return;
+      out.push({
+        curso,
+        instituicao: instituicao || null,
+        conclusao_data: conclusao_data || null,
+      });
+    });
+    return out;
+  }
+
+  function readPos(){
+    const box = byId("pos_list");
+    const out = [];
+    [...box.querySelectorAll(".item")].forEach(it => {
+      const curso = (it.querySelector('[data-k="curso"]')?.value || "").trim();
+      const tipo = (it.querySelector('[data-k="tipo"]')?.value || "").trim();
+      const instituicao = (it.querySelector('[data-k="instituicao"]')?.value || "").trim();
+      const conclusao_data = (it.querySelector('[data-k="conclusao_data"]')?.value || "").trim();
+      if (!curso) return;
+      out.push({
+        curso,
+        tipo: tipo || null,
+        instituicao: instituicao || null,
+        conclusao_data: conclusao_data || null,
+      });
+    });
+    return out;
+  }
+
   function fill(d){
     const u = (d && d.user) ? d.user : {};
     byId("nome_completo").value = u.nome_completo || "";
@@ -157,6 +269,10 @@
     byId("dependentes_qtde").value = (u.dependentes_qtde ?? "");
     byId("saldo_ferias").value = (u.saldo_ferias ?? "");
     byId("form_nivel_medio").checked = !!u.formacao_nivel_medio;
+
+    const edu = (d && d.educacao) ? d.educacao : {};
+    setGraduacoes(edu.graduacoes || []);
+    setPos(edu.pos_graduacoes || []);
   }
 
   async function loadMe(){
@@ -186,6 +302,11 @@
       endereco: (byId("endereco").value || "").trim() || null,
       dependentes_qtde: asIntOrNull(byId("dependentes_qtde").value),
       formacao_nivel_medio: !!byId("form_nivel_medio").checked,
+      formacao: {
+        nivel_medio: !!byId("form_nivel_medio").checked,
+        graduacoes: readGraduacoes(),
+        pos_graduacoes: readPos(),
+      }
     };
 
     // remove nulls pra update parcial mais limpo
@@ -222,6 +343,12 @@
   byId("cancelar").addEventListener("click", goBack);
 
   byId("salvar").addEventListener("click", onSave);
+  byId("add_graduacao").addEventListener("click", () => {
+    byId("graduacoes_list").appendChild(mkGradItem({}));
+  });
+  byId("add_pos").addEventListener("click", () => {
+    byId("pos_list").appendChild(mkPosItem({}));
+  });
 
   // Boot
   loadMe();
