@@ -23,6 +23,7 @@ sem alterar suas permissões nem sua UI.
 
 import logging
 import pathlib
+import re
 from datetime import date
 from typing import Any, Dict, List, Literal, Optional
 
@@ -36,7 +37,7 @@ from app.db import _pg, add_audit
 logger = logging.getLogger(__name__)
 
 KIND = "profile"
-PROFILE_VERSION = "0.2.0"
+PROFILE_VERSION = "0.2.1"
 
 router = APIRouter(
     prefix="/api/automations/profile",
@@ -96,7 +97,7 @@ class ProfileUpdateIn(BaseModel):
     email_principal: Optional[str] = Field(default=None, max_length=320)
     email_institucional: Optional[str] = Field(default=None, max_length=320)
     telefone_principal: Optional[str] = Field(default=None, max_length=50)
-    ramal: Optional[str] = Field(default=None, max_length=20)
+    ramal: Optional[str] = Field(default=None, max_length=4, description="4 dígitos")
     endereco: Optional[str] = Field(default=None, max_length=400)
     dependentes_qtde: Optional[int] = Field(default=None, ge=0, le=99)
     formacao_nivel_medio: Optional[bool] = None
@@ -121,6 +122,18 @@ class ProfileUpdateIn(BaseModel):
             return None
         vv = v.strip()
         return vv if vv else None
+
+    @field_validator("ramal")
+    @classmethod
+    def _validate_ramal(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        vv = v.strip()
+        if vv == "":
+            return None
+        if not re.fullmatch(r"\d{4}", vv):
+            raise ValueError("ramal deve conter exatamente 4 dígitos numéricos")
+        return vv
 
 
 class GraduacaoIn(BaseModel):

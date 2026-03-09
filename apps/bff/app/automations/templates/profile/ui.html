@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Meu Perfil · v0.2.0</title>
+<title>Meu Perfil · v0.2.1</title>
 <style>
   :root { --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb; --ok:#059669; --err:#b91c1c; --bd:#e2e8f0; }
   * { box-sizing: border-box; }
@@ -35,7 +35,7 @@
 <div class="wrap">
   <div class="header">
     <div>
-      <h1>Meu Perfil <span class="muted">· v0.2.0</span></h1>
+      <h1>Meu Perfil <span class="muted">· v0.2.1</span></h1>
       <div class="note">Você pode editar seus dados pessoais. Campos de identidade e vínculo são gerenciados pelo RH/Admin.</div>
     </div>
     <div>
@@ -69,20 +69,20 @@
     <div class="row">
       <div class="col"><label>E-mail institucional</label><input id="email_institucional"/></div>
       <div class="col"><label>Telefone principal</label><input id="telefone_principal"/></div>
-      <div class="col"><label>Ramal</label><input id="ramal"/></div>
-    </div>
-
-    <div class="row">
-      <div class="col" style="flex:2"><label>Endereço</label><input id="endereco"/></div>
-      <div class="col" style="max-width:200px"><label>Dependentes (qtde)</label><input id="dependentes_qtde" type="number" min="0" step="1"/></div>
-    </div>
-
-    <div class="row">
-      <div class="col" style="max-width:240px">
-        <label>Saldo de férias (dias)</label>
-        <input id="saldo_ferias" type="number" readonly placeholder="—"/>
-        <div class="note">Somente leitura neste modo.</div>
+      <div class="col">
+        <label>Ramal</label>
+        <input id="ramal" inputmode="numeric" maxlength="4" pattern="\\d{4}" placeholder="0000" title="Informe 4 dígitos (ex.: 1234)"/>
+        <div class="note">Aceita somente 4 dígitos.</div>
       </div>
+    </div>
+
+    <div class="row">
+      <div class="col" style="flex:2">
+        <label>Endereço</label>
+        <input id="endereco" placeholder="Rua, número - Bairro, Cidade - UF"/>
+        <div class="note">Ex.: Rua XV de Novembro, 123 - Centro, Curitiba - PR</div>
+      </div>
+      <div class="col" style="max-width:200px"><label>Dependentes (qtde)</label><input id="dependentes_qtde" type="number" min="0" step="1"/></div>
     </div>
 
     <div class="row">
@@ -182,7 +182,6 @@
     el.className = "item";
     el.innerHTML = `
       <div class="row">
-        <div class="col"><label>Curso</label><input data-k="curso" value="${esc(p.curso)}"/></div>
         <div class="col">
           <label>Tipo</label>
           <select data-k="tipo">
@@ -193,6 +192,7 @@
             <option value="pos" ${tipo==="pos"?"selected":""}>Pós</option>
           </select>
         </div>
+        <div class="col"><label>Curso</label><input data-k="curso" value="${esc(p.curso)}"/></div>
         <div class="col"><label>Instituição</label><input data-k="instituicao" value="${esc(p.instituicao)}"/></div>
         <div class="col" style="max-width:220px"><label>Conclusão</label><input type="date" data-k="conclusao_data" value="${esc(p.conclusao_data)}"/></div>
       </div>
@@ -267,12 +267,16 @@
     byId("ramal").value = u.ramal || "";
     byId("endereco").value = u.endereco || "";
     byId("dependentes_qtde").value = (u.dependentes_qtde ?? "");
-    byId("saldo_ferias").value = (u.saldo_ferias ?? "");
     byId("form_nivel_medio").checked = !!u.formacao_nivel_medio;
 
     const edu = (d && d.educacao) ? d.educacao : {};
     setGraduacoes(edu.graduacoes || []);
     setPos(edu.pos_graduacoes || []);
+  }
+
+  function normalizeRamal(raw){
+    const digits = String(raw || "").replace(/\\D/g, "").slice(0, 4);
+    return digits;
   }
 
   async function loadMe(){
@@ -290,6 +294,13 @@
   }
 
   async function onSave(){
+    // Ramal: somente 4 dígitos
+    const ramalDigits = normalizeRamal(byId("ramal").value);
+    byId("ramal").value = ramalDigits;
+    if (ramalDigits && ramalDigits.length !== 4){
+      toast("Ramal deve conter exatamente 4 dígitos.", "err");
+      return;
+    }
     // Payload compatível com ProfileUpdateIn (whitelist)
     const payload = {
       nome_completo: (byId("nome_completo").value || "").trim() || null,
@@ -298,7 +309,7 @@
       email_principal: (byId("email_principal").value || "").trim() || null,
       email_institucional: (byId("email_institucional").value || "").trim() || null,
       telefone_principal: (byId("telefone_principal").value || "").trim() || null,
-      ramal: (byId("ramal").value || "").trim() || null,
+      ramal: ramalDigits || null,
       endereco: (byId("endereco").value || "").trim() || null,
       dependentes_qtde: asIntOrNull(byId("dependentes_qtde").value),
       formacao_nivel_medio: !!byId("form_nivel_medio").checked,
@@ -341,6 +352,12 @@
   }
   byId("btn_fechar").addEventListener("click", goBack);
   byId("cancelar").addEventListener("click", goBack);
+
+  // Restringe digitação do ramal em tempo real
+  byId("ramal").addEventListener("input", (e) => {
+    const v = normalizeRamal(e.target.value);
+    e.target.value = v;
+  });
 
   byId("salvar").addEventListener("click", onSave);
   byId("add_graduacao").addEventListener("click", () => {
