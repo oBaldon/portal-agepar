@@ -157,6 +157,40 @@ def init_db() -> None:
       ON submissions (kind, (payload->>'numero'));
     CREATE INDEX IF NOT EXISTS ix_submissions_kind_payload_protocolo
       ON submissions (kind, (payload->>'protocolo'));
+
+
+    -- NOTIFICAÇÕES (inbox)
+    CREATE TABLE IF NOT EXISTS notifications (
+      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      actor_cpf          TEXT,
+      actor_nome         TEXT,
+      actor_email        TEXT,
+      title              TEXT NOT NULL,
+      message            TEXT NOT NULL,
+      level              TEXT NOT NULL DEFAULT 'info',
+      action_url         TEXT,
+      meta               JSONB
+    );
+
+    CREATE TABLE IF NOT EXISTS notification_recipients (
+      notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+      user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      delivered_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      read_at         TIMESTAMPTZ,
+      PRIMARY KEY (notification_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_notifications_created_at
+      ON notifications (created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS ix_notification_recipients_user
+      ON notification_recipients (user_id);
+
+    CREATE INDEX IF NOT EXISTS ix_notification_recipients_user_unread
+      ON notification_recipients (user_id)
+      WHERE read_at IS NULL;
     """
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(sql)

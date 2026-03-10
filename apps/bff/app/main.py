@@ -44,6 +44,7 @@ from app.automations.fileshare import router as fileshare_router
 from app.automations.whoisonline import router as whoisonline_router
 from app.automations.support import router as support_router
 from app.automations.usuarios import router as usuarios_router
+from app.notifications import router as notifications_router
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
@@ -505,6 +506,7 @@ APP.include_router(accounts_router,        dependencies=[Depends(require_passwor
 APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(profile_router,         dependencies=[Depends(require_password_changed)])
+APP.include_router(notifications_router,   dependencies=[Depends(require_password_changed)])
 
 """
 Nota de segurança (produção)

@@ -41,7 +41,9 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import { configureApiHandlers, pingEProtocolo } from "@/lib/api";
+import { Bell } from "lucide-react";
+
+import { configureApiHandlers, pingEProtocolo, getUnreadNotificationCount } from "@/lib/api";
 import { loadCatalog } from "@/lib/catalog";
 
 import type { Catalog, Block, BlockRoute, User } from "@/types";
@@ -52,6 +54,7 @@ import HomeDashboard from "@/pages/HomeDashboard";
 import CategoryView from "@/pages/CategoryView";
 import DfdEntry from "@/pages/DfdEntry";
 import AccountSessions from "@/pages/AccountSessions";
+import NotificationsPage from "@/pages/Notifications";
 import Forbidden from "@/pages/Forbidden";
 import { useAuth } from "@/auth/AuthProvider";
 
@@ -95,6 +98,8 @@ function RootRedirect({ user, catalog }: { user: User | null; catalog: Catalog |
 export default function App() {
   const { user, loading, logout: doLogout } = useAuth();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const NOTIF_EVENT = "portal:notifications:unread";
 
   const nav = useNavigate();
   const loc = useLocation();
@@ -113,6 +118,52 @@ export default function App() {
       },
     });
   }, [doLogout, nav, loc.pathname, user]);
+
+  // Atualização imediata do sino (sem reload) quando a página de notificações marca como lida.
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const e = ev as CustomEvent;
+      const detail = (e?.detail ?? {}) as { unread?: number; delta?: number };
+
+      if (typeof detail.unread === "number" && Number.isFinite(detail.unread)) {
+        setUnreadNotifications(Math.max(0, Math.floor(detail.unread)));
+        return;
+      }
+
+      if (typeof detail.delta === "number" && Number.isFinite(detail.delta)) {
+        setUnreadNotifications((prev) => Math.max(0, prev + Math.floor(detail.delta)));
+      }
+    };
+
+    window.addEventListener(NOTIF_EVENT, handler as EventListener);
+    return () => window.removeEventListener(NOTIF_EVENT, handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadNotifications(0);
+      return;
+    }
+
+    let alive = true;
+
+    const refresh = async () => {
+      try {
+        const n = await getUnreadNotificationCount();
+        if (alive) setUnreadNotifications(n);
+      } catch {
+        // best-effort
+      }
+    };
+
+    void refresh();
+    const t = window.setInterval(() => void refresh(), 30_000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [user?.id, user?.cpf]);
 
   useEffect(() => {
     if (!user) {
@@ -168,7 +219,7 @@ export default function App() {
   const initials =
     user?.nome?.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AG";
 
-    const dfdBlock = useMemo(() => {
+  const dfdBlock = useMemo(() => {
     return (catalog?.blocks ?? []).find((b: any) => b?.name === "dfd") ?? null;
   }, [catalog]);
 
@@ -243,11 +294,22 @@ export default function App() {
                   </div>
                 </Link>
                 <Link
-                  to="/conta/sessoes"
-                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
-                  title="Gerenciar sessões ativas"
+                  to="/notificacoes"
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-slate-50"
+                  title="Notificações"
+                  aria-label="Notificações"
                 >
-                  Sessões
+                  <Bell
+                    className={[
+                      "h-5 w-5",
+                      unreadNotifications > 0 ? "text-rose-600" : "text-slate-700",
+                    ].join(" ")}
+                  />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full border border-white bg-rose-600 text-white text-[10px] font-semibold grid place-items-center">
+                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                    </span>
+                  )}
                 </Link>
                 <button
                   onClick={onLogout}
@@ -368,6 +430,11 @@ export default function App() {
         <Route path="/" element={<RootRedirect user={user} catalog={catalog} />} />
 
         <Route path="/conta/sessoes" element={<AccountSessions />} />
+
+        <Route
+          path="/notificacoes"
+          element={user ? <NotificationsPage /> : <Navigate to="/login" replace />}
+        />
 
         {(catalog?.blocks ?? [])
           .filter((b: any) => !b?.hidden)

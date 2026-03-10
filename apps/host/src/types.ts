@@ -134,6 +134,19 @@ export type User = {
   saldo_ferias?: number;
 };
 
+export type NotificationLevel = "info" | "success" | "warning" | "danger";
+
+export type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  level: NotificationLevel;
+  actionUrl?: string | null;
+  createdAt: string;
+  readAt?: string | null;
+  meta?: Record<string, unknown> | null;
+};
+
 /* =============================================================================
    Helpers (agrupamento, ordenação e RBAC simples)
    ============================================================================= */

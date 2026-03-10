@@ -1,5 +1,5 @@
 // apps/host/src/lib/api.ts
-import type { User } from "@/types";
+import type { User, Notification } from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
@@ -313,4 +313,43 @@ export async function downloadSubmission(kind: string, id: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+/** Notificações (inbox) */
+
+export async function listNotifications(params?: {
+  unreadOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<Notification[]> {
+  const qs = new URLSearchParams();
+  if (params?.unreadOnly) qs.set("unread_only", "true");
+  if (typeof params?.limit === "number") qs.set("limit", String(params.limit));
+  if (typeof params?.offset === "number") qs.set("offset", String(params.offset));
+
+  const path = `${API_BASE}/notifications${qs.toString() ? `?${qs.toString()}` : ""}`;
+  const res = await fetch(path, { credentials: "include" });
+  return jsonOrThrow<Notification[]>(res);
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const res = await fetch(`${API_BASE}/notifications/unread-count`, { credentials: "include" });
+  const data = await jsonOrThrow<{ unread: number }>(res);
+  return Number(data.unread || 0);
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/${encodeURIComponent(notificationId)}/read`, {
+    method: "POST",
+    credentials: "include",
+  });
+  await ensureOkOrThrow(res);
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/read-all`, {
+    method: "POST",
+    credentials: "include",
+  });
+  await ensureOkOrThrow(res);
 }
