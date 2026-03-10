@@ -77,9 +77,6 @@ from app.db import (
     list_submissions,
     add_audit,
     list_audits,
-    _pg,
-    add_audit,
-    list_audits,
 )
 from app.auth.rbac import require_roles_any
 from app.notifications import send_notification
