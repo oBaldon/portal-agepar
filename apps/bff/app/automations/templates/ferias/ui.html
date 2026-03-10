@@ -35,10 +35,9 @@
   .warn { color:#7c2d12; background:#fef3c7; border:1px solid #fde68a; padding:6px 8px; border-radius:8px; font-size:12px; display:inline-block; }
   .err { color:#7f1d1d; background:#fee2e2; border:1px solid #fecaca; padding:6px 8px; border-radius:8px; font-size:12px; display:inline-block; }
 
-  .item { position: relative; padding:12px; padding-bottom: 56px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
+  .item { position: relative; padding:12px; border:1px dashed #e2e8f0; border-radius: 10px; margin-bottom: 12px; background:#fff; }
   .item .meta { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#eef2ff; color:#1e3a8a; margin-right:6px; }
-  .item-actions { position:absolute; right:12px; bottom:12px; display:flex; gap:8px; }
 
   .hr { height:1px; background:#e2e8f0; border:0; margin:12px 0; }
 
@@ -160,9 +159,15 @@
 
   <!-- Períodos -->
   <div class="card">
-    <h2>Períodos de férias</h2>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+      <h2 style="margin:0">Períodos de férias</h2>
+      <button class="btn secondary small" id="limparPeriodosBtn" type="button" title="Limpar os 3 períodos">
+        Limpar
+      </button>
+    </div>
     <div class="note" style="margin-bottom:8px">
-      Até <b id="maxPeriodosText">3</b> períodos, cada um com <b>mínimo de 10 dias</b>.  
+      Existem <b>3 períodos</b> disponíveis. Preencha <b>1 a 3</b> (mínimo de <b>10 dias</b> por período).<br/>
+      Máximo permitido pelo saldo atual: <b id="maxPeriodosText">3</b> período(s).<br/>
       O início deve ser <b>≥ hoje + <span id="leadDaysText">30</span> dias</b>.
     </div>
 
@@ -300,6 +305,12 @@
     return (b - a) + 1;
   };
 
+  // Pega os 2 inputs date (início/fim) do card, sem depender de :first-of-type/:last-of-type
+  function getPeriodoDateInputs(div){
+    const inputs = div.querySelectorAll('input[type="date"]');
+    return { ini: inputs[0] || null, fim: inputs[1] || null };
+  }
+
   // ---------------------- Estado ----------------------
   const periodosEl = $("#periodos");
   const msgEl = $("#msg");
@@ -317,6 +328,7 @@
   const tipoFeriasEl = $("#tipoFerias");
   const leadDaysText = $("#leadDaysText");
   const maxPeriodosText = $("#maxPeriodosText");
+  const limparPeriodosBtn = $("#limparPeriodosBtn");
   const protocoloEl = $("#protocolo");
 
   const despachoEl = $("#despacho");
@@ -327,7 +339,6 @@
   const chefiaEl = $("#chefia");
 
   let hasFeriasRole = false;
-  let cardSeq = 0;
   let saldoFromMe = null; // saldo_ferias vindo do /api/me (banco)
 
   // === AUTO-REFRESH ===
@@ -357,8 +368,7 @@
   function autofillFirstPeriodEndFromSaldo(){
     const first = periodosEl.firstElementChild;
     if (!first) return;
-    const ini = first.querySelector('input[type="date"]:first-of-type');
-    const fim = first.querySelector('input[type="date"]:last-of-type');
+    const { ini, fim } = getPeriodoDateInputs(first);
     if (!ini || !fim) return;
     if (!ini.value) return;
 
@@ -379,8 +389,7 @@
   }
 
   // ---------------------- UI Período ----------------------
-  function buildPeriodoCard(){
-    const idx = cardSeq++;
+  function buildPeriodoCard(idx){
     const card = document.createElement('div');
     card.className = 'item';
     card.dataset.idx = String(idx);
@@ -388,7 +397,7 @@
     const meta = document.createElement('div');
     meta.className = 'meta';
     const badge = document.createElement('span'); badge.className='badge'; badge.textContent='Período';
-    theNumber = document.createElement('strong'); theNumber.className='item-number'; theNumber.textContent = `#${idx+1}`;
+    const theNumber = document.createElement('strong'); theNumber.className='item-number'; theNumber.textContent = `#${idx+1}`;
     const diasInfo = document.createElement('span'); diasInfo.className='note'; diasInfo.style.marginLeft='8px'; diasInfo.textContent='— 0 dia(s)';
     meta.appendChild(badge); meta.appendChild(theNumber); meta.appendChild(diasInfo);
 
@@ -406,16 +415,7 @@
     c2.appendChild(lblFim); c2.appendChild(fim);
     row.appendChild(c1); row.appendChild(c2);
 
-    const actions = document.createElement('div'); actions.className='item-actions';
-    const removeBtn = document.createElement('button'); removeBtn.type='button'; removeBtn.className='btn small danger'; removeBtn.textContent='Remover';
-    const addBtn = document.createElement('button'); addBtn.type='button'; addBtn.className='btn small secondary'; addBtn.textContent='Adicionar período';
-
-    actions.appendChild(removeBtn); actions.appendChild(addBtn);
-
-    function isFirstPeriodo(){
-      // não depende do idx (pois idx pode mudar quando remove/reordena)
-      return periodosEl.firstElementChild === card;
-    }
+    function isFirstPeriodo(){ return idx === 0; }
 
     function applyMinAttrs(){
       const minStart = minStartYMD();
@@ -468,7 +468,6 @@
       diasInfo.textContent = `— ${isFinite(dias) && dias>0 ? dias : 0} dia(s)`;
 
       computeTotais();
-      updateAddButtons();
     }
 
     ini.addEventListener('input', recalc);
@@ -478,85 +477,17 @@
       recalc();
     });
 
-    removeBtn.onclick = ()=>{
-      if(periodosEl.children.length<=1){
-        card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),250);
-        return;
-      }
-      card.remove();
-      recomputeNumbers();
-      computeTotais();
-      updateAddButtons();
-    };
-
-    addBtn.onclick = ()=>{
-      if(!canAddAnother()) return;
-      periodosEl.appendChild(buildPeriodoCard());
-      recomputeNumbers();
-      updateAddButtons();
-      computeTotais();
-      const last = periodosEl.lastElementChild;
-      if(last) last.querySelector('input[type="date"]')?.focus();
-    };
-
     applyMinAttrs();
 
     card.appendChild(meta);
     card.appendChild(row);
-    card.appendChild(actions);
     return card;
-  }
-
-  function recomputeNumbers(){
-    $$('#periodos .item').forEach((div,i)=>{
-      const num = div.querySelector('.item-number');
-      if(num) num.textContent = `#${i+1}`;
-      div.dataset.idx = String(i);
-      div.querySelectorAll('[name^="p["]').forEach(el=>{
-        el.name = el.name.replace(/p\[\d+\]/, `p[${i}]`);
-      });
-      div.querySelectorAll('[id^="p-"]').forEach(el=>{
-        el.id = el.id.replace(/p-\d+-/, `p-${i}-`);
-      });
-      div.querySelectorAll('label[for^="p-"]').forEach(l=>{
-        l.htmlFor = l.htmlFor.replace(/p-\d+-/, `p-${i}-`);
-      });
-    });
-  }
-
-  function ensureOnePeriodo(){
-    if(periodosEl.children.length===0){
-      periodosEl.appendChild(buildPeriodoCard());
-    }
   }
 
   function maxPeriodosBySaldo(saldo){
     if(Math.floor(saldo/3) >= 10) return 3;
     if(Math.floor(saldo/2) >= 10) return 2;
     return 1;
-  }
-
-  function canAddAnother(){
-    const { saldo, diasValidos, maxP } = computeTotais();
-    const cards = $$('#periodos .item').length;
-    if(cards >= maxP) return false;
-    return (saldo - diasValidos) >= 10;
-  }
-
-  function updateAddButtons(){
-    const cards = $$('#periodos .item');
-    const canAdd = canAddAnother();
-
-    cards.forEach((c,i)=>{
-      const addBtn = c.querySelector('.item-actions .btn.secondary');
-      const remBtn = c.querySelector('.item-actions .btn.danger');
-      if(addBtn){
-        addBtn.style.display = (i===cards.length-1) ? '' : 'none';
-        addBtn.disabled = !canAdd;
-        addBtn.title = canAdd ? '' : 'Não é possível adicionar outro período.';
-      }
-      if(remBtn) remBtn.disabled = (cards.length<=1);
-    });
   }
 
   function collectPeriodos(){
@@ -956,15 +887,11 @@
       $("#leadDaysText").textContent = String(getLeadDays());
 
       $$('#periodos .item').forEach(div=>{
-        const ini = div.querySelector('input[type="date"]:first-of-type');
-        const fim = div.querySelector('input[type="date"]:last-of-type');
-        if(ini && fim){
-          ini.dispatchEvent(new Event('input', {bubbles:true}));
-          fim.dispatchEvent(new Event('input', {bubbles:true}));
-        }
+        const { ini } = getPeriodoDateInputs(div);
+        // Revalida via início (não dispara input no fim para não “travar” o autofill).
+        if(ini) ini.dispatchEvent(new Event('input', {bubbles:true}));
       });
 
-      updateAddButtons();
       computeTotais();
     }
 
@@ -980,14 +907,43 @@
       const firstIni = periodosEl.querySelector('.item input[type="date"]');
       if (firstIni) firstIni.dispatchEvent(new Event('input', { bubbles:true }));
 
-      updateAddButtons();
       computeTotais();
     });
 
     $("#enviarBtn").addEventListener('click', (e)=>{ e.preventDefault(); enviar(); });
     $("#atualizarBtn2").addEventListener('click', (e)=>{ e.preventDefault(); loadSubs(); });
 
-    ensureOnePeriodo();
+    // Limpar os 3 períodos (sem reload)
+    limparPeriodosBtn?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      // limpa datas e reseta autofill do 1º período
+      $$('#periodos .item').forEach(div=>{
+        const { ini, fim } = getPeriodoDateInputs(div);
+        if (ini) {
+          ini.value = '';
+          ini.setCustomValidity('');
+          // atualiza UI do card (dias/validação)
+          ini.dispatchEvent(new Event('input', { bubbles:true }));
+        }
+        if (fim) {
+          fim.value = '';
+          fim.dataset.autofill = "1"; // volta ao modo autofill, se o usuário usar novamente
+          fim.setCustomValidity('');
+        }
+      });
+      computeTotais();
+      $("#msg").textContent = 'Períodos limpos.';
+      setTimeout(()=>{ if ($("#msg").textContent === 'Períodos limpos.') $("#msg").textContent=''; }, 2500);
+      // foca no primeiro início para facilitar preenchimento
+      periodosEl.querySelector('.item input[type="date"]')?.focus();
+    });
+
+    // Sempre renderiza 3 períodos fixos (sem adicionar/remover).
+    periodosEl.innerHTML = '';
+    periodosEl.appendChild(buildPeriodoCard(0));
+    periodosEl.appendChild(buildPeriodoCard(1));
+    periodosEl.appendChild(buildPeriodoCard(2));
+
     applyTipoRules();
     loadSubs();
   }
