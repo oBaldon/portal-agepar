@@ -79,9 +79,10 @@ from app.db import (
     list_audits,
     _pg,
     add_audit,
-    list_audits,   
+    list_audits,
 )
 from app.auth.rbac import require_roles_any
+from app.notifications import send_notification
 
 try:
     from pdfrw import PdfReader, PdfWriter, PdfDict, PdfName
@@ -1189,6 +1190,45 @@ async def submit_ferias(
     except Exception as e:
         logger.exception("insert_submission failed")
         return err_json(500, code="storage_error", message="Falha ao salvar a submissão.", details=str(e))
+
+    # Notifica RH (best-effort; não pode bloquear o envio).
+    try:
+        # Monta um resumo curto para o RH
+        ps = payload.periodos or []
+        qtd = len(ps)
+        first_ini = (ps[0].inicio if qtd >= 1 else "") if ps else ""
+        first_fim = (ps[0].fim if qtd >= 1 else "") if ps else ""
+
+        msg_parts = [
+            "Novo requerimento de férias enviado.",
+            f"Protocolo: {payload.protocolo}.",
+            f"Exercício: {payload.exercicio}.",
+            f"Períodos: {qtd}.",
+        ]
+        if first_ini and first_fim:
+            msg_parts.append(f"1º período: {first_ini} → {first_fim}.")
+        msg_parts.append(f"Autor: {user.get('nome') or '—'}")
+
+        notif_id, delivered = send_notification(
+            actor=user,
+            title="Novo requerimento de férias",
+            message=" ".join(msg_parts),
+            role_names=["rh", "RH"],
+            action_url="/controle",
+            meta={
+                "kind": "ferias",
+                "submissionId": sid,
+                "protocolo": payload.protocolo,
+                "exercicio": payload.exercicio,
+                "tipo": payload.tipo,
+                "qtdPeriodos": qtd,
+            },
+            ip=request.client.host if request.client else None,
+            ua=request.headers.get("user-agent"),
+        )
+        logger.info("[FERIAS] Notificação enviada para RH | notif=%s | delivered=%d", notif_id, delivered)
+    except Exception:
+        logger.exception("[FERIAS] Falha ao notificar RH (não bloqueante)")
     logger.info("[FERIAS] Submissão %s criada por %s (%s) proto=%s", sid, user.get("nome"), user.get("cpf"), payload.protocolo)
     background.add_task(_process_submission, sid, payload, user)
     return {"submissionId": sid, "status": "queued", "protocolo": payload.protocolo}

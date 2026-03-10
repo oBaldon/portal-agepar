@@ -165,10 +165,11 @@
         Limpar
       </button>
     </div>
-    <div class="note" style="margin-bottom:8px">
-      Existem <b>3 períodos</b> disponíveis. Preencha <b>1 a 3</b> (mínimo de <b>10 dias</b> por período).<br/>
-      Máximo permitido pelo saldo atual: <b id="maxPeriodosText">3</b> período(s).<br/>
-    </div>
+  <div class="note" style="margin-bottom:8px">
+    Existem <b>3 períodos</b> disponíveis. Preencha <b>1 a 3</b> (mínimo de <b>10 dias</b> por período).<br/>
+    Máximo permitido pelo saldo atual: <b id="maxPeriodosText">3</b> período(s).<br/>
+    O início deve ser <b>≥ hoje + <span id="leadDaysText">30</span> dias</b>.
+  </div>
 
     <div id="periodos"></div>
 
@@ -325,7 +326,7 @@
   const exercicioEl = $("#exercicio");
   const saldoEl = $("#saldo");
   const tipoFeriasEl = $("#tipoFerias");
-  const leadDaysText = $("#leadDaysText");
+  const leadDaysText = $("#leadDaysText"); // pode ser null se o trecho for removido do HTML
   const maxPeriodosText = $("#maxPeriodosText");
   const limparPeriodosBtn = $("#limparPeriodosBtn");
   const protocoloEl = $("#protocolo");
@@ -555,8 +556,8 @@
     const qtdValidos = ps.filter(p=>p.ok).length;
 
     const maxP = maxPeriodosBySaldo(saldoVal);
-    $("#maxPeriodosText").textContent = String(maxP);
-    $("#leadDaysText").textContent = String(getLeadDays());
+    if (maxPeriodosText) maxPeriodosText.textContent = String(maxP);
+    if (leadDaysText) leadDaysText.textContent = String(getLeadDays());
 
     let parts = [];
     parts.push(`Períodos válidos: ${qtdValidos}/${ps.length} (máx. ${maxP})`);
@@ -652,15 +653,28 @@
         const r = await fetch(`./submissions/${sid}`);
         if(!r.ok){ throw new Error('poll fail'); }
         const row = await r.json();
-        const st = (row && row.status) || '';
+        const st = String((row && row.status) || '').toLowerCase();
         if (!RUN_STATES.has(st)) {
           clearInterval(timer);
           activePollers.delete(sid);
           await loadSubs();
+
+          // Atualiza mensagem quando finalizar (sem precisar reload)
+          if (st === 'done') {
+            msgEl.textContent = 'PDFs prontos. Use os botões de download no histórico.';
+          } else if (st === 'error') {
+            msgEl.textContent = 'Falha ao gerar PDFs. Veja o histórico para detalhes.';
+          } else {
+            msgEl.textContent = '';
+          }
+          setTimeout(()=>{ 
+            if (msgEl.textContent && msgEl.textContent.startsWith('PDFs prontos')) msgEl.textContent='';
+          }, 4000);
         }
         if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
           clearInterval(timer);
           activePollers.delete(sid);
+          msgEl.textContent = 'Processamento ainda em andamento. Consulte o histórico.';
         }
       }catch{}
     }, POLL_INTERVAL_SUB);
@@ -873,7 +887,7 @@
     $("#exercicio").addEventListener('blur', updateEnviarState);
     sanitizeExercicioOnInput(); updateEnviarState();
 
-    function applyTipoRules(){
+  function applyTipoRules(){
       const max = getSaldoMax();
       $("#saldo").max = String(max);
       // default: saldo do banco quando existir; senão usa o fallback antigo (20/30)
@@ -883,7 +897,9 @@
       if(!$("#saldo").value) $("#saldo").value = def;
       else $("#saldo").value = String(Math.max(0, Math.min(max, parseInt($("#saldo").value,10)||0)));
 
-      $("#leadDaysText").textContent = String(getLeadDays());
+      if (leadDaysText) {
+        leadDaysText.textContent = String(getLeadDays());
+      }
 
       $$('#periodos .item').forEach(div=>{
         const { ini } = getPeriodoDateInputs(div);
