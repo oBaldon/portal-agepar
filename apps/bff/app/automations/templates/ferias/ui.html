@@ -275,6 +275,12 @@
   const DAY = 24*3600*1000;
   const fmt2d = n => n<10 ? '0'+n : ''+n;
 
+  // Base robusto para a automação (funciona tanto em /ui quanto em /ui/)
+  // Ex.: /api/automations/ferias/ui  -> /api/automations/ferias
+  //      /api/automations/ferias/ui/ -> /api/automations/ferias
+  const API_BASE = (location.pathname || '').replace(/\/ui\/?$/, '');
+  const api = (path) => `${API_BASE}${path}`; // path começa com "/"
+
   const splitYMD = (s) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');
     if(!m) return null;
@@ -580,8 +586,8 @@
   // ---------------------- Downloads ----------------------
   async function downloadFerias(sid, fmt) {
     const url = fmt === 'zip'
-      ? `./submissions/${sid}/download`
-      : `./submissions/${sid}/download/${fmt}`;
+      ? api(`/submissions/${sid}/download`)
+      : api(`/submissions/${sid}/download/${fmt}`);
 
     const r = await fetch(url, { method: 'POST' });
     if (!r.ok) {
@@ -619,7 +625,7 @@
     if (!ok) return;
 
     try {
-      const r = await fetch(`./submissions/${sid}/delete`, {
+      const r = await fetch(api(`/submissions/${sid}/delete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: true })
@@ -650,7 +656,7 @@
     const startedAt = Date.now();
     const timer = setInterval(async ()=>{
       try{
-        const r = await fetch(`./submissions/${sid}`);
+        const r = await fetch(api(`/submissions/${sid}`));
         if(!r.ok){ throw new Error('poll fail'); }
         const row = await r.json();
         const st = String((row && row.status) || '').toLowerCase();
@@ -752,7 +758,7 @@
     $("#msg").textContent = 'Enviando…';
 
     try{
-      const r = await fetch('./submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const r = await fetch(api('/submit'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
       const j = await r.json().catch(()=>({}));
       if(!r.ok){
         $("#msg").textContent = (j && j.message) || 'Erro ao enviar.';
@@ -825,7 +831,12 @@
     const tbody = $("#subs");
     tbody.innerHTML = '';
     try{
-      const r = await fetch('./submissions?limit=50');
+      const r = await fetch(api('/submissions?limit=50'));
+      if (!r.ok) {
+        const jErr = await r.json().catch(()=>({}));
+        const msg = (jErr && (jErr.message || jErr.detail)) || `HTTP ${r.status}`;
+        throw new Error(msg);
+      }
       const j = await r.json();
       const items = (j.items||[]);
       items.forEach(s=>{
@@ -850,7 +861,9 @@
       });
       ensureTableAutoRefresh(items);
     }catch(e){
-      const tr = document.createElement('tr'); tr.innerHTML = '<td colspan="8">Erro ao carregar histórico.</td>'; tbody.appendChild(tr);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="8">Erro ao carregar histórico: ${(e && e.message) ? e.message : 'erro'}</td>`;
+      tbody.appendChild(tr);
     }
   }
 

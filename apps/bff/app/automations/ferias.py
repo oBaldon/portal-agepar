@@ -340,6 +340,12 @@ def _to_obj(x, default=None):
     return {} if default is None else default
 
 
+def _is_soft_deleted(row: Dict[str, Any]) -> bool:
+    result = _to_obj(row.get("result"), {}) or {}
+    soft_meta = (result.get("_soft_delete") or {}) if isinstance(result, dict) else {}
+    return bool(isinstance(soft_meta, dict) and soft_meta.get("deleted"))
+
+
 def none_if_empty(v: Optional[str]) -> Optional[str]:
     """
     Normaliza strings vazias para None.
@@ -1278,6 +1284,8 @@ async def download_zip(
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
     if not _can_access_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+    if _is_soft_deleted(row):
+        return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
     if row.get("status") != "done":
         return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
     result = _to_obj(row.get("result"), {})
@@ -1349,6 +1357,8 @@ async def download_one(
         return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
     if not _can_access_submission(row, user):
         return err_json(403, code="forbidden", message="Você não tem acesso a esta submissão.")
+    if _is_soft_deleted(row):
+        return err_json(404, code="not_found", message="Submissão não encontrada.", details={"sid": sid})
     if row.get("status") != "done":
         return err_json(409, code="not_ready", message="Resultado ainda não está pronto.", details={"status": row.get("status")})
     result = _to_obj(row.get("result"), {})

@@ -60,7 +60,7 @@
       <a class="tab active" href="/api/automations/controle/ferias/ui" title="Calendário de férias">Férias (Calendário)</a>
     </nav>
   </div>
-  <span class="note">Somente leitura • Coordenadores/Admin</span>
+  <span class="note">Clique em um período para cancelar o registro • Coordenador/Admin/RH</span>
 
   <div class="grid" style="margin-top:10px">
     <div class="card">
@@ -297,6 +297,38 @@
       expandRows: true,
       dayMaxEventRows: true,
       eventDisplay: "block",
+      eventClick: async (info) => {
+        try {
+          info.jsEvent?.preventDefault?.();
+          const fullId = String(info.event.id || "");
+          const sid = fullId.split("#")[0];
+          if (!sid) return;
+
+          const title = info.event.title || "Registro de férias";
+          const ok = window.confirm(
+            `Cancelar este registro?\n\n${title}\nID: ${sid}\n\nIsso removerá o registro do controle e do histórico do servidor.`
+          );
+          if (!ok) return;
+
+          const reason = (window.prompt("Motivo do cancelamento (opcional):", "") || "").trim();
+          const r = await fetch(`/api/automations/controle/ferias/submissions/${encodeURIComponent(sid)}/cancel`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirm: true, reason }),
+          });
+          if (!r.ok) {
+            const j = await r.json().catch(() => ({}));
+            alert(j?.detail || j?.message || "Falha ao cancelar o registro.");
+            return;
+          }
+          await refresh();
+          alert("Registro cancelado.");
+        } catch (e) {
+          console.error(e);
+          alert("Falha ao cancelar o registro.");
+        }
+      },
       datesSet: () => {
         if (suppressAutoRefresh) { suppressAutoRefresh = false; return; }
         const isListWeek = calendar?.view?.type === "listWeek";
@@ -306,6 +338,7 @@
         const { status, setor, obs } = info.event.extendedProps || {};
         const el = info.el;
         el.title = `${info.event.title}\n${status?`Status: ${status}\n`:''}${setor?`Setor: ${setor}\n`:''}${obs?`Obs: ${obs}`:''}`;
+        el.style.cursor = "pointer";
         el.style.borderWidth = "1px";
         el.style.boxShadow = "inset 0 -1px 0 rgba(0,0,0,.12)";
         el.setAttribute("data-event-id", info.event.id);

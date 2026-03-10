@@ -14,7 +14,7 @@ Normaliza submissões do tipo "ferias" em eventos padronizados e expõe:
 Segurança
 ---------
 Todos os endpoints são protegidos por RBAC e exigem pelo menos um dos papéis:
-`"coordenador"` ou `"admin"`.
+`"coordenador"`, `"admin"` ou `"rh"`.
 
 Detalhes de implementação
 -------------------------
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/automations/controle/ferias",
     tags=["automations", "controle", "ferias"],
-    dependencies=[Depends(require_roles_any("coordenador", "admin"))],
+    dependencies=[Depends(require_roles_any("coordenador", "admin", "rh"))],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -116,6 +116,15 @@ class EventoFerias(BaseModel):
     end: str
     obs: Optional[str] = None
     colorKey: Optional[str] = None
+
+
+class CancelFeriasIn(BaseModel):
+    """
+    Payload para cancelamento (soft delete) de uma submissão de férias pelo controle.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    confirm: bool = Field(..., description="Confirma o cancelamento do registro.")
+    reason: Optional[str] = Field(default=None, description="Motivo do cancelamento (opcional).")
 
 
 def _to_obj(x: Any) -> Dict[str, Any]:
@@ -316,6 +325,94 @@ def get_ui(request: Request):
     Retorna a página HTML (Jinja2) da visualização de férias.
     """
     return templates.TemplateResponse("controle_ferias/ui.html", {"request": request})
+
+
+@router.post("/submissions/{sid}/cancel")
+def cancel_submission(
+    sid: str,
+    body: CancelFeriasIn,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_roles_any("coordenador", "admin", "rh")),
+):
+    """
+    Cancela (soft delete) um registro de férias a partir do painel de controle.
+
+    Efeito esperado
+    --------------
+    - Some do calendário/exports (controle) e do histórico do servidor (UI de férias),
+      pois ambos ignoram registros com `result._soft_delete.deleted=true`.
+
+    Regras
+    ------
+    - Exige confirmação explícita (confirm=true).
+    - Bloqueia cancelamento quando status está `queued`/`running` (evita o worker sobrescrever o result).
+    """
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="confirmation_required")
+
+    try:
+        row = db.get_submission(sid)
+    except Exception as e:
+        logger.exception("[CONTROLE_FERIAS][CANCEL] get_submission failed")
+        raise HTTPException(status_code=500, detail=f"storage_error: {e}")
+
+    if not row:
+        raise HTTPException(status_code=404, detail="not_found")
+    if (row.get("kind") or "").lower() != "ferias":
+        raise HTTPException(status_code=404, detail="not_found")
+
+    if _is_soft_deleted(row):
+        return {"ok": True, "sid": sid, "alreadyDeleted": True}
+
+    st = (row.get("status") or "").lower()
+    if st in ("queued", "running"):
+        raise HTTPException(status_code=409, detail="submission_in_progress")
+
+    result = _to_obj(row.get("result")) or {}
+
+    reason = (body.reason or "").strip() or None
+    soft_meta: Dict[str, Any] = {
+        "deleted": True,
+        "deleted_at": datetime.utcnow().isoformat() + "Z",
+        "origin": "controle_ferias",
+        "reason": reason,
+        "deleted_by": {
+            "cpf": user.get("cpf") or None,
+            "nome": user.get("nome") or None,
+            "email": user.get("email") or None,
+            "roles": user.get("roles") or [],
+        },
+    }
+
+    result["_soft_delete"] = soft_meta
+    # Mantém compatibilidade com o padrão já usado em ferias.py
+    result["status"] = "deleted"
+
+    try:
+        # NÃO altera submissions.status (há CHECK no banco). Soft delete vive no result.
+        db.update_submission(sid, result=result)
+    except Exception as e:
+        logger.exception("[CONTROLE_FERIAS][CANCEL] update_submission failed")
+        raise HTTPException(status_code=500, detail=f"storage_error: {e}")
+
+    # Auditoria best-effort
+    try:
+        db.add_audit(
+            "ferias",
+            "cancelled",
+            user,
+            {
+                "sid": sid,
+                "reason": reason,
+                "origin": "controle_ferias",
+                "ip": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+            },
+        )
+    except Exception:
+        logger.exception("[CONTROLE_FERIAS][CANCEL] audit failed (non-blocking)")
+
+    return {"ok": True, "sid": sid}
 
 
 @router.get("/events")
