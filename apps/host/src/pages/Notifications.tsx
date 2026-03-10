@@ -36,6 +36,25 @@ export default function NotificationsPage() {
     [items]
   );
 
+  function markReadOptimistic(id: string) {
+    setItems((prev) => {
+      const now = new Date().toISOString();
+      const target = prev.find((n) => n.id === id);
+      if (!target || target.readAt) return prev;
+
+      // Se estiver filtrando somente não lidas, ao marcar como lida deve SUMIR da lista imediatamente.
+      if (unreadOnly) {
+        const next = prev.filter((n) => n.id !== id);
+        emitUnread(next.length); // em modo unreadOnly, o total de não lidas = tamanho da lista
+        return next;
+      }
+
+      const next = prev.map((n) => (n.id === id ? { ...n, readAt: now } : n));
+      emitUnread(next.filter((n) => !n.readAt).length);
+      return next;
+    });
+  }
+
   async function load() {
     setLoading(true);
     setError(null);
@@ -67,18 +86,23 @@ export default function NotificationsPage() {
 
   async function onMarkRead(id: string) {
     try {
+      // otimista: atualiza UI e sino primeiro
+      markReadOptimistic(id);
       await markNotificationRead(id);
-      setItems((prev) => {
-        const now = new Date().toISOString();
-        const next = prev.map((n) =>
-          n.id === id ? { ...n, readAt: n.readAt || now } : n
-        );
-        emitUnread(next.filter((n) => !n.readAt).length);
-        return next;
-      });
     } catch (e) {
       console.error(e);
     }
+  }
+
+  function onOpenNotification(n: Notification) {
+    // Ao abrir, também marca como lida e atualiza o sino imediatamente,
+    // sem depender do setState (porque vamos navegar em seguida).
+    if (!n.readAt) {
+      emitUnread(Math.max(0, unreadCount - 1));
+      markReadOptimistic(n.id);
+      void markNotificationRead(n.id);
+    }
+    if (n.actionUrl) nav(n.actionUrl);
   }
 
   async function onMarkAll() {
@@ -86,6 +110,10 @@ export default function NotificationsPage() {
       await markAllNotificationsRead();
       setItems((prev) => {
         const now = new Date().toISOString();
+        if (unreadOnly) {
+          emitUnread(0);
+          return [];
+        }
         const next = prev.map((n) => ({ ...n, readAt: n.readAt || now }));
         emitUnread(0);
         return next;
@@ -190,13 +218,14 @@ export default function NotificationsPage() {
 
                   <div className="flex items-center gap-2 shrink-0">
                     {n.actionUrl && (
-                      <Link
-                        to={n.actionUrl}
+                      <button
+                        type="button"
                         className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
                         title="Abrir destino"
+                        onClick={() => onOpenNotification(n)}
                       >
                         Abrir
-                      </Link>
+                      </button>
                     )}
                     {unread && (
                       <button

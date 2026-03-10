@@ -48,6 +48,7 @@ from app.utils.docx_tools import (
     convert_docx_to_pdf,
     get_docx_placeholders,
 )
+from app.notifications import send_notification
 
 logger = logging.getLogger(__name__)
 
@@ -1547,6 +1548,31 @@ async def submit_dfd(
     except Exception as e:
         logger.exception("insert_submission failed")
         return err_json(500, code="storage_error", message="Falha ao salvar a submissão.", details=str(e))
+
+    # Notifica usuários com cargo/role CA (best-effort; não pode bloquear o DFD).
+    try:
+        numero_val = (payload.numero or "").strip()
+        protocolo_val = (payload.protocolo or "").strip()
+        msg_parts = ["Um novo DFD foi enviado."]
+        if numero_val:
+            msg_parts.append(f"Memorando: {numero_val}.")
+        if protocolo_val:
+            msg_parts.append(f"Protocolo: {protocolo_val}.")
+        msg_parts.append(f"Autor: {user.get('nome') or '—'}")
+
+        notif_id, delivered = send_notification(
+            actor=user,
+            title="Novo DFD enviado",
+            message=" ".join(msg_parts),
+            role_names=["ca", "CA"],
+            action_url="/controle",
+            meta={"kind": "dfd", "submissionId": sid, "numero": numero_val, "protocolo": protocolo_val},
+            ip=request.client.host if request.client else None,
+            ua=request.headers.get("user-agent"),
+        )
+        logger.info("[DFD] Notificação enviada para CA | notif=%s | delivered=%d", notif_id, delivered)
+    except Exception:
+        logger.exception("[DFD] Falha ao notificar CA (não bloqueante)")
 
     logger.info(
         "[DFD] Submissão %s criada por %s (%s) | modelo=%s | numero=%s",
