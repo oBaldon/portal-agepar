@@ -61,9 +61,73 @@
   .btn.ghost { background:#fff; color:#334155; border-color:#cbd5e1; }
   .btn.ghost:hover { background:#f8fafc; }
 
+  /* ===== Modal "Ver" ===== */
+  .modal-backdrop{
+    position: fixed; inset: 0;
+    background: rgba(2,6,23,.55);
+    display:none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 9999;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    width: min(980px, 96vw);
+    max-height: min(88vh, 900px);
+    overflow:auto;
+    background:#fff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 18px 60px rgba(2,6,23,.25);
+  }
+  .modal-h{
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 10px;
+  }
+  .modal-title{ font-size: 14px; font-weight: 700; color:#0f172a; margin:0; }
+  .modal-body{ padding: 14px; }
+  .kv{
+    display:grid;
+    grid-template-columns: 180px 1fr;
+    gap: 8px 12px;
+    align-items:start;
+    font-size: 13px;
+  }
+  .kv .k{ color:#475569; }
+  .kv .v{ color:#0f172a; overflow-wrap:anywhere; }
+  .section{
+    margin-top: 12px;
+    border-top: 1px solid #eef2f7;
+    padding-top: 12px;
+  }
+  .section h3{
+    font-size: 13px; margin: 0 0 8px;
+    color:#0f172a;
+  }
+  .mono{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    background:#0b1220;
+    color:#e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    overflow:auto;
+    white-space: pre;
+  }
+
   @media (max-width: 640px) {
     .actions { flex-direction: column; align-items: stretch; gap: 8px; }
     .tabs { flex-wrap: wrap; }
+    .kv{ grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -87,7 +151,6 @@
         <label for="kind">Tipo (alvo)</label>
         <select id="kind">
           <option value="" selected>(Todos)</option>
-        </select>
         </select>
       </div>
       <div class="col">
@@ -156,6 +219,22 @@
       </table>
     </div>
     <div class="note" style="margin-top:8px">Dica: quando houver link disponível, os botões “baixar” e “ver” aparecem em AÇÕES.</div>
+  </div>
+</div>
+
+<!-- Modal de visualização -->
+<div class="modal-backdrop" id="viewerBackdrop" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+  <div class="modal">
+    <div class="modal-h">
+      <h2 class="modal-title" id="viewerTitle">Detalhes</h2>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="viewerOpenRaw" class="btn ghost small" type="button" title="Abrir JSON bruto em nova aba">JSON</button>
+        <button id="viewerClose" class="btn secondary small" type="button">Fechar</button>
+      </div>
+    </div>
+    <div class="modal-body" id="viewerBody">
+      <div class="note">Carregando…</div>
+    </div>
   </div>
 </div>
 
@@ -271,12 +350,12 @@
       actions.push(b);
     }
     if (it.submission_url){
-      const a = document.createElement("a");
-      a.className="btn small secondary";
-      a.textContent="ver";
-      a.href = it.submission_url;
-      a.target = "_blank"; a.rel = "noopener";
-      actions.push(a);
+      const v = document.createElement("button");
+      v.type="button";
+      v.className="btn small secondary";
+      v.textContent="ver";
+      v.addEventListener("click", ()=> openViewer(it.submission_url));
+      actions.push(v);
     }
     const tdAcoes = document.createElement("td");
     tdAcoes.className = "nowrap";
@@ -292,6 +371,153 @@
     tr.innerHTML = tdQuando + tdServidor + tdProtocolo + tdAlvo + tdFile + tdStatus;
     tr.appendChild(tdAcoes);
     return tr;
+  }
+
+  // ===== Viewer (modal) =====
+  const viewerBackdrop = qs("#viewerBackdrop");
+  const viewerBody = qs("#viewerBody");
+  const viewerTitle = qs("#viewerTitle");
+  const viewerClose = qs("#viewerClose");
+  const viewerOpenRaw = qs("#viewerOpenRaw");
+  let lastRawUrl = null;
+
+  function closeViewer(){
+    viewerBackdrop.classList.remove("open");
+    viewerBody.innerHTML = `<div class="note">—</div>`;
+    lastRawUrl = null;
+  }
+  viewerClose.addEventListener("click", closeViewer);
+  viewerBackdrop.addEventListener("click", (e)=>{ if(e.target === viewerBackdrop) closeViewer(); });
+  window.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeViewer(); });
+
+  function safeObj(x){
+    if (x && typeof x === "object") return x;
+    if (typeof x === "string"){
+      try { return JSON.parse(x); } catch { return null; }
+    }
+    return null;
+  }
+
+  function pickProtocolo(obj){
+    const px = safeObj(obj?.payload) || obj?.payload || {};
+    const rs = safeObj(obj?.result)  || obj?.result  || {};
+    return (rs?.protocolo || px?.protocolo || px?.processo || px?.process_number || "");
+  }
+
+  function fmtDateTime(v){
+    if (!v) return "—";
+    const d = new Date(v);
+    return isNaN(d) ? String(v) : d.toLocaleString();
+  }
+
+  function renderKeyValue(title, rows){
+    const html = rows
+      .filter(r => r && r.length >= 2)
+      .map(([k,v]) => `<div class="k">${esc(k)}</div><div class="v">${esc(v ?? "—")}</div>`)
+      .join("");
+    return `
+      <div class="section">
+        <h3>${esc(title)}</h3>
+        <div class="kv">${html || `<div class="note">—</div>`}</div>
+      </div>
+    `;
+  }
+
+  function renderPeriods(obj){
+    const px = safeObj(obj?.payload) || obj?.payload || {};
+    const rs = safeObj(obj?.result)  || obj?.result  || {};
+    const per = px?.periodos || rs?.periodos;
+    if (!Array.isArray(per) || !per.length) return "";
+    const lines = per
+      .map((p, i) => {
+        const ini = p?.inicio || p?.data_inicio || "";
+        const fim = p?.fim || p?.data_fim || "";
+        if (!ini || !fim) return null;
+        return `${i+1}. ${ini} → ${fim}`;
+      })
+      .filter(Boolean);
+    if (!lines.length) return "";
+    return `
+      <div class="section">
+        <h3>Períodos</h3>
+        <div class="mono">${esc(lines.join("\n"))}</div>
+      </div>
+    `;
+  }
+
+  function renderSoftDelete(obj){
+    const rs = safeObj(obj?.result) || obj?.result || {};
+    const meta = rs?._soft_delete;
+    if (!meta || !meta.deleted) return "";
+    const by = meta.deleted_by || {};
+    return renderKeyValue("Cancelamento (soft delete)", [
+      ["Cancelado em", meta.deleted_at || "—"],
+      ["Motivo", meta.reason || "—"],
+      ["Origem", meta.origin || "—"],
+      ["Por", [by.nome, by.email, by.cpf].filter(Boolean).join(" • ") || "—"],
+    ]);
+  }
+
+  async function openViewer(url){
+    viewerBackdrop.classList.add("open");
+    viewerBody.innerHTML = `<div class="note">Carregando…</div>`;
+    viewerTitle.textContent = "Detalhes";
+    lastRawUrl = url;
+
+    viewerOpenRaw.onclick = ()=>{
+      if (lastRawUrl) window.open(lastRawUrl, "_blank", "noopener");
+    };
+
+    try{
+      const r = await fetch(url, { credentials: "include" });
+      if(!r.ok){
+        const t = await r.text().catch(()=> "");
+        viewerBody.innerHTML = `<div class="err">Erro ${r.status}: ${esc(t || "falha ao carregar")}</div>`;
+        return;
+      }
+      const obj = await r.json();
+
+      const kind = (obj?.kind || (obj?.payload && obj.payload.kind) || "").toString();
+      const sid = (obj?.id || "").toString();
+      const st  = (obj?.status || "").toString();
+      const proto = pickProtocolo(obj);
+
+      viewerTitle.textContent = `${kind ? kind.toUpperCase() : "SUBMISSÃO"} • ${sid ? sid.slice(0,8) : ""}`;
+
+      const summary = renderKeyValue("Resumo", [
+        ["ID", sid || "—"],
+        ["Kind", kind || "—"],
+        ["Status", st || "—"],
+        ["Protocolo", proto || "—"],
+        ["Criado em", fmtDateTime(obj?.created_at)],
+        ["Atualizado em", fmtDateTime(obj?.updated_at)],
+        ["Servidor", [obj?.actor_nome, obj?.actor_email, obj?.actor_cpf].filter(Boolean).join(" • ") || "—"],
+        ["Erro", obj?.error || "—"],
+      ]);
+
+      const feriasExtra = (kind === "ferias")
+        ? renderKeyValue("Detalhes de Férias", [
+            ["Tipo", (safeObj(obj?.payload)?.tipo) || obj?.payload?.tipo || "—"],
+            ["Exercício", (safeObj(obj?.payload)?.exercicio) || obj?.payload?.exercicio || "—"],
+            ["Dias (total)", (safeObj(obj?.result)?.dias_total) || obj?.result?.dias_total || "—"],
+          ])
+        : "";
+
+      const soft = renderSoftDelete(obj);
+      const periods = renderPeriods(obj);
+
+      const rawPretty = `
+        <div class="section">
+          <h3>JSON (formatado)</h3>
+          <div class="mono">${esc(JSON.stringify(obj, null, 2))}</div>
+        </div>
+      `;
+
+      viewerBody.innerHTML = summary + feriasExtra + soft + periods + rawPretty;
+    }catch(e){
+      console.error(e);
+      viewerBody.innerHTML = `<div class="err">Falha ao carregar detalhes.</div>`;
+    }
   }
 
   async function doDownload(url, suggestedName){
