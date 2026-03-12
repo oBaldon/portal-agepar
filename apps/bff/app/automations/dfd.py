@@ -1370,7 +1370,7 @@ async def submit_dfd(
     Fluxo
     -----
     - Normaliza payload bruto e valida com `DfdIn`.
-    - Checa duplicidade por `numero` e `protocolo`.
+    - Checa duplicidade por `protocolo`.
     - Cria submissão `queued`, audita `submitted` e agenda `_process_submission`.
     """
 
@@ -1526,19 +1526,6 @@ async def submit_dfd(
     try:
         numero_val = (payload.numero or "").strip()
         protocolo_val = (payload.protocolo or "").strip()
-
-        if numero_val and exists_submission_payload_value(KIND, "numero", numero_val):
-            try:
-                add_audit(KIND, "duplicate_rejected", user, {"field": "numero", "numero": numero_val})
-            except Exception:
-                logger.exception("audit duplicate (numero) failed (non-blocking)")
-            return err_json(
-                409,
-                code="duplicate",
-                message="Já existe um DFD com este Nº do memorando.",
-                details={"field": "numero", "value": numero_val},
-            )
-
         if protocolo_val and exists_submission_payload_value(KIND, "protocolo", protocolo_val):
             try:
                 add_audit(KIND, "duplicate_rejected", user, {"field": "protocolo", "protocolo": protocolo_val})
