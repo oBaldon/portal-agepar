@@ -59,6 +59,8 @@ ELEVATED_ROLES = ("admin", "coordenador")
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "dfd"
 ENV_REAJUSTE_PCA_ACTIVE = "DFD_REAJUSTE_PCA_ACTIVE"
+ENV_DFD_ACCEPTING = "DFD_ACCEPTING"
+ENV_DFD_CLOSED_MESSAGE = "DFD_CLOSED_MESSAGE"
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -83,6 +85,20 @@ def is_reajuste_pca_ativo() -> bool:
     Nesta fase, é controlado por env-var (DFD_REAJUSTE_PCA_ACTIVE).
     """
     return _env_flag(ENV_REAJUSTE_PCA_ACTIVE, default=False)
+
+
+def is_dfd_accepting() -> bool:
+    """Retorna True quando o Portal está aceitando novos DFDs (controlado por env-var)."""
+    return _env_flag(ENV_DFD_ACCEPTING, default=True)
+
+
+def dfd_closed_message() -> str:
+    """Mensagem exibida quando o DFD estiver temporariamente fechado para recebimento."""
+    msg = (os.environ.get(ENV_DFD_CLOSED_MESSAGE) or "").strip()
+    return msg or (
+        "No período atual, a Coordenadoria Administrativa não está aceitando DFDs. "
+        "Para mais informações, entre em contato com a CAD."
+    )
 
 def err_json(status: int, **payload):
     """
@@ -935,6 +951,7 @@ async def get_schema():
     """
     return {"kind": KIND, "schema": SCHEMA}
 
+
 @router.get("/config")
 async def get_config(user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_ROLES))):
     """
@@ -942,7 +959,13 @@ async def get_config(user: Dict[str, Any] = Depends(require_roles_any(*REQUIRED_
 
     Nesta fase, `reajustePcaAtivo` é controlado por env-var (DFD_REAJUSTE_PCA_ACTIVE).
     """
-    return {"kind": KIND, "version": DFD_VERSION, "reajustePcaAtivo": is_reajuste_pca_ativo()}
+    return {
+        "kind": KIND,
+        "version": DFD_VERSION,
+        "reajustePcaAtivo": is_reajuste_pca_ativo(),
+        "accepting": is_dfd_accepting(),
+        "closedMessage": dfd_closed_message(),
+    }
 
 
 @router.get("/models")
@@ -1350,7 +1373,14 @@ async def submit_dfd(
     - Checa duplicidade por `numero` e `protocolo`.
     - Cria submissão `queued`, audita `submitted` e agenda `_process_submission`.
     """
-    
+
+    if not is_dfd_accepting():
+        return err_json(
+            409,
+            code="dfd_closed",
+            message=dfd_closed_message(),
+        )
+
     reajuste_ativo = is_reajuste_pca_ativo()
     justificativa_in = none_if_empty((body.get("justificativaInclusaoItem") or "").strip())
     # Fora do período, não persistimos a justificativa mesmo que venha no payload.
@@ -1784,6 +1814,19 @@ async def dfd_ui(request: Request):
           <p style="color:#334155">{msg}</p>
         </div>"""
         return HTMLResponse(html_err, status_code=status)
+
+    if not is_dfd_accepting():
+        msg = dfd_closed_message()
+        html_closed = f"""<!doctype html><html lang=\"pt-BR\"><meta charset=\"utf-8\"/>
+<title>DFD indisponível</title>
+<div style=\"font-family:system-ui;padding:24px;max-width:720px;margin:0 auto\">
+  <div style=\"border:1px solid #e2e8f0;border-radius:14px;padding:16px;background:#fff\">
+    <h1 style=\"margin:0 0 8px;font-size:18px\">DFD temporariamente indisponível</h1>
+    <p style=\"margin:0;color:#334155;line-height:1.4\">{msg}</p>
+    <p style=\"margin:12px 0 0;color:#64748b;font-size:12px\">Se necessário, contate a Coordenadoria Administrativa.</p>
+  </div>
+</div></html>"""
+        return HTMLResponse(html_closed, status_code=200)
     html = _read_html("ui.html")
     return HTMLResponse(html)
 

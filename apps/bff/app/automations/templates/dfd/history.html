@@ -45,7 +45,7 @@
 <div class="wrap">
   <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
     <h1>Histórico — Meus DFDs</h1>
-    <a href="../ui" class="btn secondary small">← Voltar ao formulário</a>
+    <a id="backToForm" href="../ui" class="btn secondary small">← Voltar ao formulário</a>
   </div>
 
   <div class="card" style="margin-top:12px;">
@@ -311,6 +311,15 @@
 
   // init
   fetchPage({ reset:true });
+  // Preserva o tipo (padrao/capacitacao) ao voltar do histórico para o formulário
+  (function(){
+    try{
+      const a = document.getElementById("backToForm");
+      if(!a) return;
+      const qs = window.location.search || "";
+      a.href = "../ui" + qs;
+    }catch{}
+  })();
 </script>
 
 </body>

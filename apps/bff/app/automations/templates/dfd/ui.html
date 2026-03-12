@@ -414,7 +414,7 @@ textarea.bigtext{ min-height: 280px; }
 <div class="wrap">
   <div class="header">
     <h1>DFD — Documento de Formalização da Demanda</h1>
-    <a class="btn secondary small" href="/api/automations/dfd/ui/history">Meus DFDs</a>
+    <a class="btn secondary small" id="meusDfdsLink" href="/api/automations/dfd/ui/history">Meus DFDs</a>
   </div>
 
   <div class="card">
@@ -2944,6 +2944,15 @@ Nesse contexto, a participação de servidores em eventos, congressos e seminár
 
   f.addEventListener('submit', submit);
   init();
+  // Preserva o tipo (padrao/capacitacao) ao navegar para o histórico
+  (function(){
+    try{
+      const a = document.getElementById("meusDfdsLink");
+      if(!a) return;
+      const qs = window.location.search || "";
+      a.href = "/api/automations/dfd/ui/history" + qs;
+    }catch{}
+  })();
 </script>
 </body>
 </html>

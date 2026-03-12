@@ -1,5 +1,5 @@
 // src/pages/DfdEntry.tsx
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 /**
@@ -19,6 +19,33 @@ export default function DfdEntry() {
   const nav = useNavigate();
   const loc = useLocation();
 
+  const [cfgLoading, setCfgLoading] = useState(true);
+  const [accepting, setAccepting] = useState(true);
+  const [closedMessage, setClosedMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/automations/dfd/config", { credentials: "include" });
+        if (!r.ok) return;
+        const j: any = await r.json();
+        if (!alive) return;
+        const ok = j?.accepting;
+        setAccepting(ok === undefined ? true : Boolean(ok));
+        const msg = (j?.closedMessage || j?.message || "").toString().trim();
+        setClosedMessage(msg || null);
+      } catch {
+        // best-effort
+      } finally {
+        if (alive) setCfgLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const nextParam = useMemo(() => {
     const sp = new URLSearchParams(loc.search);
     const next = sp.get("next");
@@ -26,6 +53,7 @@ export default function DfdEntry() {
   }, [loc.search]);
 
   const go = (tipo: "padrao" | "capacitacao") => {
+    if (!accepting) return;
     const target = tipo === "padrao" ? "/dfd/padrao" : "/dfd/capacitacao";
     nav(target + (nextParam ? `?next=${encodeURIComponent(nextParam)}` : ""), {
       replace: true,
@@ -41,6 +69,29 @@ export default function DfdEntry() {
         <p className="mt-2 text-slate-600">
           Selecione qual versão do DFD você deseja preencher.
         </p>
+
+        {!accepting && (
+          <div className="mt-4 border border-amber-200 bg-amber-50 text-amber-900 rounded-xl p-4">
+            <div className="font-semibold">DFD temporariamente indisponível</div>
+            <div className="mt-1 text-sm">
+              {closedMessage ||
+                "No período atual, a Coordenadoria Administrativa não está aceitando DFDs. Para mais informações, entre em contato com a CAD."}
+            </div>
+            <div className="mt-3 text-sm">
+              <button
+                type="button"
+                onClick={() => nav("/inicio")}
+                className="underline"
+              >
+                Voltar ao início
+              </button>
+            </div>
+          </div>
+        )}
+
+        {cfgLoading && accepting && (
+          <div className="mt-4 text-sm text-slate-600">Verificando disponibilidade do DFD…</div>
+        )}
 
         {/* “Popup” (modal simples) */}
         <div className="mt-8 relative">
@@ -62,7 +113,8 @@ export default function DfdEntry() {
               <button
                 type="button"
                 onClick={() => go("padrao")}
-                className="text-left border rounded-xl p-4 hover:bg-slate-50 transition"
+                disabled={!accepting}
+                className="text-left border rounded-xl p-4 hover:bg-slate-50 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <div className="font-semibold">DFD Padrão</div>
                 <div className="mt-1 text-sm text-slate-600">
@@ -73,7 +125,8 @@ export default function DfdEntry() {
               <button
                 type="button"
                 onClick={() => go("capacitacao")}
-                className="text-left border rounded-xl p-4 hover:bg-slate-50 transition"
+                disabled={!accepting}
+                className="text-left border rounded-xl p-4 hover:bg-slate-50 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <div className="font-semibold">DFD Capacitação</div>
                 <div className="mt-1 text-sm text-slate-600">
