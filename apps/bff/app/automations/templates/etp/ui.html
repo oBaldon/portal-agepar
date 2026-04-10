@@ -1,0 +1,1528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ETP — Estudo Técnico Preliminar</title>
+<style>
+  :root{
+    --fg:#0f172a;
+    --muted:#475569;
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --pri:#2563eb;
+    --pri-2:#1d4ed8;
+    --line:#e2e8f0;
+    --ok-bg:#ecfdf5;
+    --ok-bd:#86efac;
+    --ok-fg:#166534;
+    --warn-bg:#fffbeb;
+    --warn-bd:#fcd34d;
+    --warn-fg:#92400e;
+    --err-bg:#fef2f2;
+    --err-bd:#fca5a5;
+    --err-fg:#991b1b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body{
+    font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .wrap{
+    max-width: 1120px;
+    margin: 24px auto;
+    padding: 0 16px 40px;
+  }
+
+  .header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom: 16px;
+  }
+
+  h1{
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+
+  .subtitle{
+    margin:0;
+    color: var(--muted);
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  .header-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .card{
+    background: var(--card);
+    border:1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  h2{
+    font-size: 16px;
+    margin: 0 0 6px;
+  }
+
+  .section-note{
+    margin:0 0 10px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  label{
+    display:block;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 12px 0 6px;
+  }
+
+  .req{
+    color:#dc2626;
+    font-weight:700;
+    margin-left:4px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select{
+    width:100%;
+    padding: 10px 12px;
+    border:1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+    background:#fff;
+    color: var(--fg);
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus{
+    outline: 2px solid #bfdbfe;
+    outline-offset: 1px;
+    border-color:#93c5fd;
+  }
+
+  textarea{
+    min-height: 110px;
+    resize: vertical;
+  }
+
+  .textarea-lg{ min-height: 150px; }
+  .textarea-xl{ min-height: 190px; }
+
+  .row{
+    display:flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .col{
+    flex:1;
+    min-width: 0;
+  }
+
+  .col-2{ flex:2; min-width: 280px; }
+  .col-1{ flex:1; min-width: 220px; }
+  .col-3{ flex:3; min-width: 320px; }
+
+  .btn{
+    appearance:none;
+    border:1px solid transparent;
+    border-radius: 10px;
+    background: var(--pri);
+    color:#fff;
+    padding: 10px 14px;
+    font: inherit;
+    cursor:pointer;
+    transition:.16s ease;
+  }
+
+  .btn:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(2,6,23,.08);
+    background: var(--pri-2);
+  }
+
+  .btn:focus-visible{
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+  }
+
+  .btn.secondary{
+    background:#fff;
+    color:#334155;
+    border-color:#cbd5e1;
+  }
+
+  .btn.secondary:hover{
+    background:#f8fafc;
+  }
+
+  .btn.small{
+    padding:8px 10px;
+    font-size:12px;
+  }
+
+  .btn.danger{
+    background:#b91c1c;
+  }
+
+  .btn.danger:hover{
+    background:#991b1b;
+  }
+
+  .btn[disabled]{
+    opacity:.6;
+    cursor:not-allowed;
+    transform:none;
+    box-shadow:none;
+  }
+
+  .btn-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  .note{
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .status{
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .alert{
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    border:1px solid transparent;
+  }
+
+  .alert.ok{
+    background: var(--ok-bg);
+    border-color: var(--ok-bd);
+    color: var(--ok-fg);
+  }
+
+  .alert.warn{
+    background: var(--warn-bg);
+    border-color: var(--warn-bd);
+    color: var(--warn-fg);
+  }
+
+  .alert.err{
+    background: var(--err-bg);
+    border-color: var(--err-bd);
+    color: var(--err-fg);
+  }
+
+  .hidden{ display:none !important; }
+
+  .hr{
+    height:1px;
+    background: var(--line);
+    border:0;
+    margin: 14px 0;
+  }
+
+  .dyn-list{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .dyn-item{
+    position:relative;
+    border:1px dashed #cbd5e1;
+    border-radius: 12px;
+    background:#fff;
+    padding: 12px;
+  }
+
+  .dyn-item-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom: 8px;
+  }
+
+  .badge{
+    display:inline-block;
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:#eef2ff;
+    color:#1e3a8a;
+  }
+
+  .table-wrap{
+    overflow:auto;
+    border:1px solid var(--line);
+    border-radius: 12px;
+    background:#fff;
+  }
+
+  table{
+    width:100%;
+    border-collapse: collapse;
+    min-width: 780px;
+  }
+
+  th, td{
+    border-bottom:1px solid #eef2f7;
+    padding: 10px 12px;
+    vertical-align: top;
+    text-align:left;
+  }
+
+  thead th{
+    font-size:12px;
+    color:#64748b;
+    background:#f8fafc;
+  }
+
+  tbody tr:hover td{
+    background:#fbfdff;
+  }
+
+  .nowrap{ white-space: nowrap; }
+  .wrap-any{ overflow-wrap:anywhere; word-break:break-word; white-space:normal; }
+
+  .footer-actions{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .sticky-actions{
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    background: linear-gradient(to top, rgba(248,250,252,1), rgba(248,250,252,.92));
+    padding-top: 8px;
+  }
+
+  .mini{
+    font-size: 11px;
+    color:#64748b;
+  }
+
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:6px 10px;
+    background:#fff;
+    color:#334155;
+  }
+
+  .grid-2{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+  }
+
+  .label-with-help{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  .inline-help{
+    display:inline-flex;
+    align-items:center;
+    position:relative;
+  }
+
+  .inline-help .help{
+    width:18px;
+    height:18px;
+    border-radius:999px;
+    background:#e2e8f0;
+    color:#0f172a;
+    border:1px solid #cbd5e1;
+    font-size:12px;
+    line-height:16px;
+    text-align:center;
+    padding:0;
+    cursor:pointer;
+  }
+
+  .inline-help .help:hover{ background:#dbeafe; border-color:#93c5fd; }
+  .inline-help .help:focus-visible{ outline:2px solid #93c5fd; outline-offset:2px; }
+
+  .inline-help .tip{
+    position:absolute;
+    top:120%;
+    left:0;
+    z-index:20;
+    min-width:220px;
+    max-width:420px;
+    background:#0f172a;
+    color:#fff;
+    padding:8px 10px;
+    border-radius:10px;
+    font-size:12px;
+    line-height:1.45;
+    box-shadow:0 8px 24px rgba(2,6,23,.18);
+    pointer-events:none;
+    opacity:0;
+    transform:translateY(-4px);
+    transition:opacity .12s ease, transform .12s ease;
+  }
+
+  .inline-help:hover .tip,
+  .inline-help:focus-within .tip{
+    opacity:1;
+    transform:translateY(0);
+  }
+
+  .input-compact{
+    min-height: 42px;
+  }
+
+  .stack{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .muted-inline{ color: var(--muted); font-size:12px; }
+
+  @media (max-width: 860px){
+    .header{
+      flex-direction:column;
+    }
+    .header-actions{
+      justify-content:flex-start;
+    }
+    .grid-2{
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>ETP — Estudo Técnico Preliminar</h1>
+      <p class="subtitle">
+        Preencha o formulário do ETP. O sistema salvará a submissão e gerará o documento final a partir do modelo institucional.
+      </p>
+    </div>
+    <div class="header-actions">
+      <button id="btnScrollHistory" class="btn secondary" type="button">Ir para histórico</button>
+    </div>
+  </div>
+
+  <form id="formEtp" novalidate>
+    <div class="card">
+      <h2>1. Identificação</h2>
+      <p class="section-note">Campos básicos do ETP e identificação da área demandante.</p>
+
+      <div class="row">
+        <div class="col col-1">
+          <label for="protocolo">Protocolo</label>
+          <input id="protocolo" placeholder="12.345.678-0" />
+        </div>
+        <div class="col col-3">
+          <label for="objeto">Objeto<span class="req">*</span></label>
+          <input id="objeto" placeholder="Descreva o objeto da contratação pretendida." required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col col-2">
+          <label for="unidadeDemandante">Unidade demandante<span class="req">*</span></label>
+          <input id="unidadeDemandante" placeholder="Informe a unidade demandante responsável pela necessidade." required />
+        </div>
+        <div class="col col-1">
+          <label for="responsavel">Responsável<span class="req">*</span></label>
+          <input id="responsavel" placeholder="Informe o nome do responsável pela demanda." required />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col col-1">
+          <label for="email">E-mail</label>
+          <input id="email" type="email" placeholder="Informe o e-mail para contato do responsável."/>
+        </div>
+        <div class="col col-1">
+          <label for="telefone">Telefone</label>
+          <input id="telefone" placeholder="(41) 98765-4321"/>
+        </div>
+        <div class="col col-1">
+          <label for="dataAssinatura">Data da assinatura</label>
+          <input id="dataAssinatura" placeholder="dd/mm/aaaa"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. Fundamentação da contratação</h2>
+      <p class="section-note">Preencha os blocos textuais principais do ETP.</p>
+
+      <label for="descricaoNecessidade">
+        <span class="label-with-help">
+          <span>Descrição da necessidade da contratação<span class="req">*</span></span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Descrição da necessidade da contratação">?</button><span class="tip">art. 18, § 1º, inciso I, Lei Federal n.º 14.133/2021 e art. 15, inciso I, Decreto Estadual n.º 10.086/2022</span></span>
+        </span>
+      </label>
+      <textarea id="descricaoNecessidade" class="textarea-xl" placeholder="Descrever o problema a ser resolvido, isto é, qual a necessidade (prevista no Documento de Formalização da Demanda – DFD) que a Agepar possui e que precisa ser resolvida, para atender ao interesse público envolvido. Quanto mais detalhes sobre a necessidade, melhor será a identificação dos requisitos da futura contratação." required></textarea>
+
+      <label for="previsaoPca">
+        <span class="label-with-help">
+          <span>Previsão da contratação no PCA</span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Previsão da contratação no PCA">?</button><span class="tip">art. 18, § 1º, inciso II, Lei Federal n.º 14.133/2021 e art. 15, inciso II, Decreto Estadual n.º 10.086/2022</span></span>
+        </span>
+      </label>
+      <textarea id="previsaoPca" placeholder="Examinar o Plano de Contratações Anual – PCA, de modo a indicar o seu alinhamento com o Planejamento da Administração."></textarea>
+
+      <label for="requisitosContratacao">
+        <span class="label-with-help">
+          <span>Requisitos da contratação<span class="req">*</span></span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Requisitos da contratação">?</button><span class="tip">art. 18, § 1º, inciso III, Lei Federal n.º 14.133/2021 e art. 15, inciso III, Decreto Estadual n.º 10.086/2022</span></span>
+        </span>
+      </label>
+      <textarea id="requisitosContratacao" class="textarea-lg" placeholder="Descrever os requisitos necessários e suficientes à escolha da solução, a fim de atender à demanda, tais como: práticas de sustentabilidade e outros critérios que devem ser veiculados como especificações técnicas do objeto ou como obrigações da contratada; necessidade de garantia, treinamento ou serviço de instalação por parte do fornecedor, considerando que os valores decorrentes estejam incluídos no preço de referência; padrões mínimos de qualidade, de forma a permitir a seleção da proposta mais vantajosa, entre outros." required></textarea>
+    </div>
+
+    <div class="card">
+      <h2>3. Estimativas das quantidades</h2>
+      <p class="section-note">Adicione a memória de cálculo e os itens quantitativos da contratação.</p>
+
+      <label for="memoriaCalculo">
+        <span class="label-with-help">
+          <span>Memória de cálculo</span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Estimativas das quantidades para a contratação">?</button><span class="tip">art. 18, § 1º, inciso IV, Lei Federal n.º 14.133/2021 e art. 15, inciso IV, Decreto Estadual n.º 10.086/2022</span></span>
+        </span>
+      </label>
+      <textarea id="memoriaCalculo" class="textarea-lg" placeholder="Neste item, devem ser estimadas as quantidades a serem contratadas, acompanhadas das memórias de cálculo e dos documentos que lhes dão suporte, considerando a interdependência com outras contratações, de modo a possibilitar economia de escala."></textarea>
+
+      <div class="hr"></div>
+
+      <div class="btn-row" style="margin-bottom:10px">
+        <button id="btnAddItem" type="button" class="btn secondary small">Adicionar item</button>
+      </div>
+
+      <div id="itensQuantitativos" class="dyn-list"></div>
+      <p class="note">É obrigatório informar ao menos um item.</p>
+    </div>
+
+    <div class="card">
+      <h2>4. Levantamento de mercado</h2>
+      <p class="section-note">Para cada solução existente no mercado, registre a respectiva análise técnica e econômica.</p>
+
+      <div class="btn-row" style="margin-bottom:10px">
+        <span class="pill">Soluções e análises</span>
+        <button id="btnAddSolucaoAnalise" type="button" class="btn secondary small">Adicionar solução</button>
+      </div>
+      <div id="solucoesAnalises" class="dyn-list"></div>
+      <p class="note">Informe pelo menos uma solução com sua respectiva análise.</p>
+
+      <label for="conclusaoSolucao"><span class="label-with-help"><span>Conclusão quanto à solução a ser adotada<span class="req">*</span></span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Levantamento de mercado">?</button><span class="tip">art. 18, § 1º, inciso V, Lei Federal n.º 14.133/2021 e art. 15, inciso V, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="conclusaoSolucao" class="textarea-lg" placeholder="Explicar o porquê de ser realizada a compra/aquisição/comodato nos moldes descritos e, sempre que possível, esclarecer o porquê de a opção X ser mais vantajosa, em relação às demais opções existentes no mercado." required></textarea>
+    </div>
+
+    <div class="card">
+      <h2>5. Valor, solução e execução</h2>
+      <p class="section-note">Complete os campos textuais complementares do ETP.</p>
+
+      <label for="estimativaValor"><span class="label-with-help"><span>Estimativa do valor da contratação</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Estimativa do valor da contratação">?</button><span class="tip">art. 18, § 1º, inciso VI, Lei Federal n.º 14.133/2021 e art. 15, inciso VI, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="estimativaValor" placeholder="Neste tópico deve ser inserido o valor estimado dos itens, com base em histórico anterior de contratação ou valor estimado de mercado. Trata-se de estimativa preliminar, tendo como objetivo conferir uma noção do investimento necessário para a solução do problema. Podem ser tomados por base os valores praticados por fornecedores junto a outros órgãos, vendas em sites específicos, bem como valores auferidos mediante consulta a potenciais fornecedores. É obrigatória a comprovação da origem das informações obtidas (memória de cálculo), para fins de estimativa de preços."></textarea>
+
+      <label for="descricaoSolucaoComoUmTodo"><span class="label-with-help"><span>Descrição da solução como um todo</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Descrição da solução como um todo">?</button><span class="tip">art. 18, § 1º, inciso VII, Lei Federal n.º 14.133/2021 e art. 15, inciso VII, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="descricaoSolucaoComoUmTodo" class="textarea-lg" placeholder="Deve-se considerar todo o ciclo de vida do objeto a ser adquirido/executado, inclusive as questões relacionadas à manutenção, assistência técnica, utilização, reposição, impacto ambiental, entre outros fatores vinculados ao ciclo de vida, o que definirá o dispêndio a ser efetuado durante o seu uso."></textarea>
+
+      <label for="justificativaParcelamento"><span class="label-with-help"><span>Justificativa para parcelamento ou não da contratação</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Justificativa para parcelamento ou não da contratação">?</button><span class="tip">art. 18, § 1º, inciso VIII, Lei Federal n.º 14.133/2021 e art. 15, inciso VIII, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="justificativaParcelamento" placeholder="No caso de parcelamento do objeto, justificar a escolha dentre as formas admitidas, quais sejam, a utilização de licitações distintas, a adjudicação por itens, a permissão de subcontratação de parte específica do objeto ou a permissão para a formação de consórcios."></textarea>
+
+      <label for="resultadosPretendidos"><span class="label-with-help"><span>Resultados pretendidos</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Resultados pretendidos">?</button><span class="tip">art. 18, § 1º, inciso IX, Lei Federal n.º 14.133/2021 e art. 15, inciso IX, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="resultadosPretendidos" placeholder="Neste item devem ser estabelecidos os resultados que se pretende alcançar com a contratação em termos de economicidade e de melhor aproveitamento dos recursos humanos, materiais e financeiros disponíveis."></textarea>
+
+      <label for="providenciasPrevias"><span class="label-with-help"><span>Providências prévias</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Providências prévias">?</button><span class="tip">art. 18, § 1º, inciso X, Lei Federal n.º 14.133/2021 e art. 15, inciso X, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="providenciasPrevias" placeholder="Neste item devem ser estudadas as ações que a Administração precisa providenciar antes da futura contratação, isto é, requisitos para que a execução contratual obtenha êxito, inclusive quanto à capacitação de servidores, para fins de fiscalização e gestão contratual, bem como adequação de ambientes físicos."></textarea>
+
+      <label for="contratacoesCorrelatas"><span class="label-with-help"><span>Contratações correlatas e/ou interdependentes</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Contratações correlatas e/ou interdependentes">?</button><span class="tip">art. 18, § 1º, inciso XI, Lei Federal n.º 14.133/2021 e art. 15, inciso XI, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="contratacoesCorrelatas" placeholder="Deve-se verificar se há contratações correlatas ou interdependentes, relativas à contratação pretendida, para que seja identificada a existência de requisitos que impeçam a execução do contrato, ou seja, é preciso avaliar a necessidade de se providenciar outras contratações, prévia ou paralelamente à contratação pretendida, em função da viabilidade e êxito do objeto."></textarea>
+
+      <label for="impactosAmbientais"><span class="label-with-help"><span>Impactos ambientais e medidas mitigadoras</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Impactos ambientais e medidas mitigadoras">?</button><span class="tip">art. 18, § 1º, inciso XII, Lei Federal n.º 14.133/2021 e art. 15, inciso XII, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="impactosAmbientais" placeholder="Neste item devem ser descritos os possíveis impactos ambientais e respectivas medidas mitigadoras, incluídos requisitos de baixo consumo de energia, exigência de logística reversa para desfazimento e reciclagem de bens e refugos, dentre outros, quando aplicáveis."></textarea>
+
+      <label for="posicionamentoConclusivo"><span class="label-with-help"><span>Posicionamento conclusivo<span class="req">*</span></span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Posicionamento conclusivo">?</button><span class="tip">art. 18, § 1º, inciso XIII, Lei Federal n.º 14.133/2021 e art. 15, inciso XII, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="posicionamentoConclusivo" class="textarea-lg" placeholder="Neste item deve ser elaborado relatório final conclusivo, indicando, a partir do que foi evidenciado pelo Estudo Técnico Preliminar – ETP, a viabilidade técnica, socioeconômica, socioambiental e sociocultural ou não da contratação." required></textarea>
+    </div>
+
+    <div class="card">
+      <h2>6. Assinaturas e aprovação</h2>
+      <p class="section-note">Informe os responsáveis pela elaboração e os dados finais do documento.</p>
+
+      <div class="btn-row" style="margin-bottom:10px">
+        <span class="pill">Responsáveis pela elaboração</span>
+        <button id="btnAddResponsavel" type="button" class="btn secondary small">Adicionar responsável</button>
+      </div>
+      <div id="responsaveisElaboracao" class="dyn-list"></div>
+      <datalist id="pessoasCadastradasList"></datalist>
+
+      <div class="row">
+        <div class="col col-1">
+          <label for="diretorAreaDemandante">Diretor(a) da área demandante</label>
+          <input id="diretorAreaDemandante" placeholder="Informe o nome do(a) diretor(a) da área demandante."/>
+        </div>
+      </div>
+
+      <!--
+      <label for="aprovacaoAutoridadeMaxima">
+        <span class="label-with-help">
+          <span>Aprovação da autoridade máxima</span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Aprovação da autoridade máxima">?</button><span class="tip">art. 34, parágrafo único, Decreto Estadual n.º 10.086/2022</span></span>
+        </span>
+      </label>
+      <textarea id="aprovacaoAutoridadeMaxima" placeholder="O ETP deverá ser aprovado pela autoridade máxima, ou a quem delegar competência, por meio de despacho motivado, atestando alinhamento ao Planejamento Estratégico e ao Plano de Contratações Anual da Agência."></textarea>
+      -->
+    </div>
+
+    <div class="card">
+      <h2>7. Riscos</h2>
+      <p class="section-note">Bloco final relativo à fase de identificação e análise de riscos.</p>
+
+      <label for="faseRiscos"><span class="label-with-help"><span>Fase de identificação e análise dos riscos</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Fase de identificação e análise dos riscos">?</button><span class="tip">art. 18, inciso X, Lei Federal n.º 14.133/2021; art. 2º, inciso XLVII; e art. 187 do Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="faseRiscos" placeholder="O artigo 18, inciso X, da Lei Federal n.º 14.133/2021, estabelece que, durante a fase preparatória, deve-se promover a identificação e análise dos riscos que possam comprometer o sucesso da licitação e a boa execução contratual. “Risco” pode ser entendido como um evento futuro e incerto, do qual decorre uma ou mais consequências, que podem ser positivas ou negativas. Para resguardar o interesse público e os recursos envolvidos nos contratos administrativos, é preciso identificar os riscos que possam comprometer a satisfação da necessidade que motivou a contratação, adotando procedimentos e controles que impeçam resultados negativos."></textarea>
+
+      <label for="mapaRiscos"><span class="label-with-help"><span>Mapa de riscos</span><span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Mapa de riscos">?</button><span class="tip">art. 186, Decreto Estadual n.º 10.086/2022</span></span></span></label>
+      <textarea id="mapaRiscos" class="textarea-lg" placeholder="O gerenciamento de riscos materializa-se com o Mapa de Riscos, documento em que devem constar cenários possíveis, presumíveis dentre aqueles considerados críticos para a contratação, de modo a delimitar as prioridades de ação. O Mapa de Riscos consiste em um plano que permite classificar os riscos, de acordo com a probabilidade de ocorrência, observado o respectivo grau de impacto decorrente, a fim de prever medidas de mitigação e de contingência, bem como definir as responsabilidades para o enfrentamento do evento. Relevante ferramenta do planejamento, o Mapa de Riscos objetiva mensurar, avaliar e ordenar ocorrências futuras e incertas que possam afetar o alcance dos objetivos da contratação, devendo ser juntado aos autos do processo de contratação, ao final da elaboração do Estudo Técnico Preliminar – ETP, como parte integrante do estudo."></textarea>
+    </div>
+
+    <div class="sticky-actions">
+      <div class="card">
+        <div class="footer-actions">
+          <div>
+            <div id="msg" class="alert hidden" style="margin:10px 0 0"></div>
+            <div class="mini">Campos marcados com <span class="req">*</span> são obrigatórios.</div>
+            <div id="submitStatus" class="status"></div>
+          </div>
+          <div class="btn-row">
+            <button id="btnLimpar" type="button" class="btn secondary">Limpar formulário</button>
+            <button id="btnEnviar" type="submit" class="btn">Gerar ETP</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div id="resultadoCard" class="card hidden">
+    <h2>Resultado da submissão</h2>
+    <p id="resultadoResumo" class="section-note">Acompanhe o processamento e faça o download quando estiver pronto.</p>
+    <div class="btn-row">
+      <button id="btnBaixarDocx" class="btn secondary hidden" type="button">Baixar DOCX</button>
+    </div>
+  </div>
+
+  <div id="historyCard" class="card">
+    <div class="header" style="margin-bottom:10px">
+      <div>
+        <h2 style="margin:0 0 4px">Histórico de submissões</h2>
+        <p class="section-note" style="margin:0">Mostra suas últimas submissões do ETP.</p>
+      </div>
+      <div class="btn-row">
+        <button id="btnReloadHistory" class="btn secondary small" type="button">Atualizar</button>
+        <button id="btnFullHistory" class="btn secondary small" type="button">Histórico completo</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="nowrap">Criado em</th>
+            <th>Status</th>
+            <th>Protocolo</th>
+            <th>Objeto</th>
+            <th>Responsável</th>
+            <th>Downloads</th>
+          </tr>
+        </thead>
+        <tbody id="subs">
+          <tr><td colspan="6">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const API_BASE = "/api/automations/etp";
+  let currentSubmissionId = null;
+  let historyTimer = null;
+  let pollTimer = null;
+
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  const els = {
+    form: $("#formEtp"),
+    msg: $("#msg"),
+    submitStatus: $("#submitStatus"),
+    btnEnviar: $("#btnEnviar"),
+    btnLimpar: $("#btnLimpar"),
+    btnAddItem: $("#btnAddItem"),
+    btnAddSolucaoAnalise: $("#btnAddSolucaoAnalise"),
+    btnAddResponsavel: $("#btnAddResponsavel"),
+    itensQuantitativos: $("#itensQuantitativos"),
+    solucoesAnalises: $("#solucoesAnalises"),
+    responsaveisElaboracao: $("#responsaveisElaboracao"),
+    resultadoCard: $("#resultadoCard"),
+    resultadoResumo: $("#resultadoResumo"),
+    btnBaixarDocx: $("#btnBaixarDocx"),
+    subs: $("#subs"),
+    btnReloadHistory: $("#btnReloadHistory"),
+    btnFullHistory: $("#btnFullHistory"),
+    btnScrollHistory: $("#btnScrollHistory")
+  };
+
+  const UNIDADES_MEDIDA = [
+    "Caixa",
+    "Caloria",
+    "Cartela",
+    "Cartucho",
+    "Dose",
+    "Dúzia",
+    "Frasco",
+    "Grama",
+    "Kit",
+    "Litro",
+    "Mês",
+    "Metro",
+    "Metro cúbico",
+    "Metro linear",
+    "Metro quadrado",
+    "Milheiro",
+    "Miligrama",
+    "Mililitro",
+    "Outras Unidades de Medidas",
+    "Par",
+    "Quilograma",
+    "Quilograma do peso drenado",
+    "Quilômetro",
+    "Rolo",
+    "Teste",
+    "Tubo",
+    "Unidade Internacional",
+    "Unitário"
+  ];
+
+  function api(path){
+    return `${API_BASE}${path}`;
+  }
+
+  const FIELD_LABELS = {
+    protocolo: "Protocolo",
+    objeto: "Objeto",
+    unidadeDemandante: "Unidade demandante",
+    unidade_demandante: "Unidade demandante",
+    responsavel: "Responsável",
+    email: "E-mail",
+    telefone: "Telefone",
+    descricaoNecessidade: "Descrição da necessidade da contratação",
+    descricao_necessidade: "Descrição da necessidade da contratação",
+    previsaoPca: "Previsão da contratação no PCA",
+    previsao_pca: "Previsão da contratação no PCA",
+    requisitosContratacao: "Requisitos da contratação",
+    requisitos_contratacao: "Requisitos da contratação",
+    memoriaCalculo: "Memória de cálculo",
+    memoria_calculo: "Memória de cálculo",
+    itensQuantitativos: "Itens quantitativos",
+    itens_quantitativos: "Itens quantitativos",
+    solucoesExistentes: "Soluções existentes no mercado",
+    solucoes_existentes: "Soluções existentes no mercado",
+    analiseSolucoes: "Análise das soluções existentes",
+    analise_solucoes: "Análise das soluções existentes",
+    conclusaoSolucao: "Conclusão quanto à solução a ser adotada",
+    conclusao_solucao: "Conclusão quanto à solução a ser adotada",
+    estimativaValor: "Estimativa do valor da contratação",
+    estimativa_valor: "Estimativa do valor da contratação",
+    descricaoSolucaoComoUmTodo: "Descrição da solução como um todo",
+    descricao_solucao_como_um_todo: "Descrição da solução como um todo",
+    justificativaParcelamento: "Justificativa para parcelamento ou não",
+    justificativa_parcelamento: "Justificativa para parcelamento ou não",
+    resultadosPretendidos: "Resultados pretendidos",
+    resultados_pretendidos: "Resultados pretendidos",
+    providenciasPrevias: "Providências prévias",
+    providencias_previas: "Providências prévias",
+    contratacoesCorrelatas: "Contratações correlatas",
+    contratacoes_correlatas: "Contratações correlatas",
+    impactosAmbientais: "Impactos ambientais",
+    impactos_ambientais: "Impactos ambientais",
+    posicionamentoConclusivo: "Posicionamento conclusivo",
+    posicionamento_conclusivo: "Posicionamento conclusivo",
+    dataAssinatura: "Data da assinatura",
+    data_assinatura: "Data da assinatura",
+    responsaveisElaboracao: "Responsáveis pela elaboração",
+    responsaveis_elaboracao: "Responsáveis pela elaboração",
+    diretorAreaDemandante: "Diretor(a) da área demandante",
+    diretor_area_demandante: "Diretor(a) da área demandante",
+    aprovacaoAutoridadeMaxima: "Aprovação da autoridade máxima",
+    aprovacao_autoridade_maxima: "Aprovação da autoridade máxima",
+    faseRiscos: "Fase de identificação e análise dos riscos",
+    fase_riscos: "Fase de identificação e análise dos riscos",
+    mapaRiscos: "Mapa de riscos",
+    mapa_riscos: "Mapa de riscos"
+  };
+
+  function showMsg(type, text){
+    els.msg.className = `alert ${type}`;
+    els.msg.textContent = text || "";
+    els.msg.classList.toggle("hidden", !text);
+    if (text) {
+      els.msg.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function clearMsg(){
+    els.msg.textContent = "";
+    els.msg.className = "alert hidden";
+  }
+
+  function humanizeField(field){
+    const raw = safeText(field);
+    if (!raw) return "Formulário";
+    const cleaned = raw
+      .replace(/\.\d+\./g, ".")
+      .replace(/\.\d+$/g, "")
+      .replace(/\[\d+\]/g, "")
+      .split(".")
+      .filter(Boolean)
+      .pop();
+    return FIELD_LABELS[cleaned] || FIELD_LABELS[raw] || cleaned || "Formulário";
+  }
+
+  function formatValidationErrors(errors){
+    if (!Array.isArray(errors) || !errors.length) return "";
+    return errors
+      .map(err => {
+        const field = humanizeField(err?.field);
+        const message = safeText(err?.message) || "Valor inválido.";
+        return `${field}: ${message}`;
+      })
+      .join(" | ");
+  }
+
+  function setBusy(isBusy, text){
+    els.btnEnviar.disabled = !!isBusy;
+    els.submitStatus.textContent = text || "";
+  }
+
+  function safeText(v){
+    return (v == null ? "" : String(v)).trim();
+  }
+
+  function nl2br(s){
+    return safeText(s).replace(/\n/g, "<br>");
+  }
+
+  function escapeHtml(str){
+    return safeText(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function parseJsonSafe(v){
+    if (!v) return {};
+    if (typeof v === "object") return v;
+    try { return JSON.parse(v); } catch { return {}; }
+  }
+
+  function fmtWhen(s){
+    if (!s) return "";
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())){
+      const pad = n => String(n).padStart(2, "0");
+      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    return safeText(s);
+  }
+
+  function value(id){
+    const el = document.getElementById(id);
+    return el ? safeText(el.value) : "";
+  }
+
+  function makeDynItemBadge(title){
+    const span = document.createElement("span");
+    span.className = "badge";
+    span.textContent = title;
+    return span;
+  }
+
+  function makeRemoveButton(onClick){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn secondary small";
+    btn.textContent = "Remover";
+    btn.addEventListener("click", onClick);
+    return btn;
+  }
+
+  function addQuantitativoRow(data){
+    const idx = els.itensQuantitativos.children.length + 1;
+    const div = document.createElement("div");
+    div.className = "dyn-item";
+    div.innerHTML = `
+      <div class="dyn-item-head">
+        <div></div>
+        <div></div>
+      </div>
+      <div class="row">
+        <div class="col col-1">
+          <label>Item</label>
+          <input class="q-item" placeholder="Ex.: 01" />
+        </div>
+        <div class="col col-2">
+          <label>Especificação</label>
+          <textarea class="q-especificacao" style="min-height:90px" placeholder="Descreva o item, bem ou serviço considerado na estimativa das quantidades."></textarea>
+        </div>
+        <div class="col col-1">
+          <label>Unidade</label>
+          <select class="q-unidade">${unidadeOptionsHtml(data && data.unidade)}</select>
+        </div>
+        <div class="col col-1">
+          <label>Quantidade</label>
+          <input class="q-quantidade" placeholder="Informe a quantidade estimada" />
+        </div>
+      </div>
+    `;
+
+    const headLeft = $(".dyn-item-head > div:first-child", div);
+    const headRight = $(".dyn-item-head > div:last-child", div);
+    headLeft.appendChild(makeDynItemBadge(`Item ${idx}`));
+    headRight.appendChild(makeRemoveButton(() => {
+      div.remove();
+      renumberQuantitativos();
+    }));
+
+    $(".q-item", div).value = safeText(data && data.item) || String(idx).padStart(2, "0");
+    $(".q-especificacao", div).value = safeText(data && data.especificacao);
+    $(".q-quantidade", div).value = safeText(data && data.quantidade) || "1";
+
+    els.itensQuantitativos.appendChild(div);
+    renumberQuantitativos();
+  }
+
+  function renumberQuantitativos(){
+    $$(".dyn-item", els.itensQuantitativos).forEach((item, index) => {
+      const badge = $(".badge", item);
+      if (badge) badge.textContent = `Item ${index + 1}`;
+      const input = $(".q-item", item);
+      if (input && !safeText(input.value)) {
+        input.value = String(index + 1).padStart(2, "0");
+      }
+    });
+  }
+
+  function addTextRow(container, title, className, placeholder, initialValue){
+    const idx = container.children.length + 1;
+    const div = document.createElement("div");
+    div.className = "dyn-item";
+    div.innerHTML = `
+      <div class="dyn-item-head">
+        <div></div>
+        <div></div>
+      </div>
+      <label>${title}</label>
+      <textarea class="${className}" style="min-height:110px" placeholder="${escapeHtml(placeholder)}"></textarea>
+    `;
+
+    const headLeft = $(".dyn-item-head > div:first-child", div);
+    const headRight = $(".dyn-item-head > div:last-child", div);
+    headLeft.appendChild(makeDynItemBadge(`${title} ${idx}`));
+    headRight.appendChild(makeRemoveButton(() => {
+      div.remove();
+      renumberTextRows(container, title);
+    }));
+
+    $(`.${className}`, div).value = safeText(initialValue);
+    container.appendChild(div);
+    renumberTextRows(container, title);
+  }
+
+  function renumberTextRows(container, title){
+    $$(".dyn-item", container).forEach((item, index) => {
+      const badge = $(".badge", item);
+      if (badge) badge.textContent = `${title} ${index + 1}`;
+    });
+  }
+
+  function unidadeOptionsHtml(selectedValue){
+    const current = safeText(selectedValue);
+    const placeholder = `<option value="">Selecione a unidade</option>`;
+    const options = UNIDADES_MEDIDA.map(item => {
+      const selected = current === item ? " selected" : "";
+      return `<option value="${escapeHtml(item)}"${selected}>${escapeHtml(item)}</option>`;
+    }).join("");
+    return placeholder + options;
+  }
+
+  async function fetchPeopleSuggestions(q){
+    const term = safeText(q);
+    if (term.length < 2) {
+      fillPeopleDatalist([]);
+      return [];
+    }
+
+    try{
+      const r = await fetch(api(`/people/search?q=${encodeURIComponent(term)}&limit=8`), {
+        credentials: "same-origin"
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) return [];
+      const items = Array.isArray(data?.items) ? data.items : [];
+      fillPeopleDatalist(items);
+      return items;
+    }catch(_){
+      fillPeopleDatalist([]);
+      return [];
+    }
+  }
+
+  function fillPeopleDatalist(items){
+    const list = $("#pessoasCadastradasList");
+    if (!list) return;
+    list.innerHTML = "";
+    (items || []).forEach(item => {
+      const opt = document.createElement("option");
+      const nome = safeText(item?.nome);
+      const email = safeText(item?.email);
+      opt.value = nome || email;
+      opt.label = [nome, email].filter(Boolean).join(" — ");
+      list.appendChild(opt);
+    });
+  }
+
+  function bindPeopleAutocomplete(input){
+    if (!input) return;
+    input.setAttribute("list", "pessoasCadastradasList");
+    let timer = null;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fetchPeopleSuggestions(input.value), 180);
+    });
+  }
+
+  function addSolucaoAnaliseRow(data){
+    const idx = els.solucoesAnalises.children.length + 1;
+    const div = document.createElement("div");
+    div.className = "dyn-item";
+    div.innerHTML = `
+      <div class="dyn-item-head">
+        <div></div>
+        <div></div>
+      </div>
+      <label>
+        <span class="label-with-help">
+          <span>Solução existente no mercado</span>
+          <span class="inline-help"><button type="button" class="help" aria-label="Ajuda sobre Soluções existentes no mercado">?</button><span class="tip">Ex.: compras / locação / comodato.</span></span>
+        </span>
+      </label>
+      <textarea class="solucao-texto" style="min-height:110px" placeholder="Descrição da Solução ${idx}: descreva a solução existente no mercado."></textarea>
+      <label>Análise da solução</label>
+      <textarea class="analise-texto" style="min-height:110px" placeholder="Análise da Solução ${idx}: informe pontos positivos e negativos, custos mensuráveis e não mensuráveis e detalhes da solução."></textarea>
+    `;
+
+    const headLeft = $(".dyn-item-head > div:first-child", div);
+    const headRight = $(".dyn-item-head > div:last-child", div);
+    headLeft.appendChild(makeDynItemBadge(`Solução ${idx}`));
+    headRight.appendChild(makeRemoveButton(() => {
+      div.remove();
+      renumberSolucoesAnalises();
+    }));
+
+    $(".solucao-texto", div).value = safeText(data && data.solucao);
+    $(".analise-texto", div).value = safeText(data && data.analise);
+
+    els.solucoesAnalises.appendChild(div);
+    renumberSolucoesAnalises();
+  }
+
+  function renumberSolucoesAnalises(){
+    $$(".dyn-item", els.solucoesAnalises).forEach((item, index) => {
+      const badge = $(".badge", item);
+      if (badge) badge.textContent = `Solução ${index + 1}`;
+    });
+  }
+
+  function collectQuantitativos(){
+    return $$(".dyn-item", els.itensQuantitativos)
+      .map(item => ({
+        item: safeText($(".q-item", item)?.value),
+        especificacao: safeText($(".q-especificacao", item)?.value),
+        unidade: safeText($(".q-unidade", item)?.value),
+        quantidade: safeText($(".q-quantidade", item)?.value)
+      }))
+      .filter(row => row.item || row.especificacao || row.unidade || row.quantidade);
+  }
+
+  function collectTextList(container, className){
+    return $$(".dyn-item", container)
+      .map(item => safeText($(`.${className}`, item)?.value))
+      .filter(Boolean);
+  }
+
+  function collectSolucoesAnalises(){
+    return $$(".dyn-item", els.solucoesAnalises)
+      .map(item => ({
+        solucao: safeText($(".solucao-texto", item)?.value),
+        analise: safeText($(".analise-texto", item)?.value)
+      }))
+      .filter(row => row.solucao || row.analise);
+  }
+
+  function addResponsavelRow(initialValue){
+    const idx = els.responsaveisElaboracao.children.length + 1;
+    const div = document.createElement("div");
+    div.className = "dyn-item";
+    div.innerHTML = `
+      <div class="dyn-item-head">
+        <div></div>
+        <div></div>
+      </div>
+      <div class="stack">
+        <div>
+          <label>Responsável pela elaboração</label>
+          <input class="responsavel-elaboracao-texto input-compact" placeholder="Digite o nome; se existir cadastro, o sistema vai sugerir." />
+        </div>
+      </div>
+    `;
+
+    const headLeft = $(".dyn-item-head > div:first-child", div);
+    const headRight = $(".dyn-item-head > div:last-child", div);
+    headLeft.appendChild(makeDynItemBadge(`Responsável ${idx}`));
+    headRight.appendChild(makeRemoveButton(() => {
+      div.remove();
+      renumberTextRows(els.responsaveisElaboracao, "Responsável");
+    }));
+
+    $(".responsavel-elaboracao-texto", div).value = safeText(initialValue);
+    bindPeopleAutocomplete($(".responsavel-elaboracao-texto", div));
+    els.responsaveisElaboracao.appendChild(div);
+    renumberTextRows(els.responsaveisElaboracao, "Responsável");
+  }
+
+  function getPayload(){
+    const solucoesAnalises = collectSolucoesAnalises();
+    return {
+      protocolo: value("protocolo"),
+      objeto: value("objeto"),
+      unidadeDemandante: value("unidadeDemandante"),
+      responsavel: value("responsavel"),
+      email: value("email"),
+      telefone: value("telefone"),
+      descricaoNecessidade: value("descricaoNecessidade"),
+      previsaoPca: value("previsaoPca"),
+      requisitosContratacao: value("requisitosContratacao"),
+      memoriaCalculo: value("memoriaCalculo"),
+      itensQuantitativos: collectQuantitativos(),
+      solucoesExistentes: solucoesAnalises.map(x => x.solucao).filter(Boolean),
+      analiseSolucoes: solucoesAnalises.map(x => x.analise).filter(Boolean),
+      conclusaoSolucao: value("conclusaoSolucao"),
+      estimativaValor: value("estimativaValor"),
+      descricaoSolucaoComoUmTodo: value("descricaoSolucaoComoUmTodo"),
+      justificativaParcelamento: value("justificativaParcelamento"),
+      resultadosPretendidos: value("resultadosPretendidos"),
+      providenciasPrevias: value("providenciasPrevias"),
+      contratacoesCorrelatas: value("contratacoesCorrelatas"),
+      impactosAmbientais: value("impactosAmbientais"),
+      posicionamentoConclusivo: value("posicionamentoConclusivo"),
+      dataAssinatura: value("dataAssinatura"),
+      responsaveisElaboracao: collectTextList(els.responsaveisElaboracao, "responsavel-elaboracao-texto"),
+      diretorAreaDemandante: value("diretorAreaDemandante"),
+      aprovacaoAutoridadeMaxima: value("aprovacaoAutoridadeMaxima"),
+      faseRiscos: value("faseRiscos"),
+      mapaRiscos: value("mapaRiscos")
+    };
+  }
+
+  function validatePayload(payload){
+    if (!payload.objeto) return "Objeto é obrigatório.";
+    if (!payload.unidadeDemandante) return "Unidade demandante é obrigatória.";
+    if (!payload.responsavel) return "Responsável é obrigatório.";
+    if (!payload.descricaoNecessidade) return "Descrição da necessidade é obrigatória.";
+    if (!payload.requisitosContratacao) return "Requisitos da contratação são obrigatórios.";
+    if (!payload.conclusaoSolucao) return "Conclusão quanto à solução é obrigatória.";
+    if (!payload.posicionamentoConclusivo) return "Posicionamento conclusivo é obrigatório.";
+    if (!payload.itensQuantitativos.length) return "Informe ao menos um item em estimativas das quantidades.";
+    if (!payload.solucoesExistentes.length) return "Informe ao menos uma solução existente.";
+    if (payload.solucoesExistentes.length !== payload.analiseSolucoes.length) return "Cada solução deve possuir sua respectiva análise.";
+    return "";
+  }
+
+  function resetResultado(){
+    els.resultadoCard.classList.add("hidden");
+    els.resultadoResumo.textContent = "Acompanhe o processamento e faça o download quando estiver pronto.";
+    els.btnBaixarDocx.classList.add("hidden");
+    currentSubmissionId = null;
+  }
+
+  function clearForm(){
+    els.form.reset();
+    clearMsg();
+    resetResultado();
+
+    els.itensQuantitativos.innerHTML = "";
+    els.solucoesAnalises.innerHTML = "";
+    els.responsaveisElaboracao.innerHTML = "";
+
+    addQuantitativoRow({ item: "01", unidade: "Unitário", quantidade: "1" });
+    addSolucaoAnaliseRow({ solucao: "", analise: "" });
+    addResponsavelRow(value("responsavel"));
+
+    prefillMe();
+  }
+
+  async function prefillMe(){
+    try{
+      const r = await fetch("/api/me", { credentials: "same-origin" });
+      if (!r.ok) return;
+      const me = await r.json();
+
+      const nome = safeText(me?.nome || me?.name);
+      const email = safeText(me?.email);
+      const setor = safeText(me?.setor || me?.lotacao || me?.unidade || me?.departamento);
+
+      if (nome && !value("responsavel")) $("#responsavel").value = nome;
+      if (email && !value("email")) $("#email").value = email;
+      if (setor && !value("unidadeDemandante")) $("#unidadeDemandante").value = setor;
+
+      const rows = collectTextList(els.responsaveisElaboracao, "responsavel-elaboracao-texto");
+      if (!rows.length && nome) {
+        addResponsavelRow(nome);
+      }
+    }catch(_){}
+  }
+
+  async function enviar(ev){
+    if (ev) ev.preventDefault();
+    clearMsg();
+    resetResultado();
+
+    const payload = getPayload();
+    const validationMsg = validatePayload(payload);
+    if (validationMsg){
+      showMsg("warn", validationMsg);
+      return;
+    }
+
+    setBusy(true, "Enviando formulário...");
+    try{
+      const r = await fetch(api("/submit"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(payload)
+      });
+
+      const contentType = r.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await r.json().catch(() => ({}))
+        : {};
+
+      if (!r.ok){
+        const fieldErrors = formatValidationErrors(data?.details?.errors);
+        const msg =
+          fieldErrors ||
+          data?.message ||
+          data?.detail ||
+          `HTTP ${r.status}`;
+        throw new Error(msg);
+      }
+
+      currentSubmissionId = data.submissionId;
+      els.resultadoCard.classList.remove("hidden");
+      els.resultadoResumo.textContent = `Submissão criada com sucesso. ID: ${currentSubmissionId}. Aguardando processamento...`;
+
+      showMsg("ok", "Submissão enviada. O documento está sendo processado.");
+      setBusy(false, "Submissão enviada.");
+
+      loadSubs();
+      startPoll(currentSubmissionId);
+    }catch(e){
+      setBusy(false, "");
+      showMsg("err", `Falha ao enviar: ${e && e.message ? e.message : "erro desconhecido"}`);
+    }
+  }
+
+  function stopPoll(){
+    if (pollTimer){
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function startPoll(submissionId){
+    stopPoll();
+
+    const tick = async () => {
+      try{
+        const r = await fetch(api(`/submissions/${submissionId}`), {
+          credentials: "same-origin"
+        });
+
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok){
+          throw new Error(data?.message || data?.detail || `HTTP ${r.status}`);
+        }
+
+        const status = safeText(data?.status).toLowerCase();
+        const result = parseJsonSafe(data?.result);
+        const error = safeText(data?.error);
+
+        if (status === "queued"){
+          els.resultadoCard.classList.remove("hidden");
+          els.resultadoResumo.textContent = "Submissão recebida e aguardando processamento...";
+          setBusy(false, "Na fila de processamento...");
+          return;
+        }
+
+        if (status === "running"){
+          els.resultadoCard.classList.remove("hidden");
+          els.resultadoResumo.textContent = "Documento em processamento...";
+          setBusy(false, "Processando documento...");
+          return;
+        }
+
+        if (status === "done"){
+          stopPoll();
+          els.resultadoCard.classList.remove("hidden");
+          els.resultadoResumo.textContent = "Documento finalizado. Faça o download abaixo.";
+          configureDownloadButtons(submissionId, result);
+          setBusy(false, "Documento pronto.");
+          loadSubs();
+          return;
+        }
+
+        if (status === "error"){
+          stopPoll();
+          els.resultadoCard.classList.remove("hidden");
+          els.resultadoResumo.textContent = `A submissão falhou. ${error || "Consulte o histórico."}`;
+          showMsg("err", `A geração do documento falhou. ${error || ""}`.trim());
+          setBusy(false, "");
+          loadSubs();
+          return;
+        }
+      }catch(e){
+        stopPoll();
+        setBusy(false, "");
+        showMsg("err", `Erro ao acompanhar submissão: ${e && e.message ? e.message : "erro desconhecido"}`);
+      }
+    };
+
+    tick();
+    pollTimer = setInterval(tick, 2500);
+  }
+
+  function configureDownloadButtons(sid, result){
+    if (result && result.docx_filename){
+      els.btnBaixarDocx.classList.remove("hidden");
+      els.btnBaixarDocx.onclick = () => downloadSubmission(sid, "docx");
+    } else {
+      els.btnBaixarDocx.classList.add("hidden");
+    }
+  }
+
+  async function downloadSubmission(sid, fmt){
+    try{
+      const url = fmt ? api(`/submissions/${sid}/download/${fmt}`) : api(`/submissions/${sid}/download`);
+      const r = await fetch(url, {
+        method: "POST",
+        credentials: "same-origin"
+      });
+
+      if (!r.ok){
+        const data = await r.json().catch(() => ({}));
+        const msg = data?.message || data?.detail || `HTTP ${r.status}`;
+        throw new Error(msg);
+      }
+
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/i);
+      const fileName = match ? match[1] : `etp-${sid}${fmt ? "." + fmt : ""}`;
+
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    }catch(e){
+      showMsg("err", `Falha no download: ${e && e.message ? e.message : "erro desconhecido"}`);
+    }
+  }
+
+  function downloadsCellHtml(sid, status, result){
+    if (status !== "done") {
+      return `<span class="note">aguardando...</span>`;
+    }
+
+    const hasDocx = !!result?.docx_filename;
+
+    let html = `<button class="btn small" data-download="${sid}">Baixar</button>`;
+    if (hasDocx) html += ` <button class="btn small secondary" data-download-docx="${sid}">DOCX</button>`;
+    return html;
+  }
+
+  async function loadSubs(){
+    els.subs.innerHTML = `<tr><td colspan="6">Carregando...</td></tr>`;
+
+    try{
+      const r = await fetch(api("/submissions?limit=20"), {
+        credentials: "same-origin"
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok){
+        throw new Error(data?.message || data?.detail || `HTTP ${r.status}`);
+      }
+
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (!items.length){
+        els.subs.innerHTML = `<tr><td colspan="6">Nenhuma submissão encontrada.</td></tr>`;
+        stopHistoryRefresh();
+        return;
+      }
+
+      els.subs.innerHTML = "";
+      let hasPending = false;
+
+      items.forEach(s => {
+        const payload = parseJsonSafe(s.payload);
+        const result = parseJsonSafe(s.result);
+        const status = safeText(s.status).toLowerCase();
+
+        if (status === "queued" || status === "running") hasPending = true;
+
+        const protocolo = safeText(payload?.protocolo);
+        const objeto = safeText(payload?.objeto);
+        const responsavel = safeText(payload?.responsavel);
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="nowrap">${escapeHtml(fmtWhen(s.created_at || s.createdAt || ""))}</td>
+          <td class="nowrap">${escapeHtml(s.status || "")}</td>
+          <td class="wrap-any">${escapeHtml(protocolo || "—")}</td>
+          <td class="wrap-any">${escapeHtml(objeto || "—")}</td>
+          <td class="wrap-any">${escapeHtml(responsavel || "—")}</td>
+          <td class="nowrap">${downloadsCellHtml(s.id, status, result)}</td>
+        `;
+        els.subs.appendChild(tr);
+      });
+
+      $$("[data-download]", els.subs).forEach(btn => {
+        btn.addEventListener("click", () => downloadSubmission(btn.getAttribute("data-download")));
+      });
+      $$("[data-download-docx]", els.subs).forEach(btn => {
+        btn.addEventListener("click", () => downloadSubmission(btn.getAttribute("data-download-docx"), "docx"));
+      });
+
+      if (hasPending) startHistoryRefresh();
+      else stopHistoryRefresh();
+    }catch(e){
+      els.subs.innerHTML = `<tr><td colspan="6">Erro ao carregar histórico: ${escapeHtml(e && e.message ? e.message : "erro")}</td></tr>`;
+      stopHistoryRefresh();
+    }
+  }
+
+  function startHistoryRefresh(){
+    if (historyTimer) return;
+    historyTimer = setInterval(loadSubs, 5000);
+  }
+
+  function stopHistoryRefresh(){
+    if (historyTimer){
+      clearInterval(historyTimer);
+      historyTimer = null;
+    }
+  }
+
+  function bindEvents(){
+    els.form.addEventListener("submit", enviar);
+
+    els.btnLimpar.addEventListener("click", () => {
+      if (confirm("Deseja limpar o formulário?")) {
+        clearForm();
+        showMsg("ok", "Formulário limpo.");
+      }
+    });
+
+    els.btnAddItem.addEventListener("click", () => {
+      addQuantitativoRow();
+    });
+
+    els.btnAddSolucaoAnalise.addEventListener("click", () => {
+      addSolucaoAnaliseRow({
+        solucao: "",
+        analise: ""
+      });
+    });
+
+    els.btnAddResponsavel.addEventListener("click", () => {
+      addResponsavelRow("");
+    });
+
+    els.btnReloadHistory.addEventListener("click", loadSubs);
+    els.btnFullHistory.addEventListener("click", () => {
+      window.location.href = `${API_BASE}/ui/history`;
+    });
+    els.btnScrollHistory.addEventListener("click", () => {
+      $("#historyCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  async function boot(){
+    bindEvents();
+    clearForm();
+    await loadSubs();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

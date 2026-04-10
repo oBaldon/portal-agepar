@@ -31,6 +31,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.automations.dfd import DFD_VERSION as DFD_VER
+from app.automations.etp import router as etp_router, ETP_VERSION as ETP_VER
 from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
 from app.automations.ponto_saldo import router as ponto_saldo_router, PONTO_SALDO_VERSION as PONTO_SALDO_VER
 from app.db import init_db, DATABASE_URL
@@ -134,6 +135,7 @@ def _startup() -> None:
     logger.info("DFD engine version: %s", DFD_VER)
     logger.info("FERIAS engine version: %s", FERIAS_VER)
     logger.info("PONTO_SALDO engine version: %s", PONTO_SALDO_VER)
+    logger.info("ETP engine version: %s", ETP_VER)
 
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
     """
@@ -201,6 +203,7 @@ def version() -> Dict[str, Any]:
         "env": ENV,
         "dfd_version": DFD_VER,
         "ferias_version": FERIAS_VER,
+        "etp_version": ETP_VER,
         "auth_mode": AUTH_MODE,
         "auth_legacy_mock": AUTH_LEGACY_MOCK,
         "ep_mode": EP_MODE,
@@ -482,6 +485,7 @@ def automations_index() -> Dict[str, Any]:
         "items": [
             {"kind": "form2json", "version": "1.0.0", "title": "Formulário para JSON"},
             {"kind": "profile", "version": "0.1.0", "title": "Meu Perfil"},
+            {"kind": "etp", "version": ETP_VER, "title": "ETP — Estudo Técnico Preliminar"},
             {"kind": "dfd", "version": DFD_VER, "title": "DFD — Documento de Formalização da Demanda"},
             {"kind": "ferias", "version": FERIAS_VER, "title": "Férias — Requerimento + Substituição"},
             {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
@@ -497,6 +501,7 @@ def automations_index() -> Dict[str, Any]:
 APP.include_router(fileshare_router,       dependencies=[Depends(require_password_changed)])
 APP.include_router(form2json_router,       dependencies=[Depends(require_password_changed)])
 APP.include_router(dfd_router,             dependencies=[Depends(require_password_changed)])
+APP.include_router(etp_router,             dependencies=[Depends(require_password_changed)])
 APP.include_router(ferias_router,          dependencies=[Depends(require_password_changed)])
 APP.include_router(controle_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(controle_ferias_router, dependencies=[Depends(require_password_changed)])

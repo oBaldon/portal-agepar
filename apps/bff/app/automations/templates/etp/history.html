@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ETP — Histórico</title>
+<style>
+  :root{
+    --fg:#0f172a;
+    --muted:#475569;
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --pri:#2563eb;
+    --pri-2:#1d4ed8;
+    --line:#e2e8f0;
+    --ok-bg:#ecfdf5;
+    --ok-bd:#86efac;
+    --ok-fg:#166534;
+    --warn-bg:#fffbeb;
+    --warn-bd:#fcd34d;
+    --warn-fg:#92400e;
+    --err-bg:#fef2f2;
+    --err-bd:#fca5a5;
+    --err-fg:#991b1b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body{
+    font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .wrap{
+    max-width: 1180px;
+    margin: 24px auto;
+    padding: 0 16px 40px;
+  }
+
+  .header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom: 16px;
+  }
+
+  h1{
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+
+  h2{
+    font-size: 16px;
+    margin: 0 0 6px;
+  }
+
+  .subtitle,
+  .section-note{
+    margin:0;
+    color: var(--muted);
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  .section-note{
+    font-size: 13px;
+  }
+
+  .header-actions,
+  .btn-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+
+  .card{
+    background: var(--card);
+    border:1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap:12px;
+    margin-bottom: 16px;
+  }
+
+  .metric{
+    border:1px solid var(--line);
+    border-radius: 14px;
+    background:#fff;
+    padding: 14px;
+  }
+
+  .metric .k{
+    font-size: 12px;
+    color:#64748b;
+    margin-bottom: 6px;
+  }
+
+  .metric .v{
+    font-size: 24px;
+    font-weight: 700;
+    color:#0f172a;
+  }
+
+  .metric .s{
+    font-size: 12px;
+    color:#64748b;
+    margin-top: 4px;
+  }
+
+  .alert{
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    border:1px solid transparent;
+    margin-bottom: 16px;
+  }
+
+  .alert.ok{
+    background: var(--ok-bg);
+    border-color: var(--ok-bd);
+    color: var(--ok-fg);
+  }
+
+  .alert.warn{
+    background: var(--warn-bg);
+    border-color: var(--warn-bd);
+    color: var(--warn-fg);
+  }
+
+  .alert.err{
+    background: var(--err-bg);
+    border-color: var(--err-bd);
+    color: var(--err-fg);
+  }
+
+  .hidden{ display:none !important; }
+
+  .btn{
+    appearance:none;
+    border:1px solid transparent;
+    border-radius: 10px;
+    background: var(--pri);
+    color:#fff;
+    padding: 10px 14px;
+    font: inherit;
+    cursor:pointer;
+    transition:.16s ease;
+  }
+
+  .btn:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(2,6,23,.08);
+    background: var(--pri-2);
+  }
+
+  .btn.secondary{
+    background:#fff;
+    color:#334155;
+    border-color:#cbd5e1;
+  }
+
+  .btn.secondary:hover{
+    background:#f8fafc;
+  }
+
+  .btn.small{
+    padding:8px 10px;
+    font-size:12px;
+  }
+
+  .btn[disabled]{
+    opacity:.6;
+    cursor:not-allowed;
+    transform:none;
+    box-shadow:none;
+  }
+
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:6px 10px;
+    background:#fff;
+    color:#334155;
+  }
+
+  .toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom: 12px;
+  }
+
+  .toolbar-left,
+  .toolbar-right{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  input, select{
+    padding: 10px 12px;
+    border:1px solid #cbd5e1;
+    border-radius: 10px;
+    font: inherit;
+    background:#fff;
+    color: var(--fg);
+  }
+
+  input:focus, select:focus{
+    outline: 2px solid #bfdbfe;
+    outline-offset: 1px;
+    border-color:#93c5fd;
+  }
+
+  .table-wrap{
+    overflow:auto;
+    border:1px solid var(--line);
+    border-radius: 12px;
+    background:#fff;
+  }
+
+  table{
+    width:100%;
+    border-collapse: collapse;
+    min-width: 1100px;
+  }
+
+  th, td{
+    border-bottom:1px solid #eef2f7;
+    padding: 10px 12px;
+    vertical-align: top;
+    text-align:left;
+  }
+
+  thead th{
+    font-size:12px;
+    color:#64748b;
+    background:#f8fafc;
+  }
+
+  tbody tr:hover td{
+    background:#fbfdff;
+  }
+
+  .nowrap{ white-space: nowrap; }
+  .wrap-any{ overflow-wrap:anywhere; word-break:break-word; white-space:normal; }
+
+  .tag{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border-radius:999px;
+    padding:4px 10px;
+    font-size:12px;
+    font-weight:600;
+    border:1px solid transparent;
+  }
+
+  .tag.queued{
+    background:#eff6ff;
+    color:#1d4ed8;
+    border-color:#bfdbfe;
+  }
+
+  .tag.running{
+    background:#fff7ed;
+    color:#c2410c;
+    border-color:#fdba74;
+  }
+
+  .tag.done{
+    background:#ecfdf5;
+    color:#166534;
+    border-color:#86efac;
+  }
+
+  .tag.error{
+    background:#fef2f2;
+    color:#991b1b;
+    border-color:#fca5a5;
+  }
+
+  .tag.unknown{
+    background:#f8fafc;
+    color:#475569;
+    border-color:#cbd5e1;
+  }
+
+  .mini{
+    font-size: 11px;
+    color:#64748b;
+  }
+
+  .drawer{
+    position: fixed;
+    top:0;
+    right:0;
+    width:min(560px, 100vw);
+    height:100vh;
+    background:#fff;
+    border-left:1px solid var(--line);
+    box-shadow: -8px 0 24px rgba(2,6,23,.10);
+    transform: translateX(100%);
+    transition: transform .18s ease;
+    z-index: 50;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .drawer.open{
+    transform: translateX(0);
+  }
+
+  .drawer-head{
+    padding:16px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .drawer-body{
+    padding:16px;
+    overflow:auto;
+    flex:1;
+  }
+
+  .drawer-block{
+    border:1px solid var(--line);
+    border-radius: 12px;
+    padding:12px;
+    margin-bottom:12px;
+    background:#fff;
+  }
+
+  .drawer-block h3{
+    margin:0 0 8px;
+    font-size:14px;
+  }
+
+  .kv{
+    display:grid;
+    grid-template-columns: 180px 1fr;
+    gap:8px 12px;
+  }
+
+  .kv .k{
+    color:#64748b;
+    font-size:12px;
+  }
+
+  .kv .v{
+    font-size:13px;
+    color:#0f172a;
+    overflow-wrap:anywhere;
+  }
+
+  .pre{
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font:inherit;
+    line-height:1.5;
+    color:#0f172a;
+  }
+
+  .overlay{
+    position: fixed;
+    inset:0;
+    background: rgba(15,23,42,.25);
+    z-index: 40;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease;
+  }
+
+  .overlay.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  @media (max-width: 980px){
+    .grid{
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px){
+    .header{
+      flex-direction:column;
+    }
+    .grid{
+      grid-template-columns: 1fr;
+    }
+    .kv{
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div>
+      <h1>ETP — Histórico de submissões</h1>
+      <p class="subtitle">
+        Consulte suas submissões, acompanhe o status de processamento e baixe os documentos gerados.
+      </p>
+    </div>
+    <div class="header-actions">
+      <button id="btnIrFormulario" class="btn secondary" type="button">Abrir formulário</button>
+      <button id="btnAtualizarTop" class="btn secondary" type="button">Atualizar</button>
+    </div>
+  </div>
+
+  <div id="msg" class="alert hidden"></div>
+
+  <div class="grid">
+    <div class="metric">
+      <div class="k">Total</div>
+      <div id="mTotal" class="v">0</div>
+      <div class="s">Submissões carregadas</div>
+    </div>
+    <div class="metric">
+      <div class="k">Concluídas</div>
+      <div id="mDone" class="v">0</div>
+      <div class="s">Documentos prontos</div>
+    </div>
+    <div class="metric">
+      <div class="k">Em andamento</div>
+      <div id="mPending" class="v">0</div>
+      <div class="s">Fila ou processamento</div>
+    </div>
+    <div class="metric">
+      <div class="k">Com erro</div>
+      <div id="mError" class="v">0</div>
+      <div class="s">Exigem revisão</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input id="q" type="search" placeholder="Buscar por protocolo, objeto ou responsável" style="min-width:320px"/>
+        <select id="statusFilter">
+          <option value="">Todos os status</option>
+          <option value="queued">queued</option>
+          <option value="running">running</option>
+          <option value="done">done</option>
+          <option value="error">error</option>
+        </select>
+      </div>
+      <div class="toolbar-right">
+        <span id="autoRefreshBadge" class="pill">Autoatualização: desligada</span>
+        <button id="btnAtualizar" class="btn secondary small" type="button">Atualizar agora</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="nowrap">Criado em</th>
+            <th>Status</th>
+            <th>Protocolo</th>
+            <th>Objeto</th>
+            <th>Responsável</th>
+            <th class="nowrap">Versão</th>
+            <th class="nowrap">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="subs">
+          <tr><td colspan="7">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mini" style="margin-top:10px">
+      O histórico lista as submissões do usuário autenticado.
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay"></div>
+
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <h2 style="margin:0 0 4px">Detalhes da submissão</h2>
+      <p id="drawerSubtitle" class="section-note">Carregando...</p>
+    </div>
+    <button id="btnCloseDrawer" class="btn secondary small" type="button">Fechar</button>
+  </div>
+  <div id="drawerBody" class="drawer-body">
+    <div class="drawer-block">Carregando...</div>
+  </div>
+</aside>
+
+<script>
+(function(){
+  "use strict";
+
+  const API_BASE = "/api/automations/etp";
+  let allItems = [];
+  let historyTimer = null;
+
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  const els = {
+    msg: $("#msg"),
+    subs: $("#subs"),
+    q: $("#q"),
+    statusFilter: $("#statusFilter"),
+    btnAtualizar: $("#btnAtualizar"),
+    btnAtualizarTop: $("#btnAtualizarTop"),
+    btnIrFormulario: $("#btnIrFormulario"),
+    mTotal: $("#mTotal"),
+    mDone: $("#mDone"),
+    mPending: $("#mPending"),
+    mError: $("#mError"),
+    autoRefreshBadge: $("#autoRefreshBadge"),
+    drawer: $("#drawer"),
+    overlay: $("#overlay"),
+    drawerSubtitle: $("#drawerSubtitle"),
+    drawerBody: $("#drawerBody"),
+    btnCloseDrawer: $("#btnCloseDrawer")
+  };
+
+  function api(path){
+    return `${API_BASE}${path}`;
+  }
+
+  function safeText(v){
+    return (v == null ? "" : String(v)).trim();
+  }
+
+  function escapeHtml(str){
+    return safeText(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function parseJsonSafe(v){
+    if (!v) return {};
+    if (typeof v === "object") return v;
+    try { return JSON.parse(v); } catch { return {}; }
+  }
+
+  function fmtWhen(s){
+    if (!s) return "—";
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())){
+      const pad = n => String(n).padStart(2, "0");
+      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+    return safeText(s);
+  }
+
+  function showMsg(type, text){
+    els.msg.className = `alert ${type}`;
+    els.msg.textContent = text || "";
+    els.msg.classList.toggle("hidden", !text);
+  }
+
+  function clearMsg(){
+    els.msg.textContent = "";
+    els.msg.className = "alert hidden";
+  }
+
+  function statusClass(status){
+    const s = safeText(status).toLowerCase();
+    if (s === "queued") return "queued";
+    if (s === "running") return "running";
+    if (s === "done") return "done";
+    if (s === "error") return "error";
+    return "unknown";
+  }
+
+  function updateMetrics(items){
+    const total = items.length;
+    const done = items.filter(i => safeText(i.status).toLowerCase() === "done").length;
+    const pending = items.filter(i => {
+      const s = safeText(i.status).toLowerCase();
+      return s === "queued" || s === "running";
+    }).length;
+    const error = items.filter(i => safeText(i.status).toLowerCase() === "error").length;
+
+    els.mTotal.textContent = String(total);
+    els.mDone.textContent = String(done);
+    els.mPending.textContent = String(pending);
+    els.mError.textContent = String(error);
+  }
+
+  function startHistoryRefresh(){
+    if (historyTimer) return;
+    historyTimer = setInterval(loadSubs, 5000);
+    els.autoRefreshBadge.textContent = "Autoatualização: ligada";
+  }
+
+  function stopHistoryRefresh(){
+    if (historyTimer){
+      clearInterval(historyTimer);
+      historyTimer = null;
+    }
+    els.autoRefreshBadge.textContent = "Autoatualização: desligada";
+  }
+
+  async function downloadSubmission(sid, fmt){
+    try{
+      const url = fmt ? api(`/submissions/${sid}/download/${fmt}`) : api(`/submissions/${sid}/download`);
+      const r = await fetch(url, {
+        method: "POST",
+        credentials: "same-origin"
+      });
+
+      if (!r.ok){
+        const data = await r.json().catch(() => ({}));
+        throw new Error(data?.message || data?.detail || `HTTP ${r.status}`);
+      }
+
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/i);
+      const fileName = match ? match[1] : `etp-${sid}${fmt ? "." + fmt : ""}`;
+
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    }catch(e){
+      showMsg("err", `Falha no download: ${e && e.message ? e.message : "erro desconhecido"}`);
+    }
+  }
+
+  function rowMatches(item){
+    const q = safeText(els.q.value).toLowerCase();
+    const statusFilter = safeText(els.statusFilter.value).toLowerCase();
+    const payload = parseJsonSafe(item.payload);
+
+    const hay = [
+      item.id,
+      item.status,
+      payload.protocolo,
+      payload.objeto,
+      payload.responsavel
+    ].map(v => safeText(v).toLowerCase()).join(" ");
+
+    if (statusFilter && safeText(item.status).toLowerCase() !== statusFilter) return false;
+    if (q && !hay.includes(q)) return false;
+    return true;
+  }
+
+  function renderTable(){
+    const items = allItems.filter(rowMatches);
+    updateMetrics(allItems);
+
+    if (!items.length){
+      els.subs.innerHTML = `<tr><td colspan="7">Nenhuma submissão encontrada para os filtros atuais.</td></tr>`;
+      return;
+    }
+
+    els.subs.innerHTML = "";
+    let hasPending = false;
+
+    items.forEach(item => {
+      const payload = parseJsonSafe(item.payload);
+      const result = parseJsonSafe(item.result);
+      const status = safeText(item.status).toLowerCase();
+
+      if (status === "queued" || status === "running") hasPending = true;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="nowrap">${escapeHtml(fmtWhen(item.created_at || item.createdAt || ""))}</td>
+        <td class="nowrap"><span class="tag ${statusClass(item.status)}">${escapeHtml(item.status || "unknown")}</span></td>
+        <td class="wrap-any">${escapeHtml(payload.protocolo || "—")}</td>
+        <td class="wrap-any">${escapeHtml(payload.objeto || "—")}</td>
+        <td class="wrap-any">${escapeHtml(payload.responsavel || "—")}</td>
+        <td class="nowrap">${escapeHtml(item.version || "—")}</td>
+        <td class="nowrap">
+          <div class="btn-row">
+            <button class="btn secondary small" type="button" data-detail="${escapeHtml(item.id)}">Detalhes</button>
+            ${status === "done" ? `<button class="btn small" type="button" data-download="${escapeHtml(item.id)}">Baixar</button>` : ``}
+            ${status === "done" && result.docx_filename ? `<button class="btn secondary small" type="button" data-download-docx="${escapeHtml(item.id)}">DOCX</button>` : ``}
+          </div>
+        </td>
+      `;
+      els.subs.appendChild(tr);
+    });
+
+    $$("[data-detail]", els.subs).forEach(btn => {
+      btn.addEventListener("click", () => openDetails(btn.getAttribute("data-detail")));
+    });
+
+    $$("[data-download]", els.subs).forEach(btn => {
+      btn.addEventListener("click", () => downloadSubmission(btn.getAttribute("data-download")));
+    });
+
+    $$("[data-download-docx]", els.subs).forEach(btn => {
+      btn.addEventListener("click", () => downloadSubmission(btn.getAttribute("data-download-docx"), "docx"));
+    });
+
+    if (hasPending) startHistoryRefresh();
+    else stopHistoryRefresh();
+  }
+
+  async function loadSubs(){
+    clearMsg();
+    try{
+      const r = await fetch(api("/submissions?limit=50"), {
+        credentials: "same-origin"
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok){
+        throw new Error(data?.message || data?.detail || `HTTP ${r.status}`);
+      }
+
+      allItems = Array.isArray(data?.items) ? data.items : [];
+      renderTable();
+
+      if (!allItems.length){
+        stopHistoryRefresh();
+      }
+    }catch(e){
+      els.subs.innerHTML = `<tr><td colspan="7">Erro ao carregar histórico: ${escapeHtml(e && e.message ? e.message : "erro")}</td></tr>`;
+      updateMetrics([]);
+      stopHistoryRefresh();
+      showMsg("err", `Falha ao carregar histórico: ${e && e.message ? e.message : "erro desconhecido"}`);
+    }
+  }
+
+  function renderList(arr, emptyText){
+    if (!Array.isArray(arr) || !arr.length){
+      return `<div class="v">${escapeHtml(emptyText || "Não informado.")}</div>`;
+    }
+    return `<div class="v">${arr.map(x => `• ${escapeHtml(x)}`).join("<br>")}</div>`;
+  }
+
+  function renderQuantitativos(items){
+    if (!Array.isArray(items) || !items.length){
+      return `<div class="v">Não informado.</div>`;
+    }
+    return `
+      <div class="table-wrap" style="margin-top:8px">
+        <table style="min-width:700px">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Especificação</th>
+              <th>Unidade</th>
+              <th>Quantidade</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(row => `
+              <tr>
+                <td>${escapeHtml(row.item || "—")}</td>
+                <td class="wrap-any">${escapeHtml(row.especificacao || "—")}</td>
+                <td>${escapeHtml(row.unidade || "—")}</td>
+                <td>${escapeHtml(row.quantidade || "—")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderSolucoesComAnalises(solucoes, analises){
+    const s = Array.isArray(solucoes) ? solucoes : [];
+    const a = Array.isArray(analises) ? analises : [];
+    const total = Math.max(s.length, a.length);
+
+    if (!total){
+      return `<div class="v">Não informado.</div>`;
+    }
+
+    return `
+      <div class="v">
+        ${Array.from({ length: total }).map((_, i) => `
+          <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:10px">
+            <div style="font-weight:600;margin-bottom:6px">Solução ${i + 1}</div>
+            <div><strong>Descrição:</strong> ${escapeHtml(s[i] || "Não informado.")}</div>
+            <div style="margin-top:6px"><strong>Análise:</strong> ${escapeHtml(a[i] || "Não informado.")}</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function textBlock(title, value){
+    return `
+      <div class="drawer-block">
+        <h3>${escapeHtml(title)}</h3>
+        <pre class="pre">${escapeHtml(value || "Não informado.")}</pre>
+      </div>
+    `;
+  }
+
+  async function openDetails(sid){
+    els.drawerSubtitle.textContent = "Carregando detalhes...";
+    els.drawerBody.innerHTML = `<div class="drawer-block">Carregando...</div>`;
+    els.drawer.classList.add("open");
+    els.overlay.classList.add("open");
+    els.drawer.setAttribute("aria-hidden", "false");
+
+    try{
+      const r = await fetch(api(`/submissions/${sid}`), {
+        credentials: "same-origin"
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok){
+        throw new Error(data?.message || data?.detail || `HTTP ${r.status}`);
+      }
+
+      const payload = parseJsonSafe(data.payload);
+      const result = parseJsonSafe(data.result);
+      const createdAt = fmtWhen(data.created_at || data.createdAt || "");
+      const status = safeText(data.status || "unknown");
+
+      els.drawerSubtitle.textContent = `Submissão ${sid} • ${status}`;
+
+      els.drawerBody.innerHTML = `
+        <div class="drawer-block">
+          <h3>Resumo</h3>
+          <div class="kv">
+            <div class="k">ID</div><div class="v">${escapeHtml(data.id || "—")}</div>
+            <div class="k">Status</div><div class="v"><span class="tag ${statusClass(status)}">${escapeHtml(status)}</span></div>
+            <div class="k">Criado em</div><div class="v">${escapeHtml(createdAt)}</div>
+            <div class="k">Versão</div><div class="v">${escapeHtml(data.version || "—")}</div>
+            <div class="k">Protocolo</div><div class="v">${escapeHtml(payload.protocolo || "—")}</div>
+            <div class="k">Objeto</div><div class="v">${escapeHtml(payload.objeto || "—")}</div>
+            <div class="k">Unidade demandante</div><div class="v">${escapeHtml(payload.unidadeDemandante || "—")}</div>
+            <div class="k">Responsável</div><div class="v">${escapeHtml(payload.responsavel || "—")}</div>
+            <div class="k">E-mail</div><div class="v">${escapeHtml(payload.email || "—")}</div>
+            <div class="k">Telefone</div><div class="v">${escapeHtml(payload.telefone || "—")}</div>
+          </div>
+        </div>
+
+        ${textBlock("1. Descrição da necessidade da contratação", payload.descricaoNecessidade)}
+        ${textBlock("2. Previsão da contratação no Plano de Contratações Anual – PCA, sempre que elaborado", payload.previsaoPca)}
+        ${textBlock("3. Requisitos da contratação", payload.requisitosContratacao)}
+        ${textBlock("4. Estimativas das quantidades para a contratação | Memória de cálculo", payload.memoriaCalculo)}
+
+        <div class="drawer-block">
+          <h3>4. Estimativas das quantidades para a contratação</h3>
+          ${renderQuantitativos(payload.itensQuantitativos)}
+        </div>
+
+        <div class="drawer-block">
+          <h3>5. Levantamento de mercado: soluções existentes e respectivas análises</h3>
+          ${renderSolucoesComAnalises(payload.solucoesExistentes, payload.analiseSolucoes)}
+        </div>
+
+        ${textBlock("5.3 Conclusão quanto à solução a ser adotada e os motivos da escolha", payload.conclusaoSolucao)}
+        ${textBlock("6. Estimativa do valor da contratação", payload.estimativaValor)}
+        ${textBlock("7. Descrição da solução como um todo – Objeto Técnico", payload.descricaoSolucaoComoUmTodo)}
+        ${textBlock("8. Justificativas para o parcelamento ou não da contratação", payload.justificativaParcelamento)}
+        ${textBlock("9. Demonstrativo dos resultados pretendidos em termos de economicidade e de melhor aproveitamento dos recursos humanos, materiais e financeiros disponíveis", payload.resultadosPretendidos)}
+        ${textBlock("10. Providências a serem adotadas pela Administração previamente à celebração do contrato", payload.providenciasPrevias)}
+        ${textBlock("11. Contratações correlatas e/ou interdependentes", payload.contratacoesCorrelatas)}
+        ${textBlock("12. Descrição de possíveis impactos ambientais e respectivas medidas mitigadoras", payload.impactosAmbientais)}
+        ${textBlock("13. Posicionamento conclusivo sobre a adequação da contratação para o atendimento da necessidade a que se destina", payload.posicionamentoConclusivo)}
+
+        <div class="drawer-block">
+          <h3>14. Data e assinatura do(s) responsável(is) pela elaboração do ETP e Diretor(a) da área demandante</h3>
+          <div class="kv">
+            <div class="k">Data da assinatura</div><div class="v">${escapeHtml(payload.dataAssinatura || "—")}</div>
+            <div class="k">Diretor(a) da área</div><div class="v">${escapeHtml(payload.diretorAreaDemandante || "—")}</div>
+          </div>
+          <div style="margin-top:10px">
+            <div class="k" style="margin-bottom:6px">Responsáveis pela elaboração</div>
+            ${renderList(payload.responsaveisElaboracao, "Não informado.")}
+          </div>
+          ${/*
+            <div style="margin-top:12px">
+              <div class="k" style="margin-bottom:6px">15. Aprovação da autoridade máxima da Agepar</div>
+              <pre class="pre">${escapeHtml(payload.aprovacaoAutoridadeMaxima || "Não informado.")}</pre>
+            </div>
+          */""}
+        </div>
+
+        ${textBlock("16. Fase de identificação e análise dos riscos", payload.faseRiscos)}
+        ${textBlock("16.1 Mapa de Riscos", payload.mapaRiscos)}
+
+        <div class="drawer-block">
+          <h3>Arquivos gerados</h3>
+          <div class="kv">
+            <div class="k">Arquivo principal</div><div class="v">${escapeHtml(result.filename || "—")}</div>
+            <div class="k">DOCX</div><div class="v">${escapeHtml(result.docx_filename || "—")}</div>
+            <div class="k">PDF</div><div class="v">${escapeHtml(result.pdf_filename || "—")}</div>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            ${status.toLowerCase() === "done" ? `<button class="btn small" type="button" id="drawerDownloadMain">Baixar</button>` : ``}
+            ${status.toLowerCase() === "done" && result.docx_filename ? `<button class="btn secondary small" type="button" id="drawerDownloadDocx">DOCX</button>` : ``}
+          </div>
+        </div>
+
+        ${data.error ? `
+          <div class="drawer-block">
+            <h3>Erro registrado</h3>
+            <pre class="pre">${escapeHtml(data.error)}</pre>
+          </div>
+        ` : ``}
+      `;
+
+      const btnMain = $("#drawerDownloadMain");
+      const btnDocx = $("#drawerDownloadDocx");
+
+      if (btnMain) btnMain.addEventListener("click", () => downloadSubmission(sid));
+      if (btnDocx) btnDocx.addEventListener("click", () => downloadSubmission(sid, "docx"));
+    }catch(e){
+      els.drawerSubtitle.textContent = "Falha ao carregar detalhes";
+      els.drawerBody.innerHTML = `<div class="drawer-block">Erro ao consultar a submissão: ${escapeHtml(e && e.message ? e.message : "erro desconhecido")}</div>`;
+    }
+  }
+
+  function closeDrawer(){
+    els.drawer.classList.remove("open");
+    els.overlay.classList.remove("open");
+    els.drawer.setAttribute("aria-hidden", "true");
+  }
+
+  function bindEvents(){
+    els.btnAtualizar.addEventListener("click", loadSubs);
+    els.btnAtualizarTop.addEventListener("click", loadSubs);
+    els.btnIrFormulario.addEventListener("click", () => {
+      window.location.href = `${API_BASE}/ui`;
+    });
+
+    els.q.addEventListener("input", renderTable);
+    els.statusFilter.addEventListener("change", renderTable);
+
+    els.btnCloseDrawer.addEventListener("click", closeDrawer);
+    els.overlay.addEventListener("click", closeDrawer);
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") closeDrawer();
+    });
+  }
+
+  async function boot(){
+    bindEvents();
+    await loadSubs();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

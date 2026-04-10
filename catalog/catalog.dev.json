@@ -49,6 +49,23 @@
       "order": 10
     },
     {
+      "name": "etp",
+      "displayName": "ETP — Estudo Técnico Preliminar",
+      "version": "1.0.0",
+      "categoryId": "cat1",
+      "description": "Gerar o Estudo Técnico Preliminar a partir de formulário estruturado, com documento final em DOCX/PDF conforme template institucional.",
+      "ui": { "type": "iframe", "url": "/api/automations/etp/ui" },
+      "navigation": [
+        { "label": "ETP — Estudo Técnico Preliminar", "path": "/etp", "icon": "FileText" }
+      ],
+      "routes": [
+        { "path": "/etp", "kind": "iframe" }
+      ],
+      "tags": ["compras", "documentos", "etp"],
+      "requiredRoles": ["compras"],
+      "order": 11
+    },
+    {
       "name": "pca",
       "displayName": "Plano de Contratações Anual",
       "version": "0.0.0",
