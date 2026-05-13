@@ -130,8 +130,9 @@ export default function App() {
         return;
       }
 
-      if (typeof detail.delta === "number" && Number.isFinite(detail.delta)) {
-        setUnreadNotifications((prev) => Math.max(0, prev + Math.floor(detail.delta)));
+      const delta = detail.delta;
+      if (typeof delta === "number" && Number.isFinite(delta)) {
+        setUnreadNotifications((prev) => Math.max(0, prev + Math.floor(delta)));
       }
     };
 

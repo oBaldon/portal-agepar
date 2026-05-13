@@ -3,58 +3,28 @@ from __future__ import annotations
 
 """
 Notificações (inbox) — Portal AGEPAR.
-
-Objetivo
---------
-Disponibilizar um canal de notificações atrelado a:
-- uma pessoa específica (user_id), e/ou
-- um cargo/papel (role efetiva) — ex.: "compras", "rh", "ferias".
-
-Modelo
-------
-- notifications: mensagem canônica (título + corpo + metadados)
-- notification_recipients: entrega por usuário (read_at)
-
-A entrega para "cargo" é resolvida no momento do envio (snapshot dos usuários
-que possuem o papel naquele instante).
-
-Rotas HTTP
-----------
-- GET    /api/notifications
-- GET    /api/notifications/unread-count
-- POST   /api/notifications/{id}/read
-- POST   /api/notifications/read-all
-- POST   /api/notifications/send   (admin/coordenador)
-
-Integração com automations (server-side)
-----------------------------------------
-Automations podem importar e chamar:
-
-    from app.notifications import send_notification
-
-    send_notification(
-        actor=session_user,
-        title="...",
-        message="...",
-        role_names=["compras"],
-        user_ids=["<uuid>"],
-        action_url="/dfd",
-        meta={"kind": "dfd", "submission_id": sid},
-    )
 """
 
+import logging
 import os
+import threading
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from urllib.parse import urljoin
 
 import psycopg
+from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth.rbac import require_auth, require_roles_any
+from app.integrations.email_templates import build_notification_email_html
+from app.integrations.expresso_mail import ExpressoMailError, get_expresso_mail_client
 
-DATABASE_URL = os.getenv("DATABASE_URL")  # obrigatório em runtime real
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
 
@@ -95,14 +65,12 @@ def _insert_audit_event(
                 ),
             )
     except Exception:
-        # Auditoria não pode derrubar o fluxo de notificação.
         return
 
 
 def _user_uuid_from_session_user(user: Dict[str, Any]) -> uuid.UUID:
     raw = user.get("id")
     if not raw:
-        # Em sessões mock/legadas pode não haver id no banco.
         raise HTTPException(status_code=409, detail="user has no id (cannot use notifications in this auth mode)")
     try:
         return uuid.UUID(str(raw))
@@ -161,20 +129,249 @@ def _parse_default_roles() -> Set[str]:
     return {p for p in parts}
 
 
+def _normalize_email_address(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        result = validate_email(raw, check_deliverability=False)
+    except EmailNotValidError:
+        return None
+    return result.normalized
+
+
+def _select_recipient_email(
+    *,
+    email: Optional[str],
+    email_institucional: Optional[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    email_inst_raw = (email_institucional or "").strip()
+    if not email_inst_raw:
+        return None, "email_institucional_blank"
+
+    preferred = _normalize_email_address(email)
+    if preferred:
+        return preferred, None
+
+    fallback = _normalize_email_address(email_inst_raw)
+    if fallback:
+        if (email or "").strip():
+            return fallback, "email_fallback_to_institucional"
+        return fallback, None
+
+    if (email or "").strip():
+        return None, "email_invalid_and_email_institucional_invalid"
+    return None, "email_institucional_invalid"
+
+
+def _resolve_email_targets(
+    conn: psycopg.Connection,
+    recipients: Sequence[uuid.UUID],
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+    if not recipients:
+        return [], []
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, COALESCE(name, '') AS name, email, email_institucional
+            FROM users
+            WHERE id = ANY(%s)
+            """,
+            (list(recipients),),
+        )
+        rows = cur.fetchall() or []
+
+    ready: List[Dict[str, str]] = []
+    skipped: List[Dict[str, str]] = []
+
+    for user_id, name, email, email_institucional in rows:
+        selected, reason = _select_recipient_email(
+            email=email,
+            email_institucional=email_institucional,
+        )
+        if not selected:
+            skipped.append(
+                {
+                    "user_id": str(user_id),
+                    "name": str(name or "").strip(),
+                    "reason": reason or "email_not_available",
+                    "has_email": "1" if str(email or "").strip() else "0",
+                    "has_email_institucional": "1" if str(email_institucional or "").strip() else "0",
+                }
+            )
+            continue
+
+        if reason == "email_fallback_to_institucional":
+            logger.info(
+                "[NOTIFICATIONS] Fallback para email_institucional aplicado | user_id=%s | nome=%s",
+                user_id,
+                str(name or "").strip() or "-",
+            )
+
+        ready.append(
+            {
+                "user_id": str(user_id),
+                "name": str(name or "").strip(),
+                "email": selected,
+            }
+        )
+
+    return ready, skipped
+
+
+def _notification_email_subject(title: str) -> str:
+    ttl = (title or "").strip()
+    return f"[Plataforma Agepar] {ttl}" if ttl else "[Plataforma Agepar] Nova notificacao"
+
+
+def _absolute_action_url(action_url: Optional[str]) -> Optional[str]:
+    url = (action_url or "").strip()
+    if not url:
+        return None
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+
+    base = (os.getenv("PORTAL_PUBLIC_BASE_URL", "") or "").strip()
+    if base:
+        return urljoin(base.rstrip("/") + "/", url.lstrip("/"))
+
+    return url
+
+
+def _notification_email_body(
+    *,
+    recipient_name: str,
+    title: str,
+    message: str,
+    level: str,
+    action_url: Optional[str],
+) -> str:
+    opened_url = _absolute_action_url(action_url)
+    lines = [
+        f"Olá, {recipient_name or 'servidor(a)'}.",
+        "",
+        "Você recebeu uma nova notificação na Plataforma AGEPAR.",
+        "",
+        f"Título: {title}",
+        f"Mensagem: {message}",
+        f"Nível: {level}",
+        f"Gerado em: {datetime.now(timezone.utc).astimezone().strftime('%d/%m/%Y %H:%M:%S')}",
+    ]
+    if opened_url:
+        lines.extend(["", f"Abrir na plataforma: {opened_url}"])
+    elif (action_url or "").strip():
+        lines.extend(["", f"Caminho na plataforma: {action_url}"])
+
+    lines.extend(
+        [
+            "",
+            "Este e-mail foi enviado automaticamente pela Plataforma AGEPAR.",
+            "Caso você já tenha tratado essa pendência, desconsidere esta mensagem.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _dispatch_notification_emails(
+    *,
+    notification_id: str,
+    title: str,
+    message: str,
+    level: str,
+    action_url: Optional[str],
+    email_targets: Sequence[Dict[str, str]],
+) -> None:
+    client = get_expresso_mail_client()
+    if not client.enabled:
+        logger.info(
+            "[NOTIFICATIONS] Integracao de e-mail do Expresso desabilitada/incompleta | notif=%s | recipients=%d",
+            notification_id,
+            len(email_targets),
+        )
+        return
+
+    subject = _notification_email_subject(title)
+    sent = 0
+    failed = 0
+
+    for target in email_targets:
+        body_plain = _notification_email_body(
+            recipient_name=target.get("name", ""),
+            title=title,
+            message=message,
+            level=level,
+            action_url=action_url,
+        )
+        body_html = build_notification_email_html(body_plain)
+
+        try:
+            client.send_mail(
+                to=target["email"],
+                subject=subject,
+                body=body_html,
+                msg_type="html",
+            )
+            sent += 1
+            logger.info(
+                "[NOTIFICATIONS] E-mail enviado via Expresso | notif=%s | user_id=%s",
+                notification_id,
+                target.get("user_id"),
+            )
+        except ExpressoMailError as exc:
+            failed += 1
+            logger.error(
+                "[NOTIFICATIONS] Falha ao enviar e-mail via Expresso | notif=%s | user_id=%s | error=%s",
+                notification_id,
+                target.get("user_id"),
+                exc,
+            )
+        except Exception:
+            failed += 1
+            logger.exception(
+                "[NOTIFICATIONS] Erro inesperado ao enviar e-mail | notif=%s | user_id=%s",
+                notification_id,
+                target.get("user_id"),
+            )
+
+    logger.info(
+        "[NOTIFICATIONS] Resumo do disparo de e-mails | notif=%s | sent=%d | failed=%d",
+        notification_id,
+        sent,
+        failed,
+    )
+
+
+def _dispatch_notification_emails_async(
+    *,
+    notification_id: str,
+    title: str,
+    message: str,
+    level: str,
+    action_url: Optional[str],
+    email_targets: Sequence[Dict[str, str]],
+) -> None:
+    if not email_targets:
+        return
+
+    threading.Thread(
+        target=_dispatch_notification_emails,
+        kwargs={
+            "notification_id": notification_id,
+            "title": title,
+            "message": message,
+            "level": level,
+            "action_url": action_url,
+            "email_targets": list(email_targets),
+        },
+        name=f"notif-email-{notification_id[:8]}",
+        daemon=True,
+    ).start()
+
+
 def _resolve_role_user_ids(conn: psycopg.Connection, role_names: Sequence[str]) -> Set[uuid.UUID]:
-    """
-    Resolve usuários ativos que possuem qualquer um dos papéis informados.
-
-    Observação
-    ----------
-    O Portal pode ter papéis "lógicos" (ex.: vindos de AUTH_DEFAULT_ROLES),
-    que não necessariamente existem como registros em `roles`. Por isso, esta
-    resolução considera papéis efetivos:
-
-    - papéis persistidos (user_roles → roles.name)
-    - papéis globais (AUTH_DEFAULT_ROLES)
-    - superuser → papel lógico "admin"
-    """
     wanted = {r.strip() for r in role_names if r and r.strip()}
     if not wanted:
         return set()
@@ -255,13 +452,6 @@ def send_notification(
     ip: Optional[str] = None,
     ua: Optional[str] = None,
 ) -> Tuple[str, int]:
-    """
-    API server-side para envio de notificações.
-
-    Retorna
-    -------
-    (notification_id, delivered_count)
-    """
     ttl = (title or "").strip()
     msg = (message or "").strip()
     if not ttl:
@@ -289,6 +479,8 @@ def send_notification(
         recipients: Set[uuid.UUID] = set(role_user_ids) | set(direct_user_ids)
         if not recipients:
             raise HTTPException(status_code=422, detail="targets produced no recipients")
+
+        email_targets, email_skips = _resolve_email_targets(conn, list(recipients))
 
         actor_user_id = None
         actor_cpf = None
@@ -334,6 +526,17 @@ def send_notification(
                 rows,
             )
 
+        for skipped in email_skips:
+            logger.warning(
+                "[NOTIFICATIONS] E-mail não enviado para destinatário da notificação | notif=%s | user_id=%s | nome=%s | reason=%s | has_email=%s | has_email_institucional=%s",
+                notif_id,
+                skipped.get("user_id"),
+                skipped.get("name") or "-",
+                skipped.get("reason"),
+                skipped.get("has_email"),
+                skipped.get("has_email_institucional"),
+            )
+
         _insert_audit_event(
             conn,
             actor_user_id=actor_user_id,
@@ -347,9 +550,24 @@ def send_notification(
                 "user_ids": user_ids_l,
                 "level": lv,
                 "action_url": action_url,
+                "email": {
+                    "planned": len(email_targets),
+                    "skipped": len(email_skips),
+                    "skip_reasons": sorted({item.get("reason", "unknown") for item in email_skips}),
+                    "integration_enabled": get_expresso_mail_client().enabled,
+                },
             },
             ip=ip,
             ua=ua,
+        )
+
+        _dispatch_notification_emails_async(
+            notification_id=str(notif_id),
+            title=ttl,
+            message=msg,
+            level=lv,
+            action_url=action_url,
+            email_targets=email_targets,
         )
 
         return str(notif_id), len(recipients)
@@ -480,4 +698,3 @@ def send_notification_http(payload: SendNotificationIn, request: Request, user: 
         raise HTTPException(status_code=422, detail=str(e))
 
     return {"id": notif_id, "delivered": int(delivered)}
-

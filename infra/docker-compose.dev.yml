@@ -29,6 +29,13 @@ services:
       LOG_LEVEL: INFO
       AUTH_ENABLE_SELF_REGISTER: "false"
       ACCOUNTS_CREATE_LEGACY_ENABLED: "false"  # LEGADO: criação de contas desativada (true => habilita compat)
+      EXPRESSO_MAIL_ENABLED: "true"
+      EXPRESSO_API_BASE: "https://api.expresso.pr.gov.br/celepar"
+      EXPRESSO_API_USER: "plataforma.agepar"
+      EXPRESSO_API_PASSWORD: "Agepar2026"
+      EXPRESSO_MAIL_TIMEOUT_SECONDS: "10"
+      EXPRESSO_MAIL_AUTH_CACHE_SECONDS: "600"
+      PORTAL_PUBLIC_BASE_URL: "http://10.59.1.81:5173/"
     volumes:
       - ../apps/bff:/app
       - ../catalog:/catalog:ro
