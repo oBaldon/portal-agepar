@@ -1028,15 +1028,15 @@ async def submit_etp(
             actor=user,
             title="Novo ETP enviado",
             message=" ".join(msg_parts),
-            role_names=["ca", "CA"],
+            role_names=["coordendor_ca"],
             action_url="/controle",
             meta={"kind": "etp", "submissionId": sid, "protocolo": protocolo_val, "objeto": objeto_val},
             ip=request.client.host if request.client else None,
             ua=request.headers.get("user-agent"),
         )
-        logger.info("[ETP] Notificação enviada para CA | notif=%s | delivered=%d", notif_id, delivered)
+        logger.info("[ETP] Notificação enviada para COORDENDOR_CA | notif=%s | delivered=%d", notif_id, delivered)
     except Exception:
-        logger.exception("[ETP] Falha ao notificar CA (não bloqueante)")
+        logger.exception("[ETP] Falha ao notificar COORDENDOR_CA (não bloqueante)")
 
     logger.info(
         "[ETP] Submissão %s criada por %s (%s) | protocolo=%s",

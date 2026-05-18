@@ -1581,15 +1581,15 @@ async def submit_dfd(
             actor=user,
             title="Novo DFD enviado",
             message=" ".join(msg_parts),
-            role_names=["ca", "CA"],
+            role_names=["coordendor_ca"],
             action_url="/controle",
             meta={"kind": "dfd", "submissionId": sid, "numero": numero_val, "protocolo": protocolo_val},
             ip=request.client.host if request.client else None,
             ua=request.headers.get("user-agent"),
         )
-        logger.info("[DFD] Notificação enviada para CA | notif=%s | delivered=%d", notif_id, delivered)
+        logger.info("[DFD] Notificação enviada para COORDENDOR_CA | notif=%s | delivered=%d", notif_id, delivered)
     except Exception:
-        logger.exception("[DFD] Falha ao notificar CA (não bloqueante)")
+        logger.exception("[DFD] Falha ao notificar COORDENDOR_CA (não bloqueante)")
 
     logger.info(
         "[DFD] Submissão %s criada por %s (%s) | modelo=%s | numero=%s",

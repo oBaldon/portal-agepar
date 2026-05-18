@@ -126,7 +126,7 @@ class SendNotificationOut(BaseModel):
 def _parse_default_roles() -> Set[str]:
     raw = os.getenv("AUTH_DEFAULT_ROLES", "")
     parts = [p.strip() for p in raw.split(",") if p.strip()]
-    return {p for p in parts}
+    return {p.lower() for p in parts}
 
 
 def _normalize_email_address(value: Optional[str]) -> Optional[str]:
@@ -372,7 +372,7 @@ def _dispatch_notification_emails_async(
 
 
 def _resolve_role_user_ids(conn: psycopg.Connection, role_names: Sequence[str]) -> Set[uuid.UUID]:
-    wanted = {r.strip() for r in role_names if r and r.strip()}
+    wanted = {r.strip().lower() for r in role_names if r and r.strip()}
     if not wanted:
         return set()
 
@@ -396,7 +396,7 @@ def _resolve_role_user_ids(conn: psycopg.Connection, role_names: Sequence[str]) 
 
     out: Set[uuid.UUID] = set()
     for user_id, is_superuser, roles in rows:
-        eff = set(roles or []) | set(default_roles)
+        eff = {str(r).strip().lower() for r in (roles or []) if str(r).strip()} | set(default_roles)
         if is_superuser:
             eff.add("admin")
         if eff.intersection(wanted):
