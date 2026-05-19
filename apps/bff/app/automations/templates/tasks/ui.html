@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Tarefas — Plataforma AGEPAR</title>
+<style>
+  :root{
+    --bg:#f8fafc; --card:#fff; --fg:#0f172a; --muted:#475569; --line:#e2e8f0; --pri:#2563eb;
+    --pri-soft:#dbeafe; --soft:#eff6ff; --ok:#16a34a; --warn:#f59e0b; --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+  body{line-height:1.45}
+  .wrap{max-width:min(1520px, calc(100vw - 24px));margin:16px auto 32px;padding:0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+  .hero-shell{padding:20px}
+  .hero-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .hero-copy h1{font-size:28px;line-height:1.15;margin:0 0 8px}
+  .hero-copy .muted{max-width:760px}
+  .muted{color:var(--muted)}
+  .hero-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .primary-cta{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;border-radius:14px;font-weight:700;font-size:15px;background:var(--pri);color:#fff;border:1px solid transparent;box-shadow:0 8px 20px rgba(37,99,235,.18)}
+  .primary-cta:hover{filter:brightness(.98)}
+  .view-switch{display:flex;gap:8px;flex-wrap:wrap;padding:6px;background:#f8fafc;border:1px solid var(--line);border-radius:14px}
+  .view-btn{background:#fff;color:#334155;border:1px solid transparent;border-radius:10px;padding:9px 12px;font:inherit;cursor:pointer}
+  .view-btn.active{background:var(--pri);color:#fff;box-shadow:0 4px 10px rgba(37,99,235,.18)}
+  .panel{margin-top:16px}
+  .filter-shell{padding:16px}
+  .filter-top{display:grid;grid-template-columns:minmax(260px,1.5fr) repeat(4,minmax(140px,.8fr));gap:12px;align-items:end}
+  .filter-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .filter-advanced{margin-top:12px}
+  .filter-advanced details{border:1px dashed var(--line);border-radius:14px;padding:10px 12px;background:#fafcff}
+  .filter-advanced summary{cursor:pointer;font-weight:600;color:#334155}
+  .advanced-grid{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:12px;margin-top:12px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 6px}
+  input,select,textarea{width:100%;padding:11px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;font:inherit}
+  textarea{min-height:116px;resize:vertical}
+  button{border:1px solid transparent;background:var(--pri);color:#fff;border-radius:12px;padding:10px 14px;font:inherit;cursor:pointer}
+  button.secondary{background:#fff;color:#334155;border-color:#cbd5e1}
+  button.danger{background:#fff;color:#991b1b;border-color:#fecaca}
+  button.ghost{background:#fff;color:#334155;border-color:#e2e8f0}
+  button[disabled]{opacity:.55;cursor:not-allowed}
+  .status-line{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:14px;min-height:20px;flex-wrap:wrap}
+  .status-line .filter-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .stat{padding:16px}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .stat .v{font-size:28px;font-weight:800;margin-top:6px}
+  .layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(420px,.9fr);gap:16px;align-items:start}
+  .content-card{padding:12px}
+  .content-stack{display:grid;gap:16px}
+  .content-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 6px 12px}
+  .content-head h2,.side h2,.panel h2{font-size:17px;margin:0}
+  .content-subtitle{font-size:12px;color:var(--muted)}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+  table{width:100%;border-collapse:collapse;background:#fff}
+  th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}
+  th{font-size:12px;color:#64748b;background:#f8fafc;position:sticky;top:0;z-index:1}
+  tbody tr:hover td{background:#fbfdff}
+  .task-main{display:grid;gap:6px;min-width:260px}
+  .task-title{font-size:14px;font-weight:700}
+  .task-desc{font-size:12px;color:var(--muted)}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#334155}
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 8px;border:1px solid var(--line);font-size:11px;background:#fff}
+  .source-pill{background:#f1f5f9;border-color:#cbd5e1}
+  .pri-baixa{background:#f8fafc}
+  .pri-media{background:#eff6ff}
+  .pri-alta{background:#fff7ed}
+  .pri-urgente{background:#fef2f2}
+  .overdue{color:var(--danger);font-weight:700}
+  .row-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .empty{padding:22px;color:var(--muted);text-align:center}
+  .board{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:12px}
+  .col{padding:12px}
+  .col-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .col h3{font-size:15px;margin:0}
+  .task{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff;margin-bottom:10px;display:grid;gap:8px}
+  .task h4{font-size:14px;margin:0}
+  .task p{font-size:12px;color:var(--muted);margin:0;white-space:pre-wrap}
+  .calendar-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px}
+  .calendar-nav .nav-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .calendar-title{font-weight:700}
+  .week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+  .week-day,.month-cell{padding:12px}
+  .week-day h3,.month-cell-head{margin:0 0 10px;font-size:13px}
+  .day-list{display:flex;flex-direction:column;gap:8px}
+  .calendar-item{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;cursor:pointer}
+  .calendar-item .top{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px}
+  .calendar-item .title{font-size:12px;font-weight:600}
+  .calendar-item .sub{font-size:11px;color:var(--muted)}
+  .calendar-item.kind-start{border-left:4px solid #16a34a}
+  .calendar-item.kind-due{border-left:4px solid #2563eb}
+  .calendar-item.kind-created{border-left:4px solid #64748b}
+  .month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+  .month-cell{min-height:180px}
+  .month-cell.other-month{opacity:.55;background:#f8fafc}
+  .month-cell-num{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .month-cell-num strong{font-size:13px}
+  .tiny{font-size:11px;color:var(--muted)}
+  .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .side-stack{display:grid;gap:16px}
+  .side-panel{padding:16px}
+  .side-panel.sticky{position:sticky;top:16px}
+  .activity-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+  .detail{display:none}
+  .detail.show{display:block}
+  .help{font-size:12px;color:var(--muted)}
+  .form-mode{display:grid;gap:8px;margin:8px 0 14px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#f8fafc}
+  .form-mode .mode-badge{display:inline-flex;align-items:center;gap:6px;width:max-content;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;background:var(--pri-soft);color:#1d4ed8}
+  .form-mode.editing .mode-badge{background:#fff7ed;color:#b45309}
+  .form-mode strong{font-size:13px}
+  .form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .subtle-btn{background:#fff;color:#334155;border-color:#cbd5e1}
+  .tabs{display:flex;gap:8px;margin-bottom:12px}
+  .tab-btn{background:#fff;color:#334155;border:1px solid #e2e8f0;border-radius:12px;padding:9px 12px}
+  .tab-btn.active{background:var(--pri);border-color:transparent;color:#fff}
+  .status-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+  .status-buttons button{padding:11px 12px;min-height:48px;display:inline-flex;align-items:center;justify-content:center;text-align:center}
+  .quick-next{
+    grid-column:1 / -1;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:8px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#f8fafc;
+    margin-top:0;
+  }
+  .quick-next .quick-label{font-size:12px;color:var(--muted)}
+  .next-btn{background:var(--pri);color:#fff;border-color:transparent}
+  .comment,.history-item{padding:12px 0;border-bottom:1px solid #eef2f7}
+  .comment:last-child,.history-item:last-child{border-bottom:none}
+  .history-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
+  .history-summary{font-size:12px;color:#334155;margin-top:4px}
+  .hidden{display:none !important}
+  .section-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
+  .insights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .insight-box{padding:14px 16px}
+  .insight-box h3{margin:0 0 10px;font-size:14px}
+  .mini-list{display:flex;flex-direction:column;gap:8px}
+  .mini-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+  .mini-row strong{font-size:18px}
+  .stack-list{display:grid;gap:8px}
+  .stack-item{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff}
+  .sev-success{color:var(--ok);font-weight:600}
+  .sev-warning{color:#b45309;font-weight:600}
+  .sev-danger{color:var(--danger);font-weight:600}
+  .history-launch{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px;border:1px dashed var(--line);border-radius:14px;background:#fafcff}
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(15,23,42,.48);
+    display:none; align-items:center; justify-content:center; padding:18px; z-index:9999;
+  }
+  .modal-backdrop.open{display:flex}
+  .modal-card{
+    width:min(920px, 96vw); max-height:min(88vh, 920px);
+    display:flex; flex-direction:column;
+    background:#fff; border:1px solid var(--line); border-radius:18px;
+    box-shadow:0 24px 80px rgba(15,23,42,.24);
+  }
+  .modal-head{
+    position:sticky; top:0; z-index:1;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:14px 16px; background:rgba(255,255,255,.94); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .modal-body{
+    padding:16px;
+    overflow:auto;
+    max-height:calc(88vh - 84px);
+    min-height:0;
+    -webkit-overflow-scrolling:touch;
+  }
+  .modal-body .history-item{padding:14px 0}
+  @media (max-width:1280px){.layout{grid-template-columns:1fr}.side-panel.sticky{position:static}.filter-top{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (max-width:1100px){.board{grid-template-columns:repeat(2,minmax(260px,1fr))}.week-grid,.month-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:760px){.hero-top,.status-line,.section-title{flex-direction:column;align-items:stretch}.filter-top,.advanced-grid{grid-template-columns:1fr}.board,.week-grid,.month-grid{grid-template-columns:1fr}.view-switch{width:100%}.status-buttons{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card hero-shell">
+    <div class="hero-top">
+      <div class="hero-copy">
+        <h1>Gestão de Tarefas</h1>
+        <div class="muted">Organize atividades, acompanhe responsáveis, controle prazos e visualize tudo em lista, kanban ou calendário.</div>
+      </div>
+      <div class="hero-actions">
+        <button id="newTaskBtn" class="primary-cta" type="button">+ Nova tarefa</button>
+        <div class="view-switch" role="tablist" aria-label="Modos de visualização">
+          <button id="listViewBtn" class="view-btn active" type="button">Lista</button>
+          <button id="kanbanViewBtn" class="view-btn" type="button">Kanban</button>
+          <button id="weekViewBtn" class="view-btn" type="button">Semana</button>
+          <button id="monthViewBtn" class="view-btn" type="button">Mês</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card panel filter-shell">
+    <div class="filter-top">
+      <div class="field">
+        <label for="q">Buscar tarefa</label>
+        <input id="q" placeholder="Título ou descrição"/>
+      </div>
+      <div class="field">
+        <label for="statusFilter">Status</label>
+        <select id="statusFilter"></select>
+      </div>
+      <div class="field">
+        <label for="priorityFilter">Prioridade</label>
+        <select id="priorityFilter"></select>
+      </div>
+      <div class="field">
+        <label for="assignedFilter">Responsável</label>
+        <select id="assignedFilter"></select>
+      </div>
+      <div class="field">
+        <label for="scopeFilter">Escopo</label>
+        <select id="scopeFilter">
+          <option value="all">Tudo que posso ver</option>
+          <option value="mine">Minhas tarefas</option>
+          <option value="created">Criadas por mim</option>
+          <option value="assigned">Atribuídas a mim</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-advanced">
+      <details>
+        <summary>Filtros avançados</summary>
+        <div class="advanced-grid">
+          <div class="field">
+            <label for="dateFromFilter">De</label>
+            <input id="dateFromFilter" type="date"/>
+          </div>
+          <div class="field">
+            <label for="dateToFilter">Até</label>
+            <input id="dateToFilter" type="date"/>
+          </div>
+          <div class="field">
+            <label for="overdueFilter">Atrasadas</label>
+            <select id="overdueFilter">
+              <option value="all">Todas</option>
+              <option value="only">Só atrasadas</option>
+            </select>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="status-line">
+      <div class="help">Use os filtros para refinar a lista. A criação e a edição ficam no painel lateral.</div>
+      <div class="filter-actions">
+        <button id="clearFiltersBtn" class="ghost" type="button">Limpar filtros</button>
+        <button id="applyFilters" class="secondary" type="button">Atualizar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats panel">
+    <div class="card stat"><div class="k">Ativas</div><div class="v" id="statActive">0</div></div>
+    <div class="card stat"><div class="k">Atribuídas a mim</div><div class="v" id="statAssignedToMe">0</div></div>
+    <div class="card stat"><div class="k">Atrasadas</div><div class="v" id="statOverdue">0</div></div>
+    <div class="card stat"><div class="k">Próximas 7 dias</div><div class="v" id="statDueSoon">0</div></div>
+  </section>
+
+  <section class="layout panel">
+    <div class="content-stack">
+      <div id="calendarNav" class="card calendar-nav hidden">
+        <div class="nav-actions">
+          <button id="calendarPrevBtn" class="ghost" type="button">Anterior</button>
+          <button id="calendarTodayBtn" class="secondary" type="button">Hoje</button>
+          <button id="calendarNextBtn" class="ghost" type="button">Próximo</button>
+        </div>
+        <div class="calendar-title" id="calendarTitle">Calendário</div>
+        <div class="tiny" id="calendarSubtitle"></div>
+      </div>
+
+      <div id="listView" class="card content-card">
+        <div class="content-head">
+          <div>
+            <h2>Tarefas</h2>
+            <div class="content-subtitle">Visão em tabela para leitura rápida e ações diretas.</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarefa</th>
+                <th>Status</th>
+                <th>Prioridade</th>
+                <th>Responsável</th>
+                <th>Prazo</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="listBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="kanbanView" class="hidden">
+        <div class="board" id="kanbanBoard"></div>
+      </div>
+
+      <div id="weekView" class="hidden">
+        <div class="week-grid" id="weekGrid"></div>
+      </div>
+
+      <div id="monthView" class="hidden">
+        <div class="month-grid" id="monthGrid"></div>
+      </div>
+    </div>
+
+    <div class="side-stack">
+      <section class="card side-panel sticky">
+        <div class="tabs">
+          <button id="tabForm" class="tab-btn active" type="button">Nova / editar</button>
+          <button id="tabDetail" class="tab-btn" type="button">Detalhe</button>
+        </div>
+
+        <div id="formPane">
+          <h2 id="formTitle">Nova tarefa</h2>
+          <div id="formModeBox" class="form-mode">
+            <span id="formModeBadge" class="mode-badge">Criando</span>
+            <strong id="formModeTitle">Você está criando uma nova tarefa.</strong>
+            <div id="formModeText" class="help">Preencha os campos abaixo e clique em “Criar tarefa”. Para editar uma tarefa existente, abra uma tarefa na lista e use “Editar”.</div>
+          </div>
+          <form id="taskForm">
+            <input type="hidden" id="taskId"/>
+            <div>
+              <label for="title">Título</label>
+              <input id="title" required maxlength="180"/>
+            </div>
+            <div>
+              <label for="description">Descrição</label>
+              <textarea id="description" placeholder="Descreva a tarefa"></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label for="priority">Prioridade</label>
+                <select id="priority"></select>
+              </div>
+              <div>
+                <label for="assignedTo">Responsável</label>
+                <select id="assignedTo"></select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label for="startDate">Início</label>
+                <input id="startDate" type="date"/>
+              </div>
+              <div>
+                <label for="dueDate">Prazo</label>
+                <input id="dueDate" type="date"/>
+              </div>
+            </div>
+            <div class="help" style="margin-top:10px">O calendário usa as datas de início e prazo quando disponíveis. Sem datas, a tarefa aparece pelo dia de criação.</div>
+            <div class="form-actions">
+              <button type="submit" id="saveBtn">Criar tarefa</button>
+              <button type="button" id="cancelEditBtn" class="secondary">Limpar formulário</button>
+              <button type="button" id="backToDetailBtn" class="subtle-btn hidden">Voltar ao detalhe</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="detailPane" class="detail">
+          <h2 id="detailTitle">Detalhe da tarefa</h2>
+          <div id="detailMeta" class="help"></div>
+
+          <div style="margin-top:14px">
+            <label>Status</label>
+            <div class="status-buttons" id="statusButtons"></div>
+          </div>
+
+          <div style="margin-top:16px">
+            <label>Comentários</label>
+            <div id="commentsWrap"></div>
+            <textarea id="commentBody" placeholder="Adicionar comentário"></textarea>
+            <div style="margin-top:8px"><button id="addCommentBtn" class="secondary" type="button">Comentar</button></div>
+          </div>
+
+          <div style="margin-top:16px">
+            <label>Histórico</label>
+            <div class="history-launch">
+              <div>
+                <strong>Ver histórico completo</strong>
+                <div class="help">Abra o histórico em uma janela própria para leitura confortável.</div>
+              </div>
+              <button id="openHistoryBtn" class="ghost" type="button">Abrir histórico</button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+            <button id="editCurrentBtn" class="secondary" type="button">Editar</button>
+            <button id="restoreCurrentBtn" class="ghost hidden" type="button">Restaurar</button>
+            <button id="deleteCurrentBtn" class="danger" type="button">Excluir</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="card side-panel">
+      <div class="section-title">
+        <div>
+          <h2>Atividade recente</h2>
+          <div class="help">Últimos eventos visíveis no módulo de tarefas, agora em largura total para leitura confortável.</div>
+        </div>
+      </div>
+      <div id="activityWrap" class="activity-grid"></div>
+    </div>
+  </section>
+
+  <section id="insightsSection" class="panel hidden">
+    <div class="card side-panel">
+      <div class="section-title">
+        <div>
+          <h2>Painel gerencial</h2>
+          <div class="help">Visão consolidada única para coordenação, reunindo indicadores, distribuição e acompanhamento das tarefas.</div>
+        </div>
+      </div>
+      <div class="insights-grid">
+        <div class="card insight-box">
+          <div class="k">Abertas (global)</div>
+          <div class="v" id="mgmtOpen">0</div>
+          <div class="tiny">Todas as tarefas ativas visíveis à gestão</div>
+        </div>
+        <div class="card insight-box">
+          <div class="k">Concluídas no período</div>
+          <div class="v" id="mgmtCompleted">0</div>
+          <div class="tiny" id="mgmtPeriodHint">Últimos 30 dias</div>
+        </div>
+        <div class="card insight-box">
+          <div class="k">Atrasadas</div>
+          <div class="v" id="mgmtOverdue">0</div>
+          <div class="tiny">Pendências com prazo vencido</div>
+        </div>
+        <div class="card insight-box">
+          <div class="k">Em revisão</div>
+          <div class="v" id="mgmtInReview">0</div>
+          <div class="tiny">Fila atual de revisão</div>
+        </div>
+        <div class="card insight-box">
+          <div class="k">Lead time médio</div>
+          <div class="v" id="mgmtLeadHours">0h</div>
+          <div class="tiny">Concluídas no período</div>
+        </div>
+        <div class="card insight-box">
+          <h3>Status (global)</h3>
+          <div id="mgmtByStatus" class="mini-list"></div>
+        </div>
+        <div class="card insight-box">
+          <h3>Abertas por responsável</h3>
+          <div id="insOpenByAssignee" class="mini-list"></div>
+        </div>
+        <div class="card insight-box">
+          <h3>Atrasadas por responsável</h3>
+          <div id="insOverdueByAssignee" class="mini-list"></div>
+        </div>
+        <div class="card insight-box">
+          <h3>Concluídas por responsável</h3>
+          <div id="insCompletedByAssignee" class="mini-list"></div>
+        </div>
+        <div class="card insight-box">
+          <h3>Origem das tarefas</h3>
+          <div id="insBySource" class="mini-list"></div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:16px"><h2 style="font-size:15px">Resumo por responsável</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Responsável</th>
+              <th>Abertas</th>
+              <th>Atrasadas</th>
+              <th>Concluídas</th>
+              <th>Lead médio</th>
+            </tr>
+          </thead>
+          <tbody id="mgmtByUserBody"></tbody>
+        </table>
+      </div>
+      <div class="section-title" style="margin-top:16px"><h2 style="font-size:15px">Concluídas recentes</h2></div>
+      <div id="mgmtRecentCompleted" class="stack-list"></div>
+    </div>
+  </section>
+
+  <div id="historyModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <strong id="historyModalTitle">Histórico da tarefa</strong>
+          <div id="historyModalSubtitle" class="help">Carregando…</div>
+        </div>
+        <button id="closeHistoryModalBtn" class="secondary" type="button">Fechar</button>
+      </div>
+      <div class="modal-body" id="historyModalBody">
+        <div class="empty">Carregando histórico…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = {
+  config: null,
+  items: [],
+  current: null,
+  currentView: 'list',
+  calendarAnchor: new Date(),
+  summary: null,
+  activity: [],
+  insights: null,
+  management: null,
+  historyItems: [],
+};
+
+const STATUS_LABELS = {
+  a_fazer: 'A fazer',
+  em_andamento: 'Em andamento',
+  em_revisao: 'Em revisão',
+  concluida: 'Concluída',
+  cancelada: 'Cancelada',
+};
+const STATUS_FLOW_FALLBACK = {
+  a_fazer: { next: 'em_andamento', label: 'Iniciar' },
+  em_andamento: { next: 'concluida', label: 'Concluir' },
+  concluida: { next: 'em_revisao', label: 'Revisar' },
+  em_revisao: { next: 'concluida', label: 'Aprovar revisão' },
+  cancelada: null,
+};
+
+const PRIORITY_LABELS = {
+  baixa: 'Baixa',
+  media: 'Média',
+  alta: 'Alta',
+  urgente: 'Urgente',
+};
+
+const HISTORY_LABELS = {
+  task_created: 'Tarefa criada',
+  task_updated: 'Tarefa atualizada',
+  task_status_changed: 'Status alterado',
+  task_assigned: 'Responsável definido',
+  task_reassigned: 'Responsável alterado',
+  task_completed: 'Tarefa concluída',
+  task_cancelled: 'Tarefa cancelada',
+  task_deleted: 'Tarefa excluída logicamente',
+  task_restored: 'Tarefa restaurada',
+  task_comment_added: 'Comentário adicionado',
+};
+
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m])); }
+function shortText(v, max=140){ const s = String(v || ''); return s.length > max ? s.slice(0, max).trim() + '…' : s; }
+function dt(v){ if(!v) return '—'; try{ return new Date(v).toLocaleString('pt-BR'); }catch{ return v; } }
+function sourceLabel(item){
+  const kind = String(item?.sourceKind || '').trim();
+  const sid = String(item?.sourceId || '').trim();
+  if(!kind && !sid) return '';
+  return sid ? `${kind || 'origem'} · ${sid}` : kind;
+}
+function renderMiniList(items){
+  if(!(items||[]).length) return '<div class="empty" style="padding:0;text-align:left">Sem dados suficientes.</div>';
+  return items.map(it => `<div class="mini-row"><span class="truncate">${esc(it.label)}</span><strong>${esc(it.total)}</strong></div>`).join('');
+}
+function dd(v){ if(!v) return '—'; try{ return new Date(v+'T00:00:00').toLocaleDateString('pt-BR'); }catch{ return v; } }
+function priorityClass(p){ return 'pri-' + String(p || 'media'); }
+function statusLabel(v){ return STATUS_LABELS[v] || v; }
+function priorityLabel(v){ return PRIORITY_LABELS[v] || v; }
+function statusFlow(){ return state.config?.statusFlow || STATUS_FLOW_FALLBACK; }
+function nextStatusAction(item){
+  if(!item?.canChangeStatus) return null;
+  const flow = statusFlow();
+  return flow[item.status] || null;
+}
+async function applyStatusChange(taskId, status){
+  await api('/api/automations/tasks/tasks/' + encodeURIComponent(taskId) + '/status', {
+    method:'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+  await openTask(taskId);
+}
+function todayKey(){ return dateKey(new Date()); }
+function dateKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function parseDateKey(v){ return new Date(v + 'T00:00:00'); }
+function cloneDate(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function addDays(d, n){ const x = cloneDate(d); x.setDate(x.getDate() + n); return x; }
+function startOfWeek(d){ const x = cloneDate(d); const day = x.getDay(); const diff = day === 0 ? -6 : 1 - day; return addDays(x, diff); }
+function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
+function monthTitle(d){ return d.toLocaleDateString('pt-BR', { month:'long', year:'numeric' }); }
+function weekTitle(start, end){ return `${start.toLocaleDateString('pt-BR')} — ${end.toLocaleDateString('pt-BR')}`; }
+function sameMonth(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth(); }
+
+async function api(path, opts = {}){
+  const res = await fetch(path, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+  });
+  if(!res.ok){
+    const txt = await res.text();
+    throw new Error(txt || ('HTTP ' + res.status));
+  }
+  if(res.status === 204) return null;
+  return await res.json();
+}
+
+function fillSelect(el, values, labelMap, includeEmpty = false){
+  const opts = [];
+  if(includeEmpty) opts.push('<option value="">—</option>');
+  for(const v of values){
+    opts.push(`<option value="${esc(v)}">${esc(labelMap?.[v] || v)}</option>`);
+  }
+  el.innerHTML = opts.join('');
+}
+
+function updateStats(){
+  const totals = state.summary?.totals || {};
+  document.getElementById('statActive').textContent = totals.active ?? 0;
+  document.getElementById('statAssignedToMe').textContent = totals.assignedToMe ?? 0;
+  document.getElementById('statOverdue').textContent = totals.overdue ?? 0;
+  document.getElementById('statDueSoon').textContent = totals.dueNext7Days ?? 0;
+}
+
+function renderInsights(){
+  const section = document.getElementById('insightsSection');
+  if(!state.config?.me?.elevated){
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  document.getElementById('insOpenByAssignee').innerHTML = renderMiniList(state.insights?.openByAssignee || []);
+  document.getElementById('insOverdueByAssignee').innerHTML = renderMiniList(state.insights?.overdueByAssignee || []);
+  document.getElementById('insCompletedByAssignee').innerHTML = renderMiniList(state.insights?.completedByAssignee || []);
+  document.getElementById('insBySource').innerHTML = renderMiniList(state.insights?.bySource || []);
+}
+
+
+function renderManagement(){
+  const section = document.getElementById('insightsSection');
+  if(!state.config?.me?.elevated){
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  const totals = state.management?.totals || {};
+  document.getElementById('mgmtOpen').textContent = totals.open ?? 0;
+  document.getElementById('mgmtCompleted').textContent = totals.completedInPeriod ?? 0;
+  document.getElementById('mgmtOverdue').textContent = totals.overdue ?? 0;
+  document.getElementById('mgmtInReview').textContent = totals.inReview ?? 0;
+  document.getElementById('mgmtLeadHours').textContent = `${totals.avgLeadHours ?? 0}h`;
+  document.getElementById('mgmtPeriodHint').textContent = `Últimos ${state.management?.periodDays || 30} dias`;
+  document.getElementById('mgmtByStatus').innerHTML = renderMiniList(state.management?.byStatus || []);
+
+  const body = document.getElementById('mgmtByUserBody');
+  const rows = state.management?.byUser || [];
+  body.innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${esc(r.label)}</td>
+      <td>${esc(r.open)}</td>
+      <td>${esc(r.overdue)}</td>
+      <td>${esc(r.completedInPeriod)}</td>
+      <td>${esc(r.avgLeadHours)}h</td>
+    </tr>
+  `).join('') : `<tr><td colspan="5" class="empty">Sem dados gerenciais suficientes.</td></tr>`;
+
+  const recent = state.management?.recentCompleted || [];
+  document.getElementById('mgmtRecentCompleted').innerHTML = recent.length ? recent.map(it => `
+    <div class="stack-item">
+      <strong>${esc(it.title)}</strong><br>
+      <span class="muted">${esc(it.assigneeName || 'Sem responsável')}</span><br>
+      <span class="tiny">Concluída em ${esc(dt(it.completedAt))} · lead ${esc(it.leadHours)}h</span>
+    </div>
+  `).join('') : '<div class="empty">Sem concluídas recentes no período.</div>';
+}
+
+function renderHistoryItems(items){
+  return items.length ? items.map(it => `
+    <div class="history-item">
+      <div class="history-head">
+        <strong>${esc(it.eventLabel || HISTORY_LABELS[it.eventType] || it.eventType)}</strong>
+        <span class="badge ${'sev-' + esc(it.eventSeverity || 'info')}">${esc(it.eventCategory || 'evento')}</span>
+      </div>
+      <div class="muted">${esc(it.actorName || 'Sistema')} · ${esc(dt(it.createdAt))}</div>
+      ${it.summary ? `<div class="history-summary">${esc(it.summary)}</div>` : ''}
+    </div>
+  `).join('') : '<div class="empty">Sem histórico disponível.</div>';
+}
+
+function openHistoryModal(){
+  const modal = document.getElementById('historyModal');
+  const title = document.getElementById('historyModalTitle');
+  const subtitle = document.getElementById('historyModalSubtitle');
+  const body = document.getElementById('historyModalBody');
+  title.textContent = 'Histórico da tarefa';
+  subtitle.textContent = state.current?.title ? state.current.title : 'Nenhuma tarefa selecionada';
+  body.innerHTML = renderHistoryItems(state.historyItems || []);
+  modal.classList.add('open');
+}
+
+function closeHistoryModal(){
+  document.getElementById('historyModal').classList.remove('open');
+}
+
+function syncFormMode(mode, item=null){
+  const box = document.getElementById('formModeBox');
+  const badge = document.getElementById('formModeBadge');
+  const title = document.getElementById('formModeTitle');
+  const text = document.getElementById('formModeText');
+  const saveBtn = document.getElementById('saveBtn');
+  const cancelBtn = document.getElementById('cancelEditBtn');
+  const backBtn = document.getElementById('backToDetailBtn');
+
+  if(mode === 'edit' && item){
+    box.classList.add('editing');
+    badge.textContent = 'Editando';
+    title.textContent = `Você está editando: ${item.title}`;
+    text.textContent = 'Altere os campos necessários e clique em “Salvar alterações”. Para abandonar a edição, use “Cancelar edição”.';
+    saveBtn.textContent = 'Salvar alterações';
+    cancelBtn.textContent = 'Cancelar edição';
+    backBtn.classList.remove('hidden');
+    return;
+  }
+
+  box.classList.remove('editing');
+  badge.textContent = 'Criando';
+  title.textContent = 'Você está criando uma nova tarefa.';
+  text.textContent = 'Preencha os campos abaixo e clique em “Criar tarefa”. Para editar uma tarefa existente, abra uma tarefa na lista e use “Editar”.';
+  saveBtn.textContent = 'Criar tarefa';
+  cancelBtn.textContent = 'Limpar formulário';
+  backBtn.classList.add('hidden');
+}
+
+function renderActivity(){
+  const wrap = document.getElementById('activityWrap');
+  const items = state.activity || [];
+  wrap.innerHTML = items.length ? items.map(it => `
+    <div class="history-item">
+      <strong>${esc(it.actorName || 'Sistema')}</strong> · <span class="muted">${esc(dt(it.createdAt))}</span><br>
+      <span class="sev-${esc(it.eventSeverity || 'info')}">${esc(it.eventLabel || HISTORY_LABELS[it.eventType] || it.eventType)}</span><br>
+      <span class="tiny">${esc(it.taskTitle || 'Tarefa')}</span>
+    </div>
+  `).join('') : '<div class="empty">Sem atividade recente.</div>';
+}
+
+function renderList(){
+  const body = document.getElementById('listBody');
+  if(!state.items.length){
+    body.innerHTML = `<tr><td colspan="6" class="empty">Nenhuma tarefa encontrada.</td></tr>`;
+    return;
+  }
+  body.innerHTML = state.items.map(item => `
+    <tr>
+      <td>
+        <strong>${esc(item.title)}</strong><br>
+        <span class="muted">${esc(shortText(item.description, 140))}</span>
+        ${sourceLabel(item) ? `<div style="margin-top:6px"><span class="badge source-pill">${esc(sourceLabel(item))}</span></div>` : ''}
+      </td>
+      <td><span class="badge">${esc(statusLabel(item.status))}</span></td>
+      <td><span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span></td>
+      <td>${esc(item.assignedToName || '—')}</td>
+      <td>${item.isOverdue ? `<span class="overdue">${esc(dd(item.dueDate))}</span>` : esc(dd(item.dueDate))}</td>
+      <td>
+        <div class="row-actions">
+          <button class="ghost" data-act="open" data-id="${esc(item.id)}">Abrir</button>
+          ${nextStatusAction(item) ? `<button class="next-btn" data-act="next" data-next="${esc(nextStatusAction(item).next)}" data-id="${esc(item.id)}">${esc(nextStatusAction(item).label)}</button>` : ''}
+          ${item.canEdit ? `<button class="secondary" data-act="edit" data-id="${esc(item.id)}">Editar</button>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderKanban(){
+  const mount = document.getElementById('kanbanBoard');
+  const cols = ['a_fazer','em_andamento','em_revisao','concluida','cancelada'];
+  mount.innerHTML = cols.map(status => {
+    const items = state.items.filter(i => i.status === status);
+    return `
+      <div class="card col">
+        <div class="col-head">
+          <h3>${esc(statusLabel(status))}</h3>
+          <span class="badge">${items.length}</span>
+        </div>
+        ${items.length ? items.map(item => `
+          <div class="task">
+            <h4>${esc(item.title)}</h4>
+            <p>${esc(shortText(item.description, 180))}</p>
+            <div class="meta">
+              <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span>
+              <span class="badge">${esc(item.assignedToName || 'Sem responsável')}</span>
+              <span class="badge ${item.isOverdue ? 'overdue' : ''}">${esc(dd(item.dueDate))}</span>
+              ${sourceLabel(item) ? `<span class="badge source-pill">${esc(sourceLabel(item))}</span>` : ''}
+            </div>
+            <div class="row-actions" style="margin-top:10px">
+              <button class="ghost" data-act="open" data-id="${esc(item.id)}">Abrir</button>
+              ${nextStatusAction(item) ? `<button class="next-btn" data-act="next" data-next="${esc(nextStatusAction(item).next)}" data-id="${esc(item.id)}">${esc(nextStatusAction(item).label)}</button>` : ''}
+              ${item.canEdit ? `<button class="secondary" data-act="edit" data-id="${esc(item.id)}">Editar</button>` : ''}
+            </div>
+          </div>
+        `).join('') : `<div class="empty">Sem tarefas nesta coluna.</div>`}
+      </div>`;
+  }).join('');
+}
+
+function calendarEntriesForItem(item){
+  const entries = [];
+  if(item.startDate){
+    entries.push({ date: item.startDate, kind: 'start', label: 'Início' });
+  }
+  if(item.dueDate && item.dueDate !== item.startDate){
+    entries.push({ date: item.dueDate, kind: 'due', label: 'Prazo' });
+  }
+  if(!entries.length){
+    const fallback = (item.createdAt || '').slice(0, 10);
+    if(fallback) entries.push({ date: fallback, kind: 'created', label: 'Criada' });
+  }
+  return entries;
+}
+
+function renderCalendarItem(item, entry){
+  const subtitleParts = [];
+  if(item.assignedToName) subtitleParts.push(item.assignedToName);
+  if(item.dueDate) subtitleParts.push(`Prazo ${dd(item.dueDate)}`);
+  return `
+    <div class="calendar-item kind-${esc(entry.kind)}" data-act="open" data-id="${esc(item.id)}">
+      <div class="top">
+        <span class="badge">${esc(entry.label)}</span>
+        <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span>
+      </div>
+      <div class="title truncate">${esc(item.title)}</div>
+      <div class="sub truncate">${esc(subtitleParts.join(' · ') || statusLabel(item.status))}</div>
+    </div>
+  `;
+}
+
+function renderWeek(){
+  const mount = document.getElementById('weekGrid');
+  const start = startOfWeek(state.calendarAnchor);
+  const days = Array.from({length:7}, (_,i) => addDays(start, i));
+  document.getElementById('calendarTitle').textContent = 'Calendário semanal';
+  document.getElementById('calendarSubtitle').textContent = weekTitle(days[0], days[6]);
+
+  mount.innerHTML = days.map(day => {
+    const key = dateKey(day);
+    const items = [];
+    for(const item of state.items){
+      for(const entry of calendarEntriesForItem(item)){
+        if(entry.date === key){
+          items.push({ item, entry });
+        }
+      }
+    }
+    return `
+      <div class="card week-day">
+        <h3>${esc(day.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' }))}</h3>
+        <div class="day-list">
+          ${items.length ? items.map(x => renderCalendarItem(x.item, x.entry)).join('') : '<div class="empty">Sem tarefas</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderMonth(){
+  const mount = document.getElementById('monthGrid');
+  const monthStart = startOfMonth(state.calendarAnchor);
+  const monthEnd = endOfMonth(state.calendarAnchor);
+  const gridStart = startOfWeek(monthStart);
+  const gridEnd = addDays(startOfWeek(addDays(monthEnd, 6)), 6);
+  document.getElementById('calendarTitle').textContent = 'Calendário mensal';
+  document.getElementById('calendarSubtitle').textContent = monthTitle(state.calendarAnchor);
+
+  const cells = [];
+  for(let d = cloneDate(gridStart); d <= gridEnd; d = addDays(d, 1)){
+    const key = dateKey(d);
+    const items = [];
+    for(const item of state.items){
+      for(const entry of calendarEntriesForItem(item)){
+        if(entry.date === key){
+          items.push({ item, entry });
+        }
+      }
+    }
+    cells.push(`
+      <div class="card month-cell ${sameMonth(d, state.calendarAnchor) ? '' : 'other-month'}">
+        <div class="month-cell-num">
+          <strong>${esc(String(d.getDate()))}</strong>
+          ${key === todayKey() ? '<span class="badge">Hoje</span>' : ''}
+        </div>
+        <div class="day-list">
+          ${items.length ? items.map(x => renderCalendarItem(x.item, x.entry)).join('') : '<div class="tiny">Sem tarefas</div>'}
+        </div>
+      </div>
+    `);
+  }
+  mount.innerHTML = cells.join('');
+}
+
+function updateCalendar(){
+  if(state.currentView === 'week') renderWeek();
+  if(state.currentView === 'month') renderMonth();
+}
+
+function showView(view){
+  state.currentView = view;
+  document.getElementById('listView').classList.toggle('hidden', view !== 'list');
+  document.getElementById('kanbanView').classList.toggle('hidden', view !== 'kanban');
+  document.getElementById('weekView').classList.toggle('hidden', view !== 'week');
+  document.getElementById('monthView').classList.toggle('hidden', view !== 'month');
+  document.getElementById('calendarNav').classList.toggle('hidden', !['week','month'].includes(view));
+  ['list','kanban','week','month'].forEach(name => {
+    const map = {list:'listViewBtn', kanban:'kanbanViewBtn', week:'weekViewBtn', month:'monthViewBtn'};
+    const btn = document.getElementById(map[name]);
+    if(btn) btn.className = name === view ? 'view-btn active' : 'view-btn';
+  });
+  updateCalendar();
+}
+
+function resetForm(){
+  document.getElementById('taskForm').reset();
+  document.getElementById('taskId').value = '';
+  document.getElementById('formTitle').textContent = 'Nova tarefa';
+  document.getElementById('priority').value = 'media';
+  syncFormMode('create');
+}
+
+function fillForm(item){
+  document.getElementById('taskId').value = item.id;
+  document.getElementById('title').value = item.title || '';
+  document.getElementById('description').value = item.description || '';
+  document.getElementById('priority').value = item.priority || 'media';
+  document.getElementById('assignedTo').value = item.assignedToUserId || '';
+  document.getElementById('startDate').value = item.startDate || '';
+  document.getElementById('dueDate').value = item.dueDate || '';
+  document.getElementById('formTitle').textContent = 'Editar tarefa';
+  syncFormMode('edit', item);
+}
+
+function switchTab(detail=false){
+  document.getElementById('detailPane').classList.toggle('show', detail);
+  document.getElementById('formPane').classList.toggle('hidden', detail);
+  document.getElementById('tabForm').className = detail ? 'tab-btn' : 'tab-btn active';
+  document.getElementById('tabDetail').className = detail ? 'tab-btn active' : 'tab-btn';
+}
+
+async function loadConfig(){
+  const cfg = await api('/api/automations/tasks/config');
+  state.config = cfg;
+
+  fillSelect(document.getElementById('statusFilter'), [''].concat(cfg.statusValues), STATUS_LABELS);
+  document.getElementById('statusFilter').options[0].text = 'Todos';
+
+  fillSelect(document.getElementById('priorityFilter'), [''].concat(cfg.priorityValues), PRIORITY_LABELS);
+  document.getElementById('priorityFilter').options[0].text = 'Todas';
+
+  fillSelect(document.getElementById('priority'), cfg.priorityValues, PRIORITY_LABELS);
+
+  const userOptions = '<option value="">Todos</option>' + cfg.users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  document.getElementById('assignedFilter').innerHTML = userOptions;
+
+  const assigned = document.getElementById('assignedTo');
+  assigned.innerHTML = '<option value="">—</option>' + cfg.users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  renderInsights();
+  renderManagement();
+}
+
+async function loadSummary(){
+  state.summary = await api('/api/automations/tasks/summary');
+  updateStats();
+}
+
+async function loadInsights(){
+  if(!state.config?.me?.elevated){
+    state.insights = null;
+    renderInsights();
+    return;
+  }
+  state.insights = await api('/api/automations/tasks/insights?periodDays=30&limit=8');
+  renderInsights();
+  renderManagement();
+}
+
+async function loadManagement(){
+  if(!state.config?.me?.elevated){
+    state.management = null;
+    renderManagement();
+    return;
+  }
+  state.management = await api('/api/automations/tasks/management-overview?periodDays=30&limit=12');
+  renderManagement();
+}
+
+async function loadActivity(){
+  const data = await api('/api/automations/tasks/activity?limit=15');
+  state.activity = data.items || [];
+  renderActivity();
+}
+
+async function loadTasks(){
+  const params = new URLSearchParams();
+  const q = document.getElementById('q').value.trim();
+  const status = document.getElementById('statusFilter').value;
+  const priority = document.getElementById('priorityFilter').value;
+  const assignedToUserId = document.getElementById('assignedFilter').value;
+  const scope = document.getElementById('scopeFilter').value;
+  const dateFrom = document.getElementById('dateFromFilter').value;
+  const dateTo = document.getElementById('dateToFilter').value;
+  const overdue = document.getElementById('overdueFilter').value;
+  if(q) params.set('q', q);
+  if(status) params.set('status', status);
+  if(priority) params.set('priority', priority);
+  if(assignedToUserId) params.set('assignedToUserId', assignedToUserId);
+  if(scope === 'mine') params.set('mine', 'true');
+  if(scope === 'created') params.set('createdByMe', 'true');
+  if(scope === 'assigned') params.set('assignedToMe', 'true');
+  if(dateFrom) params.set('dateFrom', dateFrom);
+  if(dateTo) params.set('dateTo', dateTo);
+  if(overdue === 'only') params.set('overdueOnly', 'true');
+
+  const url = '/api/automations/tasks/tasks' + (params.toString() ? ('?' + params.toString()) : '');
+  const data = await api(url);
+  state.items = data.items || [];
+  updateStats();
+  renderList();
+  renderKanban();
+  updateCalendar();
+}
+
+function clearFilters(){
+  document.getElementById('q').value = '';
+  document.getElementById('statusFilter').value = '';
+  document.getElementById('priorityFilter').value = '';
+  document.getElementById('assignedFilter').value = '';
+  document.getElementById('scopeFilter').value = 'all';
+  document.getElementById('dateFromFilter').value = '';
+  document.getElementById('dateToFilter').value = '';
+  document.getElementById('overdueFilter').value = 'all';
+}
+
+function bindActionDelegates(){
+  document.body.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('[data-act]');
+    if(!btn) return;
+    const id = btn.getAttribute('data-id');
+    const act = btn.getAttribute('data-act');
+    if(act === 'open') await openTask(id);
+    if(act === 'next') await applyStatusChange(id, btn.getAttribute('data-next'));
+    if(act === 'edit'){
+      const item = state.items.find(x => x.id === id);
+      if(item){
+        fillForm(item);
+        switchTab(false);
+      }
+    }
+  });
+}
+
+async function openTask(id){
+  const data = await api('/api/automations/tasks/tasks/' + encodeURIComponent(id));
+  state.current = data.item;
+  renderDetail(data.item, data.comments || []);
+  await loadHistory(id);
+  switchTab(true);
+}
+
+function renderDetail(item, comments){
+  document.getElementById('detailTitle').textContent = item.title;
+  document.getElementById('detailMeta').innerHTML = `
+    Criada por <strong>${esc(item.createdByName || '—')}</strong> · Responsável: <strong>${esc(item.assignedToName || '—')}</strong><br>
+    Status: <strong>${esc(statusLabel(item.status))}</strong> · Prioridade: <strong>${esc(priorityLabel(item.priority))}</strong><br>
+    Início: <strong>${esc(dd(item.startDate))}</strong> · Prazo: <strong>${item.isOverdue ? '<span class="overdue">' + esc(dd(item.dueDate)) + '</span>' : esc(dd(item.dueDate))}</strong><br>
+    Origem: <strong>${esc(sourceLabel(item) || 'manual')}</strong>
+  `;
+
+  const statuses = state.config.statusValues;
+  const quick = nextStatusAction(item);
+  document.getElementById('statusButtons').innerHTML = `
+    ${quick ? `
+      <div class="quick-next">
+        <div class="quick-label">Próxima ação sugerida</div>
+        <button class="next-btn" data-status="${esc(quick.next)}">${esc(quick.label)}</button>
+      </div>
+    ` : ''}
+    ${statuses.map(status => `
+      <button class="${status === item.status ? '' : 'ghost'}" data-status="${esc(status)}">${esc(statusLabel(status))}</button>
+    `).join('')}
+  `;
+
+  document.getElementById('statusButtons').querySelectorAll('button').forEach(btn => {
+    btn.disabled = !item.canChangeStatus;
+    btn.onclick = async () => {
+      if(!item.canChangeStatus) return;
+      await applyStatusChange(item.id, btn.getAttribute('data-status'));
+    };
+  });
+
+  document.getElementById('commentsWrap').innerHTML = comments.length ? comments.map(c => `
+    <div class="comment"><strong>${esc(c.actorName || 'Usuário')}</strong><br><span class="muted">${esc(dt(c.createdAt))}</span><div>${esc(c.body)}</div></div>
+  `).join('') : '<div class="empty">Sem comentários ainda.</div>';
+
+  document.getElementById('editCurrentBtn').disabled = !item.canEdit;
+  document.getElementById('deleteCurrentBtn').disabled = !item.canDelete;
+  document.getElementById('restoreCurrentBtn').disabled = !item.canRestore;
+  document.getElementById('restoreCurrentBtn').classList.toggle('hidden', !item.canRestore);
+
+  document.getElementById('editCurrentBtn').onclick = () => {
+    fillForm(item);
+    switchTab(false);
+    document.getElementById('title').focus();
+  };
+
+  document.getElementById('openHistoryBtn').onclick = () => openHistoryModal();
+
+  document.getElementById('restoreCurrentBtn').onclick = async () => {
+    if(!item.canRestore) return;
+    await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/restore', { method:'POST' });
+    await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+    await openTask(item.id);
+  };
+
+  document.getElementById('deleteCurrentBtn').onclick = async () => {
+    if(!item.canDelete) return;
+    if(!confirm('Deseja excluir esta tarefa? A exclusão é lógica e manterá o histórico.')) return;
+    await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id), { method:'DELETE' });
+    state.current = null;
+    state.historyItems = [];
+    document.getElementById('commentsWrap').innerHTML = '';
+    document.getElementById('commentBody').value = '';
+    resetForm();
+    switchTab(false);
+    await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+  };
+
+  document.getElementById('addCommentBtn').onclick = async () => {
+    const body = document.getElementById('commentBody').value.trim();
+    if(!body) return;
+    await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/comments', {
+      method:'POST',
+      body: JSON.stringify({ body }),
+    });
+    document.getElementById('commentBody').value = '';
+    await openTask(item.id);
+    await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+  };
+}
+
+async function loadHistory(taskId){
+  const data = await api('/api/automations/tasks/tasks/' + encodeURIComponent(taskId) + '/history');
+  const items = data.items || [];
+  state.historyItems = items;
+}
+
+async function onSubmit(ev){
+  ev.preventDefault();
+  const payload = {
+    title: document.getElementById('title').value.trim(),
+    description: document.getElementById('description').value.trim(),
+    priority: document.getElementById('priority').value,
+    startDate: document.getElementById('startDate').value || null,
+    dueDate: document.getElementById('dueDate').value || null,
+    assignedToUserId: document.getElementById('assignedTo').value || null,
+  };
+  const taskId = document.getElementById('taskId').value;
+  if(taskId){
+    await api('/api/automations/tasks/tasks/' + encodeURIComponent(taskId), {
+      method:'PUT',
+      body: JSON.stringify(payload),
+    });
+  } else {
+    await api('/api/automations/tasks/tasks', {
+      method:'POST',
+      body: JSON.stringify({ ...payload, status: 'a_fazer' }),
+    });
+  }
+  resetForm();
+  await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+}
+
+function moveCalendar(step){
+  if(state.currentView === 'week'){
+    state.calendarAnchor = addDays(state.calendarAnchor, step * 7);
+  } else if(state.currentView === 'month'){
+    state.calendarAnchor = new Date(state.calendarAnchor.getFullYear(), state.calendarAnchor.getMonth() + step, 1);
+  }
+  updateCalendar();
+}
+
+async function boot(){
+  await loadConfig();
+  await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+  bindActionDelegates();
+  showView('list');
+  resetForm();
+
+  document.getElementById('applyFilters').onclick = loadTasks;
+  document.getElementById('clearFiltersBtn').onclick = async () => { clearFilters(); await loadTasks(); };
+  document.getElementById('newTaskBtn').onclick = () => {
+    resetForm();
+    switchTab(false);
+    const titleInput = document.getElementById('title');
+    titleInput.focus();
+    titleInput.scrollIntoView({ behavior:'smooth', block:'center' });
+  };
+  document.getElementById('listViewBtn').onclick = () => showView('list');
+  document.getElementById('kanbanViewBtn').onclick = () => showView('kanban');
+  document.getElementById('weekViewBtn').onclick = () => showView('week');
+  document.getElementById('monthViewBtn').onclick = () => showView('month');
+  document.getElementById('calendarPrevBtn').onclick = () => moveCalendar(-1);
+  document.getElementById('calendarNextBtn').onclick = () => moveCalendar(1);
+  document.getElementById('calendarTodayBtn').onclick = () => { state.calendarAnchor = new Date(); updateCalendar(); };
+  document.getElementById('tabForm').onclick = () => {
+    switchTab(false);
+    document.getElementById('title').focus();
+  };
+  document.getElementById('tabDetail').onclick = () => { if(state.current) switchTab(true); };
+  document.getElementById('cancelEditBtn').onclick = () => {
+    const wasEditing = !!document.getElementById('taskId').value;
+    resetForm();
+    if(wasEditing && state.current){
+      switchTab(true);
+    }
+  };
+  document.getElementById('backToDetailBtn').onclick = () => {
+    if(state.current){
+      switchTab(true);
+    }
+  };
+  document.getElementById('closeHistoryModalBtn').onclick = closeHistoryModal;
+  document.getElementById('historyModal').addEventListener('click', (ev) => {
+    if(ev.target.id === 'historyModal') closeHistoryModal();
+  });
+  window.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Escape') closeHistoryModal();
+  });
+  document.getElementById('taskForm').addEventListener('submit', onSubmit);
+}
+boot().catch(err => {
+  console.error(err);
+  alert('Falha ao carregar módulo de tarefas: ' + (err?.message || err));
+});
+
+</script>
+</body>
+</html>

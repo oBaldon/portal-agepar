@@ -10,7 +10,7 @@ description: Passo-a-passo opinativo para criar uma automação seguindo o padr�
 1. Crie `apps/bff/app/automations/{slug}.py`
 2. Implemente `GET /ui` e `POST /submit`
 
-<!-- truncate -->
+{/* truncate */}
 
 3. Registre no catálogo (`/catalog/dev`)
 

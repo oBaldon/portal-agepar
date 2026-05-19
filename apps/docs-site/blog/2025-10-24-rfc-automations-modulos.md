@@ -9,7 +9,7 @@ description: Proposta para consolidar os endpoints e a UI das automações no BF
 **Problema**  
 Consolidar endpoints e UI das automações para padronizar desenvolvimento e documentação.
 
-<!-- truncate -->
+{/* truncate */}
 
 **Proposta**  
 Arquivos `apps/bff/app/automations/{slug}.py` com:

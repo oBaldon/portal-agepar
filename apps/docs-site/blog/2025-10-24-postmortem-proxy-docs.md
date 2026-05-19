@@ -9,7 +9,7 @@ description: Incidente 502 ao acessar /docs após deploy do Host — causa, impa
 **Resumo**  
 Erro 502 ao acessar `/docs` após um deploy.
 
-<!-- truncate -->
+{/* truncate */}
 
 **Linha do tempo**
 - 10:12 — Deploy do Host

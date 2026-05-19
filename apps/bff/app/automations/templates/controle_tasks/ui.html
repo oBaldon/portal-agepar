@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Painel de Controle — Tarefas</title>
+<style>
+  :root{
+    --fg:#0f172a;
+    --muted:#475569;
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --pri:#2563eb;
+    --pri-soft:#dbeafe;
+    --danger:#b91c1c;
+    --warn:#b45309;
+    --ok:#166534;
+    --line:#e2e8f0;
+    --soft:#f8fafc;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--fg);
+    line-height:1.45;
+  }
+
+  .wrap{
+    max-width:min(1520px, calc(100vw - 24px));
+    margin:16px auto 32px;
+    padding:0 12px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:18px;
+    box-shadow:0 1px 2px rgba(15,23,42,.05);
+  }
+
+  .panel{margin-top:16px}
+
+  .hero{padding:20px}
+  .hero-top{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+
+  h1,h2,h3{margin:0}
+  h1{font-size:26px;line-height:1.15}
+  h2{font-size:17px}
+  h3{font-size:14px}
+
+  .muted,.note,.meta,.status{color:var(--muted)}
+  .note{font-size:13px}
+  .meta{font-size:12px}
+  .status{font-size:13px}
+
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{
+    display:inline-flex;
+    align-items:center;
+    padding:8px 12px;
+    border-radius:999px;
+    font-size:12px;
+    border:1px solid #cbd5e1;
+    color:#334155;
+    background:#fff;
+    text-decoration:none;
+  }
+  .tab:hover{background:#f1f5f9}
+  .tab.active{background:var(--pri);color:#fff;border-color:transparent}
+
+  label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:#64748b;
+    margin:0 0 6px;
+  }
+
+  input,select{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid #cbd5e1;
+    border-radius:12px;
+    font:inherit;
+    background:#fff;
+  }
+
+  .btn{
+    background:var(--pri);
+    color:#fff;
+    border:1px solid transparent;
+    border-radius:12px;
+    padding:10px 16px;
+    cursor:pointer;
+    font:inherit;
+  }
+
+  .btn.secondary{
+    background:#fff;
+    color:#334155;
+    border-color:#cbd5e1;
+  }
+
+  .btn:hover{filter:brightness(.99)}
+
+  .filter-shell{padding:16px}
+  .filter-head{
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+
+  .filter-head .copy{
+    max-width:780px;
+  }
+
+  .primary-grid{
+    display:grid;
+    grid-template-columns:minmax(240px,1.4fr) repeat(3,minmax(150px,.8fr)) auto;
+    gap:12px;
+    align-items:end;
+  }
+
+  .actions-col{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:flex-end;
+  }
+
+  .filter-advanced{margin-top:12px}
+  .filter-advanced details{
+    border:1px dashed var(--line);
+    border-radius:14px;
+    padding:10px 12px;
+    background:#fafcff;
+  }
+  .filter-advanced summary{
+    cursor:pointer;
+    font-weight:600;
+    color:#334155;
+  }
+
+  .advanced-grid{
+    display:grid;
+    grid-template-columns:repeat(4,minmax(150px,1fr));
+    gap:12px;
+    margin-top:12px;
+  }
+
+  .check{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding-top:28px;
+    font-size:13px;
+    color:#334155;
+  }
+  .check input{width:auto}
+
+  .filter-bottom{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    border-radius:999px;
+    padding:4px 8px;
+    font-size:11px;
+    border:1px solid #cbd5e1;
+    background:#fff;
+    color:#334155;
+    white-space:nowrap;
+  }
+  .pill.danger{border-color:#fecaca;background:#fef2f2;color:#991b1b}
+  .pill.warn{border-color:#fde68a;background:#fffbeb;color:#92400e}
+  .pill.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+  .pill.active{background:var(--pri-soft);color:#1d4ed8;border-color:#bfdbfe}
+
+  .kpis{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:12px;
+  }
+
+  .kpi{
+    padding:16px;
+  }
+  .kpi .label{
+    font-size:11px;
+    color:#64748b;
+    margin-bottom:6px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+  }
+  .kpi .value{
+    font-size:30px;
+    font-weight:800;
+  }
+  .kpi.danger .value{color:var(--danger)}
+  .kpi.warn .value{color:var(--warn)}
+  .kpi.ok .value{color:var(--ok)}
+
+  .secondary-kpis{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+  }
+
+  .mini-kpi{
+    padding:14px 16px;
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:center;
+  }
+  .mini-kpi strong{font-size:22px}
+
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:12px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+
+  .panel-body{padding:16px}
+
+  .dashboard-grid{
+    display:grid;
+    grid-template-columns:1.1fr .9fr;
+    gap:16px;
+  }
+
+  .stack{display:grid;gap:16px}
+
+  .table-wrap{
+    overflow:auto;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#fff;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    background:#fff;
+  }
+
+  th,td{
+    padding:12px 14px;
+    border-bottom:1px solid #eef2f7;
+    text-align:left;
+    vertical-align:top;
+  }
+
+  th{
+    font-size:12px;
+    color:#64748b;
+    background:#f8fafc;
+    position:sticky;
+    top:0;
+    z-index:1;
+  }
+
+  tr.clickable:hover td,
+  .row-item.clickable:hover{
+    background:#f8fafc;
+    cursor:pointer;
+  }
+
+  tr.selected-row td{
+    background:#eff6ff !important;
+  }
+
+  .list{display:flex;flex-direction:column;gap:8px}
+  .row-item{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px;
+    background:#fff;
+  }
+
+  .two-col{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+
+  .master-detail{
+    display:grid;
+    grid-template-columns:1.15fr .85fr;
+    gap:16px;
+  }
+
+  .title-link{
+    cursor:pointer;
+    color:var(--pri);
+    text-decoration:none;
+    font-weight:700;
+  }
+  .title-link:hover{text-decoration:underline}
+
+  .detail-empty{
+    color:#64748b;
+    font-size:14px;
+    padding:20px 4px;
+  }
+
+  .detail-box{
+    display:grid;
+    gap:14px;
+  }
+
+  .detail-summary{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    background:#fafcff;
+    display:grid;
+    gap:10px;
+  }
+
+  .summary-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+
+  .summary-item{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 12px;
+    background:#fff;
+  }
+  .summary-item .k{
+    font-size:11px;
+    color:#64748b;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    margin-bottom:4px;
+  }
+  .summary-item .v{
+    font-size:13px;
+    font-weight:600;
+  }
+
+  .history-list{
+    display:grid;
+    gap:10px;
+  }
+
+  .history-item{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px;
+    background:#fff;
+    display:grid;
+    gap:6px;
+  }
+
+  .history-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .footer-spacer{height:4px}
+
+  @media (max-width:1320px){
+    .primary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .actions-col{justify-content:flex-start}
+    .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .secondary-kpis{grid-template-columns:1fr}
+    .dashboard-grid,.master-detail,.two-col{grid-template-columns:1fr}
+  }
+
+  @media (max-width:860px){
+    .primary-grid,.advanced-grid,.summary-grid{grid-template-columns:1fr}
+    .check{padding-top:0}
+    .hero-top,.filter-bottom,.section-head{align-items:stretch}
+    .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+
+  @media (max-width:620px){
+    .kpis{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card hero">
+    <div class="hero-top">
+      <div>
+        <h1>Painel de Controle — Tarefas</h1>
+        <div class="muted" style="margin-top:8px;max-width:760px">
+          Visão consolidada para coordenação e administração, com indicadores-chave, distribuição gerencial, drill-down e histórico contextual da tarefa selecionada.
+        </div>
+      </div>
+      <nav class="tabs" aria-label="Navegação do Controle">
+        <a class="tab" href="/api/automations/controle/ui">Auditoria</a>
+        <a class="tab" href="/api/automations/controle/ferias/ui">Férias (Calendário)</a>
+        <a class="tab active" href="/api/automations/controle/tarefas/ui">Tarefas</a>
+      </nav>
+    </div>
+  </section>
+
+  <section class="card panel filter-shell">
+    <div class="filter-head">
+      <div class="copy">
+        <h2>Filtros e recortes</h2>
+        <div class="note" style="margin-top:6px">
+          Use os filtros principais para navegar rapidamente. Os filtros avançados ficam recolhidos para reduzir ruído visual.
+        </div>
+      </div>
+    </div>
+
+    <div class="primary-grid">
+      <div class="field">
+        <label for="q">Buscar tarefa</label>
+        <input id="q" placeholder="Título ou descrição"/>
+      </div>
+      <div class="field">
+        <label for="periodDays">Período</label>
+        <select id="periodDays">
+          <option value="30" selected>Últimos 30 dias</option>
+          <option value="60">Últimos 60 dias</option>
+          <option value="90">Últimos 90 dias</option>
+          <option value="180">Últimos 180 dias</option>
+          <option value="365">Últimos 365 dias</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="assignedToUserId">Responsável</label>
+        <select id="assignedToUserId"><option value="">Todos</option></select>
+      </div>
+      <div class="field">
+        <label for="statusFilter">Status</label>
+        <select id="statusFilter"><option value="">Todos</option></select>
+      </div>
+      <div class="actions-col">
+        <button id="btnReset" class="btn secondary" type="button">Limpar</button>
+        <button id="btnReload" class="btn" type="button">Atualizar</button>
+      </div>
+    </div>
+
+    <div class="filter-advanced">
+      <details>
+        <summary>Filtros avançados</summary>
+        <div class="advanced-grid">
+          <div class="field">
+            <label for="sourceKind">Origem</label>
+            <input id="sourceKind" placeholder="ex.: dfd, etp, manual"/>
+          </div>
+          <div class="field">
+            <label for="eventType">Evento</label>
+            <select id="eventType"><option value="">Todos</option></select>
+          </div>
+          <div class="field">
+            <label for="limit">Limite do painel</label>
+            <select id="limit">
+              <option value="10">10</option>
+              <option value="12" selected>12</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="activityLimit">Itens em atividade recente</label>
+            <select id="activityLimit">
+              <option value="15">15</option>
+              <option value="25" selected>25</option>
+              <option value="40">40</option>
+              <option value="60">60</option>
+            </select>
+          </div>
+          <label class="check"><input type="checkbox" id="overdueOnly"/> Somente atrasadas</label>
+          <label class="check"><input type="checkbox" id="includeDeleted"/> Incluir excluídas</label>
+        </div>
+      </details>
+    </div>
+
+    <div class="filter-bottom">
+      <div>
+        <div class="chips" id="activeChips"></div>
+        <div class="status" id="status" style="margin-top:8px">Pronto.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpis panel">
+    <div class="card kpi">
+      <div class="label">Abertas</div>
+      <div class="value" id="kpiOpen">0</div>
+    </div>
+    <div class="card kpi danger">
+      <div class="label">Atrasadas</div>
+      <div class="value" id="kpiOverdue">0</div>
+    </div>
+    <div class="card kpi warn">
+      <div class="label">Em revisão</div>
+      <div class="value" id="kpiReview">0</div>
+    </div>
+    <div class="card kpi ok">
+      <div class="label">Concluídas no período</div>
+      <div class="value" id="kpiCompleted">0</div>
+    </div>
+    <div class="card kpi">
+      <div class="label">Lead time médio (h)</div>
+      <div class="value" id="kpiLead">0</div>
+    </div>
+  </section>
+
+  <section class="secondary-kpis panel">
+    <div class="card mini-kpi">
+      <div>
+        <div class="meta">Criadas no período</div>
+        <strong id="kpiCreated">0</strong>
+      </div>
+      <span class="pill">Volume</span>
+    </div>
+    <div class="card mini-kpi">
+      <div>
+        <div class="meta">Vencem em 7 dias</div>
+        <strong id="kpiDueSoon">0</strong>
+      </div>
+      <span class="pill warn">Atenção</span>
+    </div>
+    <div class="card mini-kpi">
+      <div>
+        <div class="meta">Taxa de conclusão</div>
+        <strong id="kpiCompletionRate">0</strong>
+      </div>
+      <span class="pill ok">%</span>
+    </div>
+  </section>
+
+  <section class="card panel panel-body">
+    <div class="section-head">
+      <div>
+        <h2>Painel gerencial</h2>
+        <div class="note">Visão agrupada por responsável, status, origem, prioridade, papel atribuído e série diária.</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="stack">
+        <div class="card panel-body">
+          <div class="section-head">
+            <h3>Resumo por responsável</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Responsável</th>
+                  <th>Abertas</th>
+                  <th>Atrasadas</th>
+                  <th>Concluídas</th>
+                  <th>Lead médio</th>
+                </tr>
+              </thead>
+              <tbody id="byUserBody"><tr><td colspan="5"><small>Carregando…</small></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card panel-body">
+          <div class="section-head">
+            <h3>Série diária (criação x conclusão)</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Data</th><th>Criadas</th><th>Concluídas</th></tr>
+              </thead>
+              <tbody id="dailySeriesBody"><tr><td colspan="3"><small>Carregando…</small></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="two-col">
+          <div class="card panel-body">
+            <div class="section-head"><h3>Por status</h3></div>
+            <div class="list" id="byStatusList"><div class="note">Carregando…</div></div>
+          </div>
+          <div class="card panel-body">
+            <div class="section-head"><h3>Por origem</h3></div>
+            <div class="list" id="bySourceList"><div class="note">Carregando…</div></div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card panel-body">
+            <div class="section-head"><h3>Por prioridade</h3></div>
+            <div class="list" id="byPriorityList"><div class="note">Carregando…</div></div>
+          </div>
+          <div class="card panel-body">
+            <div class="section-head"><h3>Por papel atribuído</h3></div>
+            <div class="list" id="byAssignedRoleList"><div class="note">Carregando…</div></div>
+          </div>
+        </div>
+
+        <div class="card panel-body">
+          <div class="section-head"><h3>Concluídas recentes</h3></div>
+          <div class="list" id="recentCompletedList"><div class="note">Carregando…</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="master-detail panel">
+    <div class="card panel-body">
+      <div class="section-head">
+        <div>
+          <h2>Drill-down de tarefas</h2>
+          <div class="note">Clique na linha da tarefa para abrir o detalhe contextual e o histórico.</div>
+        </div>
+        <span class="status" id="tasksCount">0 item(ns)</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tarefa</th>
+              <th>Status</th>
+              <th>Responsável</th>
+              <th>Prazo</th>
+              <th>Origem</th>
+            </tr>
+          </thead>
+          <tbody id="tasksBody"><tr><td colspan="5"><small>Carregando…</small></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card panel-body">
+        <div class="section-head">
+          <div>
+            <h2>Tarefa selecionada</h2>
+            <div class="note" id="historyTaskLabel">Nenhuma tarefa selecionada.</div>
+          </div>
+        </div>
+
+        <div id="selectedTaskBox" class="detail-box">
+          <div class="detail-empty">Clique em uma tarefa no drill-down para ver os detalhes e o histórico.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card panel panel-body">
+    <div class="section-head">
+      <div>
+        <h2>Atividade recente</h2>
+        <div class="note">Fluxo global de eventos recentes, separado do histórico contextual da tarefa selecionada.</div>
+      </div>
+    </div>
+    <div class="list" id="activityList"><div class="note">Carregando…</div></div>
+  </section>
+
+  <div class="footer-spacer"></div>
+</div>
+
+<script>
+const qs = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m]));
+const appState = {
+  config: null,
+  selectedTaskId: null,
+  selectedTaskTitle: '',
+  selectedTask: null,
+  tasks: [],
+};
+
+const STATUS_LABELS = {
+  a_fazer: 'A fazer',
+  em_andamento: 'Em andamento',
+  em_revisao: 'Em revisão',
+  concluida: 'Concluída',
+  cancelada: 'Cancelada',
+};
+
+const PRIORITY_LABELS = {
+  baixa: 'Baixa',
+  media: 'Média',
+  alta: 'Alta',
+  urgente: 'Urgente',
+};
+
+function fmtTs(s){
+  if(!s) return '';
+  const d = new Date(s);
+  return isNaN(d) ? String(s) : d.toLocaleString();
+}
+
+function fmtDate(s){
+  if(!s) return '';
+  const d = new Date(s);
+  return isNaN(d) ? String(s) : d.toLocaleDateString();
+}
+
+function sevClass(sev){
+  if(sev === 'danger') return 'danger';
+  if(sev === 'warning') return 'warn';
+  if(sev === 'success') return 'ok';
+  return '';
+}
+
+function labelClass(status){
+  const s = String(status || '').toLowerCase();
+  if(['cancelada'].includes(s)) return 'danger';
+  if(['em_revisao'].includes(s)) return 'warn';
+  if(['concluida'].includes(s)) return 'ok';
+  return '';
+}
+
+function statusLabel(status){
+  return STATUS_LABELS[String(status || '').toLowerCase()] || String(status || '—');
+}
+
+function priorityLabel(priority){
+  return PRIORITY_LABELS[String(priority || '').toLowerCase()] || String(priority || '—');
+}
+
+function sourceLabel(value){
+  const txt = String(value || '').trim();
+  return txt || 'Manual';
+}
+
+function setStatus(msg){
+  qs('#status').textContent = msg || '';
+}
+
+function currentFilters(){
+  return {
+    periodDays: Number(qs('#periodDays').value || 30),
+    q: qs('#q').value.trim(),
+    assignedToUserId: qs('#assignedToUserId').value || '',
+    status: qs('#statusFilter').value || '',
+    sourceKind: qs('#sourceKind').value.trim(),
+    overdueOnly: qs('#overdueOnly').checked,
+    includeDeleted: qs('#includeDeleted').checked,
+    limit: Number(qs('#limit').value || 12),
+    activityLimit: Number(qs('#activityLimit').value || 25),
+    eventType: qs('#eventType').value || '',
+  };
+}
+
+function toQuery(obj){
+  const p = new URLSearchParams();
+  Object.entries(obj).forEach(([k, v]) => {
+    if(v === '' || v === null || v === undefined) return;
+    if(typeof v === 'boolean'){
+      if(v) p.set(k, 'true');
+      return;
+    }
+    p.set(k, String(v));
+  });
+  return p.toString();
+}
+
+async function fetchJson(url){
+  const res = await fetch(url, { credentials:'include' });
+  if(!res.ok) throw new Error(`${res.status} ${url}`);
+  return await res.json();
+}
+
+async function loadConfig(){
+  const data = await fetchJson('/api/automations/controle/tarefas/config');
+  appState.config = data;
+
+  qs('#assignedToUserId').innerHTML =
+    '<option value="">Todos</option>' +
+    (data.users || []).map(u => `<option value="${esc(u.id)}">${esc(u.name || u.email || u.id)}</option>`).join('');
+
+  qs('#statusFilter').innerHTML =
+    '<option value="">Todos</option>' +
+    (data.statusValues || []).map(v => `<option value="${esc(v)}">${esc(statusLabel(v))}</option>`).join('');
+
+  const catalog = data.eventCatalog || {};
+  qs('#eventType').innerHTML =
+    '<option value="">Todos</option>' +
+    Object.entries(catalog).map(([k,v]) => `<option value="${esc(k)}">${esc(v.label || k)}</option>`).join('');
+}
+
+function renderActiveChips(filters){
+  const chips = [];
+  if(filters.q) chips.push(`Busca: ${filters.q}`);
+  if(filters.status) chips.push(`Status: ${statusLabel(filters.status)}`);
+  if(filters.assignedToUserId){
+    const user = (appState.config?.users || []).find(u => u.id === filters.assignedToUserId);
+    chips.push(`Responsável: ${user?.name || filters.assignedToUserId}`);
+  }
+  if(filters.sourceKind) chips.push(`Origem: ${filters.sourceKind}`);
+  if(filters.eventType){
+    const label = appState.config?.eventCatalog?.[filters.eventType]?.label || filters.eventType;
+    chips.push(`Evento: ${label}`);
+  }
+  if(filters.overdueOnly) chips.push('Somente atrasadas');
+  if(filters.includeDeleted) chips.push('Inclui excluídas');
+
+  qs('#activeChips').innerHTML = chips.length
+    ? chips.map(c => `<span class="pill active">${esc(c)}</span>`).join('')
+    : '<span class="note">Sem filtros adicionais.</span>';
+}
+
+function wireOverviewFilters(){
+  document.querySelectorAll('[data-filter-user]').forEach(el => {
+    el.addEventListener('click', () => {
+      qs('#assignedToUserId').value = el.getAttribute('data-filter-user') || '';
+      refreshAll();
+    });
+  });
+
+  document.querySelectorAll('[data-filter-status]').forEach(el => {
+    el.addEventListener('click', () => {
+      qs('#statusFilter').value = el.getAttribute('data-filter-status') || '';
+      refreshAll();
+    });
+  });
+
+  document.querySelectorAll('[data-filter-source]').forEach(el => {
+    el.addEventListener('click', () => {
+      qs('#sourceKind').value = el.getAttribute('data-filter-source') || '';
+      refreshAll();
+    });
+  });
+}
+
+function renderOverview(data){
+  const totals = data.totals || {};
+  qs('#kpiOpen').textContent = totals.open ?? 0;
+  qs('#kpiCreated').textContent = totals.createdInPeriod ?? 0;
+  qs('#kpiCompleted').textContent = totals.completedInPeriod ?? 0;
+  qs('#kpiOverdue').textContent = totals.overdue ?? 0;
+  qs('#kpiDueSoon').textContent = totals.dueSoon ?? 0;
+  qs('#kpiReview').textContent = totals.inReview ?? 0;
+  qs('#kpiCompletionRate').textContent = totals.completionRatePercent ?? 0;
+  qs('#kpiLead').textContent = totals.avgLeadHours ?? 0;
+
+  qs('#byUserBody').innerHTML = (data.byUser || []).map(item => `
+    <tr class="clickable" data-filter-user="${esc(item.userId || '')}">
+      <td><strong>${esc(item.label)}</strong></td>
+      <td>${item.open ?? 0}</td>
+      <td>${item.overdue ?? 0}</td>
+      <td>${item.completedInPeriod ?? 0}</td>
+      <td>${item.avgLeadHours ?? 0}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5"><small>Nenhum dado encontrado.</small></td></tr>';
+
+  qs('#byStatusList').innerHTML = (data.byStatus || []).map(item => `
+    <div class="row-item clickable" data-filter-status="${esc(item.status)}">
+      <div>
+        <div><strong>${esc(item.label || statusLabel(item.status))}</strong></div>
+        <div class="meta">Status</div>
+      </div>
+      <span class="pill ${labelClass(item.status)}">${item.total ?? 0}</span>
+    </div>
+  `).join('') || '<div class="note">Nenhum dado encontrado.</div>';
+
+  qs('#byPriorityList').innerHTML = (data.byPriority || []).map(item => `
+    <div class="row-item">
+      <div>
+        <div><strong>${esc(item.label || priorityLabel(item.priority))}</strong></div>
+        <div class="meta">Prioridade</div>
+      </div>
+      <span class="pill">${item.total ?? 0}</span>
+    </div>
+  `).join('') || '<div class="note">Nenhuma prioridade encontrada.</div>';
+
+  qs('#bySourceList').innerHTML = (data.bySource || []).map(item => {
+    const rawSource = item.sourceKind || item.label || 'manual';
+    return `
+      <div class="row-item clickable" data-filter-source="${esc(rawSource)}">
+        <div>
+          <div><strong>${esc(item.label || sourceLabel(rawSource))}</strong></div>
+          <div class="meta">Origem</div>
+        </div>
+        <span class="pill">${item.total ?? 0}</span>
+      </div>
+    `;
+  }).join('') || '<div class="note">Nenhuma origem encontrada.</div>';
+
+  qs('#byAssignedRoleList').innerHTML = (data.byAssignedRole || []).map(item => `
+    <div class="row-item">
+      <div>
+        <div><strong>${esc(item.label || item.roleName || 'Sem papel')}</strong></div>
+        <div class="meta">Papel atribuído</div>
+      </div>
+      <span class="pill">${item.total ?? 0}</span>
+    </div>
+  `).join('') || '<div class="note">Nenhum papel atribuído encontrado.</div>';
+
+  qs('#dailySeriesBody').innerHTML = (data.dailySeries || []).map(item => `
+    <tr>
+      <td>${esc(item.date)}</td>
+      <td>${item.created ?? 0}</td>
+      <td>${item.completed ?? 0}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="3"><small>Nenhuma série disponível.</small></td></tr>';
+
+  qs('#recentCompletedList').innerHTML = (data.recentCompleted || []).map(item => `
+    <div class="row-item">
+      <div>
+        <div><strong>${esc(item.title)}</strong></div>
+        <div class="meta">${esc(item.assigneeName || 'Sem responsável')} • ${fmtTs(item.completedAt)}</div>
+      </div>
+      <span class="pill ok">${item.leadHours ?? 0}h</span>
+    </div>
+  `).join('') || '<div class="note">Nenhuma conclusão recente.</div>';
+
+  wireOverviewFilters();
+}
+
+function renderActivity(data){
+  qs('#activityList').innerHTML = (data.items || []).map(item => `
+    <div class="row-item">
+      <div>
+        <div><strong>${esc(item.taskTitle)}</strong></div>
+        <div class="meta">${esc(item.eventLabel || item.eventType)} • ${esc(item.actorName || 'Sistema')} • ${fmtTs(item.createdAt)}</div>
+      </div>
+      <span class="pill ${sevClass(item.eventSeverity)}">${esc(item.eventCategory || 'evento')}</span>
+    </div>
+  `).join('') || '<div class="note">Nenhuma atividade recente.</div>';
+}
+
+function renderSelectedTask(){
+  const mount = qs('#selectedTaskBox');
+  const item = appState.selectedTask;
+
+  if(!item){
+    qs('#historyTaskLabel').textContent = 'Nenhuma tarefa selecionada.';
+    mount.innerHTML = '<div class="detail-empty">Clique em uma tarefa no drill-down para ver os detalhes e o histórico.</div>';
+    return;
+  }
+
+  qs('#historyTaskLabel').textContent = item.title || 'Tarefa selecionada';
+
+  mount.innerHTML = `
+    <div class="detail-summary">
+      <div>
+        <strong style="font-size:16px">${esc(item.title)}</strong>
+        <div class="meta" style="margin-top:6px">
+          Criada por ${esc(item.createdByName || '—')}
+        </div>
+      </div>
+
+      <div class="chips">
+        <span class="pill ${labelClass(item.status)}">${esc(statusLabel(item.status))}</span>
+        <span class="pill">${esc(priorityLabel(item.priority))}</span>
+        <span class="pill">${esc(item.assignedToName || 'Sem responsável')}</span>
+        <span class="pill">${esc(sourceLabel(item.sourceKind))}</span>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="k">Responsável</div>
+          <div class="v">${esc(item.assignedToName || 'Sem responsável')}</div>
+        </div>
+        <div class="summary-item">
+          <div class="k">Prazo</div>
+          <div class="v">${esc(item.dueDate ? fmtDate(item.dueDate) : 'Sem prazo')}</div>
+        </div>
+        <div class="summary-item">
+          <div class="k">Origem</div>
+          <div class="v">${esc(sourceLabel(item.sourceKind))}</div>
+        </div>
+        <div class="summary-item">
+          <div class="k">Atualização</div>
+          <div class="v">${esc(item.updatedAt ? fmtTs(item.updatedAt) : '—')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <h3>Histórico da tarefa</h3>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="detail-empty">Carregando histórico…</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTasks(data){
+  const items = data.items || [];
+  appState.tasks = items;
+  qs('#tasksCount').textContent = `${items.length} item(ns)`;
+
+  qs('#tasksBody').innerHTML = items.map(item => `
+    <tr
+      class="clickable ${appState.selectedTaskId === item.id ? 'selected-row' : ''}"
+      data-task-id="${esc(item.id)}"
+    >
+      <td>
+        <span class="title-link">${esc(item.title)}</span>
+        <div class="meta">${esc(priorityLabel(item.priority))} • ${esc(item.createdByName || '-')}</div>
+      </td>
+      <td><span class="pill ${labelClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
+      <td>${esc(item.assignedToName || 'Sem responsável')}</td>
+      <td>${esc(item.dueDate ? fmtDate(item.dueDate) : 'Sem prazo')}</td>
+      <td>${esc(sourceLabel(item.sourceKind))}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5"><small>Nenhuma tarefa encontrada.</small></td></tr>';
+
+  document.querySelectorAll('[data-task-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-task-id');
+      const found = appState.tasks.find(t => t.id === id) || null;
+      appState.selectedTaskId = id;
+      appState.selectedTask = found;
+      appState.selectedTaskTitle = found?.title || '';
+      renderTasks({ items: appState.tasks });
+      renderSelectedTask();
+      loadHistory();
+    });
+  });
+}
+
+function renderHistory(data){
+  const items = data.items || [];
+  const mount = qs('#historyList');
+  if(!mount) return;
+
+  mount.innerHTML = items.length ? items.map(item => `
+    <div class="history-item">
+      <div class="history-head">
+        <strong>${esc(item.eventLabel || item.eventType)}</strong>
+        <span class="pill ${sevClass(item.eventSeverity)}">${esc(item.eventCategory || 'evento')}</span>
+      </div>
+      <div class="meta">${esc(item.actorName || 'Sistema')} • ${fmtTs(item.createdAt)}</div>
+      <div class="muted">${esc(item.summary || '')}</div>
+    </div>
+  `).join('') : '<div class="detail-empty">Sem histórico para esta tarefa.</div>';
+}
+
+async function loadOverview(filters){
+  return await fetchJson(`/api/automations/controle/tarefas/overview?${toQuery({
+    periodDays: filters.periodDays,
+    q: filters.q,
+    status: filters.status,
+    assignedToUserId: filters.assignedToUserId,
+    sourceKind: filters.sourceKind,
+    overdueOnly: filters.overdueOnly,
+    includeDeleted: filters.includeDeleted,
+    limit: filters.limit,
+  })}`);
+}
+
+async function loadActivity(filters){
+  return await fetchJson(`/api/automations/controle/tarefas/activity?${toQuery({
+    periodDays: filters.periodDays,
+    q: filters.q,
+    status: filters.status,
+    assignedToUserId: filters.assignedToUserId,
+    eventType: filters.eventType,
+    limit: filters.activityLimit,
+  })}`);
+}
+
+async function loadTasks(filters){
+  return await fetchJson(`/api/automations/controle/tarefas/tasks?${toQuery({
+    q: filters.q,
+    status: filters.status,
+    assignedToUserId: filters.assignedToUserId,
+    sourceKind: filters.sourceKind,
+    overdueOnly: filters.overdueOnly,
+    includeDeleted: filters.includeDeleted,
+  })}`);
+}
+
+async function loadHistory(){
+  if(!appState.selectedTaskId){
+    renderSelectedTask();
+    return;
+  }
+
+  try{
+    const data = await fetchJson(`/api/automations/controle/tarefas/tasks/${appState.selectedTaskId}/history`);
+    renderHistory(data);
+  }catch(err){
+    console.error(err);
+    const mount = qs('#historyList');
+    if(mount){
+      mount.innerHTML = '<div class="detail-empty">Falha ao carregar o histórico.</div>';
+    }
+  }
+}
+
+async function refreshAll(){
+  const filters = currentFilters();
+  renderActiveChips(filters);
+  setStatus('Carregando…');
+
+  try{
+    const [overview, activity, tasks] = await Promise.all([
+      loadOverview(filters),
+      loadActivity(filters),
+      loadTasks(filters),
+    ]);
+
+    renderOverview(overview);
+    renderActivity(activity);
+    renderTasks(tasks);
+
+    if(appState.selectedTaskId){
+      const stillThere = (tasks.items || []).find(t => t.id === appState.selectedTaskId);
+      if(stillThere){
+        appState.selectedTask = stillThere;
+        appState.selectedTaskTitle = stillThere.title || '';
+        renderSelectedTask();
+        await loadHistory();
+      }else{
+        appState.selectedTaskId = null;
+        appState.selectedTaskTitle = '';
+        appState.selectedTask = null;
+        renderSelectedTask();
+      }
+    }else{
+      renderSelectedTask();
+    }
+
+    setStatus('Atualizado.');
+  }catch(err){
+    console.error(err);
+    setStatus('Falha ao carregar dados.');
+  }
+}
+
+function resetFilters(){
+  qs('#periodDays').value = '30';
+  qs('#q').value = '';
+  qs('#assignedToUserId').value = '';
+  qs('#statusFilter').value = '';
+  qs('#sourceKind').value = '';
+  qs('#overdueOnly').checked = false;
+  qs('#includeDeleted').checked = false;
+  qs('#limit').value = '12';
+  qs('#activityLimit').value = '25';
+  qs('#eventType').value = '';
+  appState.selectedTaskId = null;
+  appState.selectedTaskTitle = '';
+  appState.selectedTask = null;
+  refreshAll();
+}
+
+qs('#btnReload').addEventListener('click', refreshAll);
+qs('#btnReset').addEventListener('click', resetFilters);
+
+['#periodDays','#assignedToUserId','#statusFilter','#limit','#activityLimit','#eventType'].forEach(sel => {
+  qs(sel).addEventListener('change', refreshAll);
+});
+
+['#overdueOnly','#includeDeleted'].forEach(sel => {
+  qs(sel).addEventListener('change', refreshAll);
+});
+
+['#q','#sourceKind'].forEach(sel => {
+  qs(sel).addEventListener('keydown', ev => {
+    if(ev.key === 'Enter') refreshAll();
+  });
+});
+
+(async function init(){
+  try{
+    await loadConfig();
+    await refreshAll();
+  }catch(err){
+    console.error(err);
+    setStatus('Falha ao inicializar.');
+  }
+})();
+</script>
+</body>
+</html>

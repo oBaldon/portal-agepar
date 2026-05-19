@@ -11,7 +11,7 @@ description: Primeiro release do Catálogo com schema de bloco, proxy do Vite e 
 - Proxy do Vite para `/catalog`.
 - Documentação dedicada com exemplos e melhores práticas.
 
-<!-- truncate -->
+{/* truncate */}
 
 ### Migração
 1. Atualize o Host.

@@ -40,9 +40,11 @@ from app.automations.form2json import router as form2json_router
 from app.automations.dfd import router as dfd_router
 from app.automations.controle import router as controle_router
 from app.automations.controle_ferias import router as controle_ferias_router
+from app.automations.controle_tasks import router as controle_tasks_router
 from app.automations.accounts import router as accounts_router
 from app.automations.fileshare import router as fileshare_router
 from app.automations.whoisonline import router as whoisonline_router
+from app.automations.tasks import router as tasks_router, TASKS_VERSION as TASKS_VER
 from app.automations.support import router as support_router
 from app.automations.usuarios import router as usuarios_router
 from app.notifications import router as notifications_router
@@ -136,6 +138,7 @@ def _startup() -> None:
     logger.info("FERIAS engine version: %s", FERIAS_VER)
     logger.info("PONTO_SALDO engine version: %s", PONTO_SALDO_VER)
     logger.info("ETP engine version: %s", ETP_VER)
+    logger.info("TASKS engine version: %s", TASKS_VER)
 
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
     """
@@ -204,6 +207,7 @@ def version() -> Dict[str, Any]:
         "dfd_version": DFD_VER,
         "ferias_version": FERIAS_VER,
         "etp_version": ETP_VER,
+        "tasks_version": TASKS_VER,
         "auth_mode": AUTH_MODE,
         "auth_legacy_mock": AUTH_LEGACY_MOCK,
         "ep_mode": EP_MODE,
@@ -505,10 +509,12 @@ APP.include_router(etp_router,             dependencies=[Depends(require_passwor
 APP.include_router(ferias_router,          dependencies=[Depends(require_password_changed)])
 APP.include_router(controle_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(controle_ferias_router, dependencies=[Depends(require_password_changed)])
+APP.include_router(controle_tasks_router,  dependencies=[Depends(require_password_changed)])
 APP.include_router(support_router,         dependencies=[Depends(require_password_changed)])
 APP.include_router(ponto_saldo_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(accounts_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
+APP.include_router(tasks_router,           dependencies=[Depends(require_password_changed)])
 APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])
 APP.include_router(profile_router,         dependencies=[Depends(require_password_changed)])
 APP.include_router(notifications_router,   dependencies=[Depends(require_password_changed)])

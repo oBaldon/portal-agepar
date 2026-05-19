@@ -191,6 +191,94 @@ def init_db() -> None:
     CREATE INDEX IF NOT EXISTS ix_notification_recipients_user_unread
       ON notification_recipients (user_id)
       WHERE read_at IS NULL;
+
+    -- TAREFAS (gestão operacional)
+    CREATE TABLE IF NOT EXISTS tasks (
+      id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title                TEXT NOT NULL,
+      description          TEXT NOT NULL DEFAULT '',
+      status               TEXT NOT NULL DEFAULT 'a_fazer',
+      priority             TEXT NOT NULL DEFAULT 'media',
+      start_date           DATE,
+      due_date             DATE,
+      completed_at         TIMESTAMPTZ,
+      created_by_user_id   UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      assigned_to_user_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+      last_updated_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      deleted_at           TIMESTAMPTZ,
+      deleted_by_user_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+      source_kind          TEXT,
+      source_id            TEXT,
+      assigned_role_name   TEXT,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    DO $$
+    BEGIN
+      ALTER TABLE tasks DROP CONSTRAINT IF EXISTS chk_tasks_status;
+      UPDATE tasks
+         SET status = 'a_fazer'
+       WHERE status = 'backlog';
+      ALTER TABLE tasks
+        ADD CONSTRAINT chk_tasks_status
+        CHECK (status IN ('a_fazer','em_andamento','em_revisao','concluida','cancelada'));
+
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'chk_tasks_priority'
+          AND conrelid = 'tasks'::regclass
+      ) THEN
+        ALTER TABLE tasks
+          ADD CONSTRAINT chk_tasks_priority
+          CHECK (priority IN ('baixa','media','alta','urgente'));
+      END IF;
+    END$$;
+
+    DROP TRIGGER IF EXISTS trg_tasks_touch ON tasks;
+    CREATE TRIGGER trg_tasks_touch
+    BEFORE UPDATE ON tasks
+    FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+    CREATE INDEX IF NOT EXISTS ix_tasks_status_updated_at
+      ON tasks (status, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_tasks_due_date
+      ON tasks (due_date ASC);
+    CREATE INDEX IF NOT EXISTS ix_tasks_creator
+      ON tasks (created_by_user_id);
+    CREATE INDEX IF NOT EXISTS ix_tasks_assignee
+      ON tasks (assigned_to_user_id);
+    CREATE INDEX IF NOT EXISTS ix_tasks_deleted_at
+      ON tasks (deleted_at);
+    CREATE INDEX IF NOT EXISTS ix_tasks_created_at
+      ON tasks (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS task_events (
+      id            BIGSERIAL PRIMARY KEY,
+      task_id        UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      actor_user_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+      event_type     TEXT NOT NULL,
+      old_value      JSONB,
+      new_value      JSONB,
+      metadata       JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_task_events_task_created_at
+      ON task_events (task_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS task_comments (
+      id            BIGSERIAL PRIMARY KEY,
+      task_id        UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      actor_user_id  UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      body           TEXT NOT NULL,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_task_comments_task_created_at
+      ON task_comments (task_id, created_at ASC);
+
     """
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(sql)

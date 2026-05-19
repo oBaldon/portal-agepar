@@ -4,31 +4,76 @@
     "version": "1.0.0",
     "minBlockEngine": "1.0.0"
   },
-
   "categories": [
-    { "id": "cat1", "label": "Compras", "icon": "ShoppingCart" },
-    { "id": "cat2", "label": "Central de Viagens", "icon": "ShieldCheck", "hidden": true },
-    { "id": "cat3", "label": "Sistema PRIME", "icon": "ShieldCheck", "hidden": true },
-    { "id": "x", "label": "Testes & Lab", "icon": "FlaskConical", "hidden": true },
-    { "id": "ferias", "label": "Férias", "icon": "CalendarDays" },
-    { "id": "util", "label": "Utilidades", "icon": "Upload" },
-    { "id": "governanca", "label": "Governança & Controle", "icon": "Shield", "requiredRoles": ["admin", "coordenador"] }
+    {
+      "id": "cat1",
+      "label": "Compras",
+      "icon": "ShoppingCart"
+    },
+    {
+      "id": "cat2",
+      "label": "Central de Viagens",
+      "icon": "ShieldCheck",
+      "hidden": true
+    },
+    {
+      "id": "cat3",
+      "label": "Sistema PRIME",
+      "icon": "ShieldCheck",
+      "hidden": true
+    },
+    {
+      "id": "x",
+      "label": "Testes & Lab",
+      "icon": "FlaskConical",
+      "hidden": true
+    },
+    {
+      "id": "ferias",
+      "label": "Férias",
+      "icon": "CalendarDays"
+    },
+    {
+      "id": "util",
+      "label": "Utilidades",
+      "icon": "Upload"
+    },
+    {
+      "id": "governanca",
+      "label": "Governança & Controle",
+      "icon": "Shield",
+      "requiredRoles": [
+        "admin",
+        "coordenador"
+      ]
+    }
   ],
-
   "blocks": [
     {
       "name": "demo",
       "displayName": "Demo",
       "version": "1.0.0",
       "categoryId": "x",
-      "ui": { "type": "iframe", "url": "/api/demo" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/demo"
+      },
       "navigation": [
-        { "label": "Demo", "path": "/demo", "icon": "Sparkles" }
+        {
+          "label": "Demo",
+          "path": "/demo",
+          "icon": "Sparkles"
+        }
       ],
       "routes": [
-        { "path": "/demo", "kind": "iframe" }
+        {
+          "path": "/demo",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["exemplo"],
+      "tags": [
+        "exemplo"
+      ],
       "hidden": true
     },
     {
@@ -37,15 +82,30 @@
       "version": "1.0.0",
       "categoryId": "cat1",
       "description": "Gerar o Documento de Formalização da Demanda, em PDF, com rastreabilidade.",
-      "ui": { "type": "iframe", "url": "/api/automations/dfd/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/dfd/ui"
+      },
       "navigation": [
-        { "label": "DFD — Formalização da Demanda", "path": "/dfd", "icon": "FileText" }
+        {
+          "label": "DFD — Formalização da Demanda",
+          "path": "/dfd",
+          "icon": "FileText"
+        }
       ],
       "routes": [
-        { "path": "/dfd", "kind": "iframe" }
+        {
+          "path": "/dfd",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["compras", "documentos"],
-      "requiredRoles": ["compras"],
+      "tags": [
+        "compras",
+        "documentos"
+      ],
+      "requiredRoles": [
+        "compras"
+      ],
       "order": 10
     },
     {
@@ -54,15 +114,31 @@
       "version": "1.0.0",
       "categoryId": "cat1",
       "description": "Gerar o Estudo Técnico Preliminar a partir de formulário estruturado, com documento final em DOCX/PDF conforme template institucional.",
-      "ui": { "type": "iframe", "url": "/api/automations/etp/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/etp/ui"
+      },
       "navigation": [
-        { "label": "ETP — Estudo Técnico Preliminar", "path": "/etp", "icon": "FileText" }
+        {
+          "label": "ETP — Estudo Técnico Preliminar",
+          "path": "/etp",
+          "icon": "FileText"
+        }
       ],
       "routes": [
-        { "path": "/etp", "kind": "iframe" }
+        {
+          "path": "/etp",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["compras", "documentos", "etp"],
-      "requiredRoles": ["compras"],
+      "tags": [
+        "compras",
+        "documentos",
+        "etp"
+      ],
+      "requiredRoles": [
+        "compras"
+      ],
       "order": 11
     },
     {
@@ -70,15 +146,30 @@
       "displayName": "Plano de Contratações Anual",
       "version": "0.0.0",
       "categoryId": "cat1",
-      "ui": { "type": "iframe", "url": "/api/demo?view=pca" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/demo?view=pca"
+      },
       "navigation": [
-        { "label": "Plano de Contratações Anual", "path": "/pca", "icon": "FileJson" }
+        {
+          "label": "Plano de Contratações Anual",
+          "path": "/pca",
+          "icon": "FileJson"
+        }
       ],
       "routes": [
-        { "path": "/pca", "kind": "iframe" }
+        {
+          "path": "/pca",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["utilitário"],
-      "requiredRoles": ["coordenador", "admin"]
+      "tags": [
+        "utilitário"
+      ],
+      "requiredRoles": [
+        "coordenador",
+        "admin"
+      ]
     },
     {
       "name": "controle",
@@ -86,17 +177,38 @@
       "version": "1.0.0",
       "categoryId": "governanca",
       "description": "Auditoria de ações dos servidores.",
-      "ui": { "type": "iframe", "url": "/api/automations/controle/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/controle/ui"
+      },
       "navigation": [
-         { "label": "Painel (Auditoria)", "href": "/api/automations/controle/ui" }
-
-        ,{ "label": "Férias (Calendário)", "href": "/api/automations/controle/ferias/ui" }
-       ],
-      "routes": [
-        { "path": "/controle", "kind": "iframe" }
+        {
+          "label": "Painel (Auditoria)",
+          "href": "/api/automations/controle/ui"
+        },
+        {
+          "label": "Férias (Calendário)",
+          "href": "/api/automations/controle/ferias/ui"
+        },
+        {
+          "label": "Tarefas",
+          "href": "/api/automations/controle/tarefas/ui"
+        }
       ],
-      "tags": ["governança", "auditoria"],
-      "requiredRoles": ["coordenador", "admin"],
+      "routes": [
+        {
+          "path": "/controle",
+          "kind": "iframe"
+        }
+      ],
+      "tags": [
+        "governança",
+        "auditoria"
+      ],
+      "requiredRoles": [
+        "coordenador",
+        "admin"
+      ],
       "order": 1
     },
     {
@@ -104,15 +216,29 @@
       "displayName": "Formulário para JSON",
       "version": "1.0.0",
       "categoryId": "cat1",
-      "ui": { "type": "iframe", "url": "/api/automations/form2json/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/form2json/ui"
+      },
       "navigation": [
-        { "label": "Formulário para JSON", "path": "/form2json", "icon": "FileJson" }
+        {
+          "label": "Formulário para JSON",
+          "path": "/form2json",
+          "icon": "FileJson"
+        }
       ],
       "routes": [
-        { "path": "/form2json", "kind": "iframe" }
+        {
+          "path": "/form2json",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["utilitário"],
-      "requiredRoles": ["automations.form2json"],
+      "tags": [
+        "utilitário"
+      ],
+      "requiredRoles": [
+        "automations.form2json"
+      ],
       "hidden": true
     },
     {
@@ -120,14 +246,27 @@
       "displayName": "Automação 2",
       "version": "0.0.0",
       "categoryId": "cat2",
-      "ui": { "type": "iframe", "url": "/api/demo?view=automacao2" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/demo?view=automacao2"
+      },
       "navigation": [
-        { "label": "Automação 2", "path": "/automacao-2", "icon": "Workflow" }
+        {
+          "label": "Automação 2",
+          "path": "/automacao-2",
+          "icon": "Workflow"
+        }
       ],
       "routes": [
-        { "path": "/automacao-2", "kind": "iframe" }
+        {
+          "path": "/automacao-2",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["exemplo", "piloto"],
+      "tags": [
+        "exemplo",
+        "piloto"
+      ],
       "hidden": true
     },
     {
@@ -135,14 +274,27 @@
       "displayName": "Automação 3",
       "version": "0.0.0",
       "categoryId": "cat3",
-      "ui": { "type": "iframe", "url": "/api/demo?view=automacao3" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/demo?view=automacao3"
+      },
       "navigation": [
-        { "label": "Automação 3", "path": "/automacao-3", "icon": "Workflow" }
+        {
+          "label": "Automação 3",
+          "path": "/automacao-3",
+          "icon": "Workflow"
+        }
       ],
       "routes": [
-        { "path": "/automacao-3", "kind": "iframe" }
+        {
+          "path": "/automacao-3",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["exemplo", "piloto"],
+      "tags": [
+        "exemplo",
+        "piloto"
+      ],
       "hidden": true
     },
     {
@@ -150,15 +302,30 @@
       "displayName": "Possibilidades",
       "version": "1.0.0",
       "categoryId": "x",
-      "ui": { "type": "iframe", "url": "/api/games/snake/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/games/snake/ui"
+      },
       "navigation": [
-        { "label": "Possibilidades", "path": "/possibilidades", "icon": "Lightbulb" }
+        {
+          "label": "Possibilidades",
+          "path": "/possibilidades",
+          "icon": "Lightbulb"
+        }
       ],
       "routes": [
-        { "path": "/possibilidades", "kind": "iframe" }
+        {
+          "path": "/possibilidades",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["idéias", "exploração"],
-      "requiredRoles": ["admin"],
+      "tags": [
+        "idéias",
+        "exploração"
+      ],
+      "requiredRoles": [
+        "admin"
+      ],
       "hidden": true
     },
     {
@@ -167,14 +334,28 @@
       "version": "1.0.0",
       "categoryId": "governanca",
       "description": "Gerenciar usuários (criar, editar, excluir) e delegar roles — somente superuser.",
-      "ui": { "type": "iframe", "url": "/api/automations/accounts/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/accounts/ui"
+      },
       "navigation": [
-        { "label": "Admin — Contas & Roles", "path": "/admin/accounts", "icon": "Users" }
+        {
+          "label": "Admin — Contas & Roles",
+          "path": "/admin/accounts",
+          "icon": "Users"
+        }
       ],
       "routes": [
-        { "path": "/admin/accounts", "kind": "iframe" }
+        {
+          "path": "/admin/accounts",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["rbac", "superuser", "contas"],
+      "tags": [
+        "rbac",
+        "superuser",
+        "contas"
+      ],
       "superuserOnly": true
     },
     {
@@ -182,19 +363,52 @@
       "displayName": "Usuários (RH)",
       "version": "0.1.0",
       "categoryId": "governanca",
-      "ui": { "type": "iframe", "url": "/api/automations/usuarios/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/usuarios/ui"
+      },
       "navigation": [
-        { "label": "Usuários (RH)", "path": "/usuarios", "icon": "Users" },
-        { "label": "Criar", "path": "/usuarios?tab=criar", "icon": "UserPlus" },
-        { "label": "Buscar/Editar", "path": "/usuarios/cadastrados", "icon": "Search" },
-        { "label": "Roles", "path": "/usuarios?tab=roles", "icon": "Shield" },
-        { "label": "Sessões", "path": "/usuarios?tab=sessoes", "icon": "Activity" }
+        {
+          "label": "Usuários (RH)",
+          "path": "/usuarios",
+          "icon": "Users"
+        },
+        {
+          "label": "Criar",
+          "path": "/usuarios?tab=criar",
+          "icon": "UserPlus"
+        },
+        {
+          "label": "Buscar/Editar",
+          "path": "/usuarios/cadastrados",
+          "icon": "Search"
+        },
+        {
+          "label": "Roles",
+          "path": "/usuarios?tab=roles",
+          "icon": "Shield"
+        },
+        {
+          "label": "Sessões",
+          "path": "/usuarios?tab=sessoes",
+          "icon": "Activity"
+        }
       ],
       "routes": [
-        { "path": "/usuarios", "kind": "iframe" }
+        {
+          "path": "/usuarios",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["RH", "usuários", "gestão"],
-      "requiredRoles": ["rh", "admin"],
+      "tags": [
+        "RH",
+        "usuários",
+        "gestão"
+      ],
+      "requiredRoles": [
+        "rh",
+        "admin"
+      ],
       "description": "Cadastro e gestão de usuários corporativos pelo RH."
     },
     {
@@ -203,16 +417,61 @@
       "version": "0.1.0",
       "categoryId": "ferias",
       "description": "Requerimento + Substituição em um único fluxo (gera dois PDFs).",
-      "ui": { "type": "iframe", "url": "/api/automations/ferias/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/ferias/ui"
+      },
       "navigation": [
-        { "label": "Férias", "path": "/ferias", "icon": "CalendarDays" }
+        {
+          "label": "Férias",
+          "path": "/ferias",
+          "icon": "CalendarDays"
+        }
       ],
       "routes": [
-        { "path": "/ferias", "kind": "iframe" }
+        {
+          "path": "/ferias",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["RH", "férias"],
-      "requiredRoles": ["ferias"],
+      "tags": [
+        "RH",
+        "férias"
+      ],
+      "requiredRoles": [
+        "ferias"
+      ],
       "order": 20
+    },
+    {
+      "name": "tasks",
+      "displayName": "Gestão de Tarefas",
+      "version": "0.1.0",
+      "categoryId": "util",
+      "description": "Organize tarefas pessoais e de equipe com visualização em lista e kanban. Calendário e automações entram nas próximas etapas.",
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/tasks/ui"
+      },
+      "navigation": [
+        {
+          "label": "Gestão de Tarefas",
+          "path": "/tarefas",
+          "icon": "ListTodo"
+        }
+      ],
+      "routes": [
+        {
+          "path": "/tarefas",
+          "kind": "iframe"
+        }
+      ],
+      "tags": [
+        "tarefas",
+        "kanban",
+        "organização"
+      ],
+      "order": 1
     },
     {
       "name": "support",
@@ -220,15 +479,28 @@
       "version": "1.0.0",
       "categoryId": "util",
       "description": "Relate bugs e melhorias (módulo impactado, gravidade, passos, anexos).",
-      "ui": { "type": "iframe", "url": "/api/automations/support/ui" },
-      "ui": { "type": "iframe", "url": "/api/automations/support/padrao.html" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/support/padrao.html"
+      },
       "navigation": [
-        { "label": "Suporte & Feedback", "path": "/support", "icon": "LifeBuoy" }
+        {
+          "label": "Suporte & Feedback",
+          "path": "/support",
+          "icon": "LifeBuoy"
+        }
       ],
       "routes": [
-        { "path": "/support", "kind": "iframe" }
+        {
+          "path": "/support",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["suporte", "feedback", "qualidade"],
+      "tags": [
+        "suporte",
+        "feedback",
+        "qualidade"
+      ],
       "order": 2
     },
     {
@@ -237,14 +509,28 @@
       "version": "0.1.0",
       "categoryId": "util",
       "description": "Área comunitária para envio/compartilhamento temporário de arquivos (TTL 1 dia/semana/mês, opção de chave secreta).",
-      "ui": { "type": "iframe", "url": "/api/automations/fileshare/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/fileshare/ui"
+      },
       "navigation": [
-        { "label": "Uploader temporário", "path": "/fileshare", "icon": "Upload" }
+        {
+          "label": "Uploader temporário",
+          "path": "/fileshare",
+          "icon": "Upload"
+        }
       ],
       "routes": [
-        { "path": "/fileshare", "kind": "iframe" }
+        {
+          "path": "/fileshare",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["utilitário", "arquivos", "temporário"],
+      "tags": [
+        "utilitário",
+        "arquivos",
+        "temporário"
+      ],
       "order": 5
     },
     {
@@ -253,14 +539,29 @@
       "version": "0.1.0",
       "categoryId": "util",
       "description": "Lê o espelho de ponto em PDF, calcula horas faltantes/sobrando e sugere distribuição nos dias úteis restantes do mês (considerando feriados/ponto facultativo conforme o PDF).",
-      "ui": { "type": "iframe", "url": "/api/automations/ponto_saldo/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/ponto_saldo/ui"
+      },
       "navigation": [
-        { "label": "Saldo de Horas (PDF)", "path": "/ponto-saldo", "icon": "Clock" }
+        {
+          "label": "Saldo de Horas (PDF)",
+          "path": "/ponto-saldo",
+          "icon": "Clock"
+        }
       ],
       "routes": [
-        { "path": "/ponto-saldo", "kind": "iframe" }
+        {
+          "path": "/ponto-saldo",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["utilitário", "ponto", "horas", "pdf"],
+      "tags": [
+        "utilitário",
+        "ponto",
+        "horas",
+        "pdf"
+      ],
       "order": 6
     },
     {
@@ -269,14 +570,29 @@
       "version": "0.1.0",
       "categoryId": "governanca",
       "description": "Sessões ativas, idle, agentes e revogação — somente superuser.",
-      "ui": { "type": "iframe", "url": "/api/automations/whoisonline/ui" },
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/whoisonline/ui"
+      },
       "navigation": [
-        { "label": "Admin — Usuários Online", "path": "/admin/whoisonline", "icon": "Activity" }
+        {
+          "label": "Admin — Usuários Online",
+          "path": "/admin/whoisonline",
+          "icon": "Activity"
+        }
       ],
       "routes": [
-        { "path": "/admin/whoisonline", "kind": "iframe" }
+        {
+          "path": "/admin/whoisonline",
+          "kind": "iframe"
+        }
       ],
-      "tags": ["governança", "superuser", "sessões", "monitoramento"],
+      "tags": [
+        "governança",
+        "superuser",
+        "sessões",
+        "monitoramento"
+      ],
       "superuserOnly": true,
       "order": 0
     }
