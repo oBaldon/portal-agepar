@@ -122,6 +122,57 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 CREATE INDEX IF NOT EXISTS ix_auth_sessions_user ON auth_sessions (user_id);
 CREATE INDEX IF NOT EXISTS ix_auth_sessions_exp ON auth_sessions (expires_at);
 
+-- AVISOS GLOBAIS (rastreáveis)
+CREATE TABLE IF NOT EXISTS platform_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  level TEXT NOT NULL DEFAULT 'warning' CHECK (level IN ('info','warning','danger')),
+  status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published','closed','expired','cancelled')),
+  created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  closed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_cpf TEXT,
+  actor_nome TEXT,
+  actor_email TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  closed_at TIMESTAMPTZ,
+  closed_reason TEXT,
+  allow_dismiss BOOLEAN NOT NULL DEFAULT FALSE,
+  objection_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  objection_requires_message BOOLEAN NOT NULL DEFAULT TRUE,
+  tab_badge_enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS platform_alert_recipients (
+  alert_id UUID NOT NULL REFERENCES platform_alerts(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','seen','confirmed','objected')),
+  delivered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  first_seen_at TIMESTAMPTZ,
+  responded_at TIMESTAMPTZ,
+  confirmed_at TIMESTAMPTZ,
+  objected_at TIMESTAMPTZ,
+  objection_message TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (alert_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_platform_alerts_status_published_at
+  ON platform_alerts (status, published_at DESC);
+CREATE INDEX IF NOT EXISTS ix_platform_alerts_expires_at
+  ON platform_alerts (expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_platform_alerts_single_published
+  ON platform_alerts ((1))
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS ix_platform_alert_recipients_user_status
+  ON platform_alert_recipients (user_id, status, delivered_at DESC);
+CREATE INDEX IF NOT EXISTS ix_platform_alert_recipients_alert_status
+  ON platform_alert_recipients (alert_id, status);
+
 -- LOGIN_ATTEMPTS
 CREATE TABLE IF NOT EXISTS login_attempts (
   id BIGSERIAL PRIMARY KEY,

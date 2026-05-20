@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin — Avisos Globais</title>
+  <style>
+    :root{
+      --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#fff; --pri:#2563eb;
+      --warn:#b45309; --bad:#b91c1c; --ok:#15803d; --line:#e2e8f0;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--fg)}
+    .wrap{max-width:1360px;margin:24px auto;padding:0 16px}
+    h1{font-size:22px;margin:0 0 12px}
+    h2{font-size:16px;margin:0 0 8px}
+    h3{font-size:14px;margin:0 0 8px}
+    .muted{color:var(--muted)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:16px}
+    .grid{display:grid;gap:16px}
+    .page-stack{display:flex;flex-direction:column;gap:16px}
+    .top-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);gap:16px;align-items:start}
+    .grid.cols{grid-template-columns:1.15fr .85fr}
+    .stack{display:flex;flex-direction:column;gap:16px}
+    .row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+    .col{flex:1;min-width:0}
+    label{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px}
+    input,select,textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
+    textarea{min-height:140px;resize:vertical}
+    input[type="checkbox"]{width:auto;transform:translateY(2px)}
+    .inline-check{display:flex;gap:8px;align-items:flex-start;margin-top:10px}
+    .inline-check label{margin:0;font-size:13px;color:var(--fg)}
+    .btn{background:var(--pri);color:#fff;border:1px solid transparent;border-radius:10px;padding:10px 14px;cursor:pointer;transition:.16s ease}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(2,6,23,.08)}
+    .btn.secondary{background:#fff;color:#334155;border-color:#cbd5e1}
+    .btn.danger{background:var(--bad)}
+    .btn.small{padding:8px 10px;font-size:12px}
+    .btn[disabled]{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .status{font-size:13px;color:var(--muted)}
+    .status.ok{color:var(--ok)}
+    .status.bad{color:var(--bad)}
+    .list{display:flex;flex-direction:column;gap:10px;max-height:720px;overflow:auto}
+    .alert-item{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff;cursor:pointer;transition:.16s ease}
+    .alert-item:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(2,6,23,.05)}
+    .alert-item.active{border-color:#93c5fd;background:#eff6ff}
+    .alert-title{font-weight:700;margin-bottom:4px}
+    .alert-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+    .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:#eef2ff;color:#1e3a8a}
+    .badge.warning{background:#fef3c7;color:#92400e}
+    .badge.danger{background:#fee2e2;color:#991b1b}
+    .badge.info{background:#e0f2fe;color:#0c4a6e}
+    .badge.success,.badge.confirmed{background:#dcfce7;color:#166534}
+    .badge.objected{background:#fee2e2;color:#991b1b}
+    .badge.pending{background:#f1f5f9;color:#334155}
+    .badge.seen{background:#ede9fe;color:#5b21b6}
+    .badge.closed{background:#e2e8f0;color:#334155}
+    .badge.expired{background:#fef2f2;color:#991b1b}
+    .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+    .kpi{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+    .kpi h4{margin:0;font-size:12px;color:var(--muted)}
+    .kpi div{font-size:24px;font-weight:800;margin-top:6px}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{padding:10px 12px;border-bottom:1px solid #eef2f7;vertical-align:top;text-align:left;font-size:13px}
+    thead th{position:sticky;top:0;background:#f8fafc;z-index:1;font-size:12px;color:#64748b}
+    tbody tr:hover{background:#fcfdff}
+    .empty{padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center}
+    .pre{white-space:pre-wrap}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .detail-sections{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+    .triple{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .hint{font-size:12px;color:var(--muted)}
+    .toolbar.compact{margin:0 0 12px;justify-content:flex-start}
+    .toolbar.compact > *{margin:0}
+    .toolbar.actions-start{justify-content:flex-start}
+    .inline-check.disabled{opacity:.6}
+    .inline-check.disabled label{color:#94a3b8}
+    .preview-card{position:relative}
+    .preview-card[hidden]{display:none}
+    .preview-shell{border:1px dashed var(--line);border-radius:24px;background:linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%);padding:18px}
+    .preview-modal{max-width:640px;margin:0 auto;border:1px solid #dbeafe;border-radius:28px;background:#fff;box-shadow:0 24px 60px rgba(15,23,42,.16);overflow:hidden}
+    .preview-head{padding:20px 22px;border-bottom:1px solid #e2e8f0}
+    .preview-body{padding:20px 22px}
+    .preview-footer{padding:16px 22px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+    .preview-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+    .preview-message{white-space:pre-wrap;word-break:break-word;color:var(--fg);line-height:1.55}
+    .card-section{padding:12px}
+    .table-wrap .pre, .cell-wrap{white-space:pre-wrap;word-break:break-word}
+    .cell-wrap{min-width:280px;max-width:640px}
+    @media (max-width: 1080px){
+      .grid.cols{grid-template-columns:1fr}
+      .top-grid{grid-template-columns:1fr}
+      .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .split{grid-template-columns:1fr}
+      .triple{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div>
+        <h1>Avisos Globais</h1>
+        <div class="muted">Publique comunicados obrigatórios para todos os usuários com sessão ativa no momento do disparo.</div>
+      </div>
+      <button id="refreshBtn" class="btn secondary">Atualizar</button>
+    </div>
+
+    <div class="page-stack">
+      <section class="top-grid">
+        <div class="card">
+          <h2>Novo aviso</h2>
+          <div class="hint">No MVP, apenas 1 aviso global pode ficar ativo por vez.</div>
+          <label for="title">Título</label>
+          <input id="title" maxlength="160" placeholder="Ex.: Instabilidade programada às 14h"/>
+
+          <label for="message">Mensagem</label>
+          <textarea id="message" maxlength="4000" placeholder="Descreva o aviso de forma objetiva."></textarea>
+
+          <div class="row">
+            <div class="col">
+              <label for="level">Nível</label>
+              <select id="level">
+                <option value="info">Informativo</option>
+                <option value="warning" selected>Atenção</option>
+                <option value="danger">Crítico</option>
+              </select>
+            </div>
+            <div class="col">
+              <label for="expiresIn">Vigência (minutos)</label>
+              <input id="expiresIn" type="number" min="1" max="10080" value="60"/>
+            </div>
+          </div>
+
+          <div class="inline-check">
+            <input id="allowDismiss" type="checkbox"/>
+            <label for="allowDismiss">Permitir fechar temporariamente o popup sem responder (ele continuará pendente).</label>
+          </div>
+          <div class="inline-check">
+            <input id="objectionEnabled" type="checkbox" checked/>
+            <label for="objectionEnabled">Habilitar botão de objeção para o usuário.</label>
+          </div>
+          <div id="objectionRequiresMessageWrap" class="inline-check">
+            <input id="objectionRequiresMessage" type="checkbox" checked/>
+            <label for="objectionRequiresMessage">Exigir mensagem ao registrar objeção.</label>
+          </div>
+          <div class="inline-check">
+            <input id="tabBadgeEnabled" type="checkbox" checked/>
+            <label for="tabBadgeEnabled">Sinalizar pendência também no título da aba do navegador.</label>
+          </div>
+
+          <div class="toolbar" style="margin-top:16px;margin-bottom:0">
+            <span id="createStatus" class="status">Pronto para publicar.</span>
+            <div class="row" style="justify-content:flex-end">
+              <button id="previewBtn" class="btn secondary" type="button">Ver prévia</button>
+              <button id="publishBtn" class="btn">Publicar aviso</button>
+            </div>
+          </div>
+        </div>
+
+        <aside id="previewCard" class="card preview-card" hidden>
+          <div class="toolbar compact">
+            <div>
+              <h2>Prévia do popup</h2>
+              <div class="hint">Simulação visual do aviso que o usuário verá no Portal.</div>
+            </div>
+            <button id="closePreviewBtn" class="btn secondary small" type="button">Ocultar</button>
+          </div>
+          <div class="preview-shell">
+            <div id="previewContent"></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="stack">
+        <div class="card">
+          <div class="toolbar">
+            <div>
+              <h2>Histórico</h2>
+              <div class="hint">Selecione um aviso para ver status por usuário, objeções e eventos.</div>
+            </div>
+            <select id="statusFilter" style="max-width:220px">
+              <option value="">Todos os status</option>
+              <option value="published">Ativos</option>
+              <option value="closed">Encerrados</option>
+              <option value="expired">Expirados</option>
+              <option value="cancelled">Cancelados</option>
+            </select>
+          </div>
+          <div id="alertList" class="list"></div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <div id="detailCard" class="card">
+          <div class="empty">Selecione um aviso para ver o detalhamento.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const api = {
+      async json(url, opts = {}) {
+        const res = await fetch(url, {
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+          ...opts,
+        });
+        if (!res.ok) {
+          let data = null;
+          try { data = await res.json(); } catch {}
+          const msg = data?.detail || data?.message || `HTTP ${res.status}`;
+          throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+        }
+        return res.status === 204 ? null : res.json();
+      },
+      list(status = "") {
+        const qs = new URLSearchParams();
+        if (status) qs.set("status", status);
+        return this.json(`/api/automations/avisos${qs.toString() ? `?${qs.toString()}` : ""}`);
+      },
+      create(payload) {
+        return this.json("/api/automations/avisos", { method: "POST", body: JSON.stringify(payload) });
+      },
+      detail(id) {
+        return this.json(`/api/automations/avisos/${encodeURIComponent(id)}`);
+      },
+      recipients(id, q = "", status = "") {
+        const qs = new URLSearchParams();
+        if (q) qs.set("q", q);
+        if (status) qs.set("status", status);
+        return this.json(`/api/automations/avisos/${encodeURIComponent(id)}/recipients${qs.toString() ? `?${qs.toString()}` : ""}`);
+      },
+      objections(id, q = "") {
+        const qs = new URLSearchParams();
+        if (q) qs.set("q", q);
+        return this.json(`/api/automations/avisos/${encodeURIComponent(id)}/objections${qs.toString() ? `?${qs.toString()}` : ""}`);
+      },
+      events(id, limit = 200) {
+        const qs = new URLSearchParams();
+        qs.set("limit", String(limit));
+        return this.json(`/api/automations/avisos/${encodeURIComponent(id)}/events?${qs.toString()}`);
+      },
+      close(id, reason = "") {
+        return this.json(`/api/automations/avisos/${encodeURIComponent(id)}/close`, {
+          method: "POST",
+          body: JSON.stringify({ reason }),
+        });
+      },
+      downloadUrl(id, kind, params = {}) {
+        const qs = new URLSearchParams();
+        qs.set("kind", kind);
+        Object.entries(params || {}).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== "") {
+            qs.set(key, String(value));
+          }
+        });
+        return `/api/automations/avisos/${encodeURIComponent(id)}/download?${qs.toString()}`;
+      },
+    };
+
+    const state = {
+      items: [],
+      selectedId: null,
+      detail: null,
+      recipients: [],
+      objections: [],
+      events: [],
+      recipientQuery: "",
+      recipientStatus: "",
+      objectionQuery: "",
+      refreshTick: 0,
+      previewOpen: false,
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const listEl = $("alertList");
+    const detailCard = $("detailCard");
+    const createStatus = $("createStatus");
+    const previewCard = $("previewCard");
+    const previewContent = $("previewContent");
+    let refreshTimer = null;
+
+    function fmtDate(v) {
+      if (!v) return "—";
+      try {
+        return new Date(v).toLocaleString("pt-BR");
+      } catch {
+        return v;
+      }
+    }
+
+    function esc(v) {
+      return String(v ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function badge(levelOrStatus, label) {
+      return `<span class="badge ${esc(levelOrStatus)}">${esc(label || levelOrStatus)}</span>`;
+    }
+
+    function badgeSummary(item) {
+      return `
+        ${badge(item.level, item.level)}
+        ${badge(item.status, item.status)}
+        <span>Total: <strong>${item.counts?.total ?? 0}</strong></span>
+        <span>OK: <strong>${item.counts?.confirmed ?? 0}</strong></span>
+        <span>Objeções: <strong>${item.counts?.objected ?? 0}</strong></span>
+        <span>Sem ação: <strong>${item.counts?.noAction ?? 0}</strong></span>
+      `;
+    }
+
+    function collectFormPayload() {
+      const objectionEnabled = $("objectionEnabled").checked;
+      const objectionRequiresMessage = objectionEnabled && $("objectionRequiresMessage").checked;
+      return {
+        title: $("title").value.trim(),
+        message: $("message").value.trim(),
+        level: $("level").value,
+        expires_in_minutes: Number($("expiresIn").value || 60),
+        allow_dismiss: $("allowDismiss").checked,
+        objection_enabled: objectionEnabled,
+        objection_requires_message: objectionRequiresMessage,
+        tab_badge_enabled: $("tabBadgeEnabled").checked,
+      };
+    }
+
+    function syncFormDependencies() {
+      const objectionEnabled = $("objectionEnabled").checked;
+      const wrap = $("objectionRequiresMessageWrap");
+      const requiresMessage = $("objectionRequiresMessage");
+      if (!objectionEnabled) {
+        requiresMessage.checked = false;
+      }
+      requiresMessage.disabled = !objectionEnabled;
+      wrap.classList.toggle("disabled", !objectionEnabled);
+      wrap.title = objectionEnabled ? "" : "Ative o botão de objeção para permitir essa opção.";
+      if (state.previewOpen) {
+        renderPreview();
+      }
+    }
+
+    function previewLevelText(level) {
+      if (level === "danger") return "Crítico";
+      if (level === "warning") return "Atenção";
+      return "Informativo";
+    }
+
+    function renderPreview() {
+      if (!state.previewOpen) {
+        previewCard.hidden = true;
+        $("previewBtn").textContent = "Ver prévia";
+        return;
+      }
+
+      const payload = collectFormPayload();
+      previewCard.hidden = false;
+      $("previewBtn").textContent = "Ocultar prévia";
+
+      const title = payload.title || "Título do aviso";
+      const message = payload.message || "A mensagem aparecerá aqui na mesma estrutura do popup global do Portal.";
+      const objectionButton = payload.objection_enabled
+        ? `<button class="btn secondary" type="button">${payload.objection_requires_message ? "Registrar objeção" : "Objeção"}</button>`
+        : "";
+
+      previewContent.innerHTML = `
+        <div class="preview-modal" role="presentation" aria-hidden="true">
+          <div class="preview-head">
+            <div class="preview-meta">
+              ${badge(payload.level, previewLevelText(payload.level))}
+              <span>Vigência: ${esc(String(payload.expires_in_minutes))} minuto(s)</span>
+              <span>Badge na aba: ${payload.tab_badge_enabled ? "ativo" : "desativado"}</span>
+            </div>
+            <h3 style="margin:10px 0 0;font-size:20px">${esc(title)}</h3>
+          </div>
+          <div class="preview-body">
+            <div class="preview-message">${esc(message)}</div>
+            <div class="preview-meta">
+              <span>Fechamento temporário: <strong>${payload.allow_dismiss ? "permitido" : "bloqueado"}</strong></span>
+              <span>Objeção: <strong>${payload.objection_enabled ? "habilitada" : "desabilitada"}</strong></span>
+              ${payload.objection_enabled ? `<span>Mensagem obrigatória: <strong>${payload.objection_requires_message ? "sim" : "não"}</strong></span>` : ""}
+            </div>
+          </div>
+          <div class="preview-footer">
+            ${objectionButton}
+            <button class="btn" type="button">Confirmar</button>
+          </div>
+        </div>
+      `;
+    }
+
+
+    function renderList() {
+      if (!state.items.length) {
+        listEl.innerHTML = `<div class="empty">Nenhum aviso encontrado para o filtro atual.</div>`;
+        return;
+      }
+      listEl.innerHTML = state.items.map((item) => `
+        <button class="alert-item ${item.id === state.selectedId ? "active" : ""}" data-id="${esc(item.id)}">
+          <div class="alert-title">${esc(item.title)}</div>
+          <div class="muted pre">${esc((item.message || "").slice(0, 180))}${item.message && item.message.length > 180 ? "…" : ""}</div>
+          <div class="alert-meta">${badgeSummary(item)}</div>
+          <div class="alert-meta">
+            <span>Publicado: ${esc(fmtDate(item.publishedAt || item.createdAt))}</span>
+            <span>Expira: ${esc(fmtDate(item.expiresAt))}</span>
+          </div>
+        </button>
+      `).join("");
+      listEl.querySelectorAll("[data-id]").forEach((el) => {
+        el.addEventListener("click", () => selectAlert(el.getAttribute("data-id")));
+      });
+    }
+
+    function recipientsRows() {
+      if (!state.recipients.length) {
+        return `<tr><td colspan="7" class="muted">Nenhum destinatário corresponde ao filtro atual.</td></tr>`;
+      }
+      return state.recipients.map((r) => `
+        <tr>
+          <td>${esc(r.name || "—")}</td>
+          <td>${esc(r.email || "—")}</td>
+          <td>${esc(r.cpf || "—")}</td>
+          <td>${badge(r.status, r.status)}</td>
+          <td>${esc(fmtDate(r.firstSeenAt))}</td>
+          <td>${esc(fmtDate(r.respondedAt))}</td>
+          <td class="cell-wrap">${esc(r.objectionMessage || "—")}</td>
+        </tr>
+      `).join("");
+    }
+
+    function objectionRows() {
+      if (!state.objections.length) {
+        return `<tr><td colspan="5" class="muted">Nenhuma objeção encontrada para o filtro atual.</td></tr>`;
+      }
+      return state.objections.map((r) => `
+        <tr>
+          <td>${esc(r.name || "—")}</td>
+          <td>${esc(r.email || "—")}</td>
+          <td>${esc(r.cpf || "—")}</td>
+          <td>${esc(fmtDate(r.objectedAt))}</td>
+          <td class="cell-wrap">${esc(r.message || "—")}</td>
+        </tr>
+      `).join("");
+    }
+
+    function eventRows() {
+      if (!state.events.length) {
+        return `<tr><td colspan="6" class="muted">Nenhum evento de auditoria encontrado.</td></tr>`;
+      }
+      return state.events.map((ev) => `
+        <tr>
+          <td>${esc(fmtDate(ev.at))}</td>
+          <td>${badge(ev.action || "evento", ev.action || "evento")}</td>
+          <td>${esc(ev.actorName || ev.actorEmail || "sistema")}</td>
+          <td>${esc(ev.ip || "—")}</td>
+          <td class="cell-wrap">${esc(ev.message || "—")}</td>
+          <td class="cell-wrap">${esc(JSON.stringify(ev.metadata || {}, null, 2))}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderDetail() {
+      const item = state.detail;
+      if (!item) {
+        detailCard.innerHTML = `<div class="empty">Selecione um aviso para ver o detalhamento.</div>`;
+        return;
+      }
+
+      detailCard.innerHTML = `
+        <div class="toolbar">
+          <div>
+            <h2 style="margin-bottom:4px">${esc(item.title)}</h2>
+            <div class="muted">${badgeSummary(item)}</div>
+          </div>
+          <div class="row" style="justify-content:flex-end">
+            <a class="btn secondary small" href="${esc(api.downloadUrl(item.id, "recipients", { q: state.recipientQuery, status: state.recipientStatus }))}">Exportar destinatários</a>
+            <a class="btn secondary small" href="${esc(api.downloadUrl(item.id, "objections", { q: state.objectionQuery }))}">Exportar objeções</a>
+            <a class="btn secondary small" href="${esc(api.downloadUrl(item.id, "events"))}">Exportar eventos</a>
+            ${item.status === "published" ? `<button id="closeBtn" class="btn danger small">Encerrar aviso</button>` : ""}
+          </div>
+        </div>
+
+        <div class="card" style="padding:12px;background:#f8fafc;border-style:dashed">
+          <div class="pre">${esc(item.message)}</div>
+          <div class="alert-meta" style="margin-top:10px">
+            <span>Publicado: <strong>${esc(fmtDate(item.publishedAt || item.createdAt))}</strong></span>
+            <span>Expira: <strong>${esc(fmtDate(item.expiresAt))}</strong></span>
+            <span>Criado por: <strong>${esc(item.createdByName || item.createdByEmail || "—")}</strong></span>
+            <span>Fechamento permitido pelo usuário: <strong>${item.allowDismiss ? "sim" : "não"}</strong></span>
+          </div>
+        </div>
+
+        <div class="kpis" style="margin-top:16px">
+          <div class="kpi"><h4>Total</h4><div>${item.counts?.total ?? 0}</div></div>
+          <div class="kpi"><h4>Visualizados</h4><div>${item.counts?.visualized ?? 0}</div></div>
+          <div class="kpi"><h4>Confirmados</h4><div>${item.counts?.confirmed ?? 0}</div></div>
+          <div class="kpi"><h4>Objeções</h4><div>${item.counts?.objected ?? 0}</div></div>
+          <div class="kpi"><h4>Sem ação</h4><div>${item.counts?.noAction ?? 0}</div></div>
+        </div>
+
+        <div class="detail-sections">
+          <div class="card card-section">
+            <div class="toolbar compact">
+              <div>
+                <h3>Destinatários</h3>
+                <div class="hint">Filtre por nome, e-mail, CPF ou status.</div>
+              </div>
+            </div>
+            <div class="row" style="margin-bottom:12px">
+              <div class="col">
+                <input id="recipientQuery" placeholder="Buscar destinatário…" value="${esc(state.recipientQuery)}" />
+              </div>
+              <div class="col" style="max-width:220px">
+                <select id="recipientStatus">
+                  <option value="" ${state.recipientStatus === "" ? "selected" : ""}>Todos os status</option>
+                  <option value="pending" ${state.recipientStatus === "pending" ? "selected" : ""}>Pendente</option>
+                  <option value="seen" ${state.recipientStatus === "seen" ? "selected" : ""}>Visualizado</option>
+                  <option value="confirmed" ${state.recipientStatus === "confirmed" ? "selected" : ""}>Confirmado</option>
+                  <option value="objected" ${state.recipientStatus === "objected" ? "selected" : ""}>Objetado</option>
+                </select>
+              </div>
+              <button id="applyRecipientFilters" class="btn secondary small">Aplicar</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>CPF</th>
+                    <th>Status</th>
+                    <th>Primeira visualização</th>
+                    <th>Resposta</th>
+                    <th>Objeção</th>
+                  </tr>
+                </thead>
+                <tbody>${recipientsRows()}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card card-section">
+            <div class="toolbar compact">
+              <div>
+                <h3>Objeções</h3>
+                <div class="hint">Busque no remetente ou no conteúdo da mensagem.</div>
+              </div>
+            </div>
+            <div class="row" style="margin-bottom:12px">
+              <div class="col">
+                <input id="objectionQuery" placeholder="Buscar objeções…" value="${esc(state.objectionQuery)}" />
+              </div>
+              <button id="applyObjectionFilters" class="btn secondary small">Aplicar</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>CPF</th>
+                    <th>Quando</th>
+                    <th>Mensagem</th>
+                  </tr>
+                </thead>
+                <tbody>${objectionRows()}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card card-section">
+            <div class="toolbar compact">
+              <div>
+                <h3>Trilha de eventos</h3>
+                <div class="hint">Últimos eventos administrativos e respostas dos usuários.</div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Quando</th>
+                    <th>Ação</th>
+                    <th>Ator</th>
+                    <th>IP</th>
+                    <th>Mensagem</th>
+                    <th>Metadata</th>
+                  </tr>
+                </thead>
+                <tbody>${eventRows()}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const closeBtn = $("closeBtn");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", async () => {
+          const reason = window.prompt("Motivo do encerramento (opcional):", "closed_by_admin") || "";
+          closeBtn.disabled = true;
+          try {
+            await api.close(item.id, reason);
+            await loadAll(state.selectedId);
+          } catch (err) {
+            window.alert(err.message || String(err));
+          } finally {
+            closeBtn.disabled = false;
+          }
+        });
+      }
+
+      $("applyRecipientFilters")?.addEventListener("click", async () => {
+        state.recipientQuery = $("recipientQuery")?.value?.trim() || "";
+        state.recipientStatus = $("recipientStatus")?.value || "";
+        await refreshSelection();
+      });
+      $("applyObjectionFilters")?.addEventListener("click", async () => {
+        state.objectionQuery = $("objectionQuery")?.value?.trim() || "";
+        await refreshSelection();
+      });
+
+      $("recipientQuery")?.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          state.recipientQuery = $("recipientQuery")?.value?.trim() || "";
+          state.recipientStatus = $("recipientStatus")?.value || "";
+          await refreshSelection();
+        }
+      });
+
+      $("objectionQuery")?.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          state.objectionQuery = $("objectionQuery")?.value?.trim() || "";
+          await refreshSelection();
+        }
+      });
+    }
+
+    async function refreshSelection() {
+      if (!state.selectedId) return;
+      try {
+        const [detail, recipients, objections, events] = await Promise.all([
+          api.detail(state.selectedId),
+          api.recipients(state.selectedId, state.recipientQuery, state.recipientStatus),
+          api.objections(state.selectedId, state.objectionQuery),
+          api.events(state.selectedId),
+        ]);
+        state.detail = detail.item || null;
+        state.recipients = recipients.items || [];
+        state.objections = objections.items || [];
+        state.events = events.items || [];
+        renderDetail();
+        syncSelectedItemSummary();
+      } catch (err) {
+        detailCard.innerHTML = `<div class="empty">${esc(err.message || String(err))}</div>`;
+      }
+    }
+
+    function syncSelectedItemSummary() {
+      if (!state.detail) return;
+      state.items = state.items.map((item) => item.id === state.detail.id ? { ...item, ...state.detail } : item);
+      renderList();
+    }
+
+    async function selectAlert(id) {
+      if (!id) return;
+      state.selectedId = id;
+      renderList();
+      await refreshSelection();
+    }
+
+    async function loadAll(preferredId = null) {
+      $("refreshBtn").disabled = true;
+      try {
+        const status = $("statusFilter").value;
+        const data = await api.list(status);
+        state.items = data.items || [];
+        const nextId = preferredId || state.selectedId || state.items[0]?.id || null;
+        state.selectedId = nextId;
+        renderList();
+        if (nextId) {
+          await refreshSelection();
+        } else {
+          state.detail = null;
+          state.recipients = [];
+          state.objections = [];
+          state.events = [];
+          renderDetail();
+        }
+      } catch (err) {
+        listEl.innerHTML = `<div class="empty">${esc(err.message || String(err))}</div>`;
+      } finally {
+        $("refreshBtn").disabled = false;
+      }
+    }
+
+    function resetForm() {
+      $("title").value = "";
+      $("message").value = "";
+      $("expiresIn").value = "60";
+      $("allowDismiss").checked = false;
+      $("objectionEnabled").checked = true;
+      $("objectionRequiresMessage").checked = true;
+      $("tabBadgeEnabled").checked = true;
+      state.previewOpen = false;
+      syncFormDependencies();
+      renderPreview();
+    }
+
+    async function publish() {
+      const payload = collectFormPayload();
+
+      if (!payload.title || !payload.message) {
+        createStatus.textContent = "Preencha título e mensagem antes de publicar.";
+        createStatus.className = "status bad";
+        return;
+      }
+
+      const summary = [
+        `Título: ${payload.title}`,
+        `Nível: ${payload.level}`,
+        `Vigência: ${payload.expires_in_minutes} minuto(s)`,
+        `Pode fechar temporariamente: ${payload.allow_dismiss ? "sim" : "não"}`,
+        `Botão de objeção: ${payload.objection_enabled ? "sim" : "não"}`,
+        `Exige mensagem na objeção: ${payload.objection_requires_message ? "sim" : "não"}`,
+        `Badge na aba: ${payload.tab_badge_enabled ? "sim" : "não"}`,
+      ].join("\n");
+
+      if (!window.confirm(`Confirmar publicação do aviso?\n\n${summary}`)) {
+        return;
+      }
+
+      $("publishBtn").disabled = true;
+      createStatus.textContent = "Publicando aviso…";
+      createStatus.className = "status";
+      try {
+        const data = await api.create(payload);
+        createStatus.textContent = `Aviso publicado com sucesso para ${data?.item?.counts?.total ?? "?"} destinatário(s).`;
+        createStatus.className = "status ok";
+        resetForm();
+        await loadAll(data?.item?.id || null);
+      } catch (err) {
+        createStatus.textContent = err.message || String(err);
+        createStatus.className = "status bad";
+      } finally {
+        $("publishBtn").disabled = false;
+      }
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) window.clearInterval(refreshTimer);
+      refreshTimer = window.setInterval(async () => {
+        if (document.visibilityState !== "visible") return;
+        if (state.selectedId) {
+          await loadAll(state.selectedId);
+        }
+      }, 20000);
+    }
+
+    $("publishBtn").addEventListener("click", publish);
+    $("previewBtn").addEventListener("click", () => {
+      state.previewOpen = !state.previewOpen;
+      renderPreview();
+    });
+    $("closePreviewBtn").addEventListener("click", () => {
+      state.previewOpen = false;
+      renderPreview();
+    });
+    ["title", "message", "level", "expiresIn", "allowDismiss", "objectionRequiresMessage", "tabBadgeEnabled"].forEach((id) => {
+      $(id).addEventListener("input", renderPreview);
+      $(id).addEventListener("change", renderPreview);
+    });
+    $("objectionEnabled").addEventListener("change", () => {
+      syncFormDependencies();
+      renderPreview();
+    });
+    $("refreshBtn").addEventListener("click", () => loadAll(state.selectedId));
+    $("statusFilter").addEventListener("change", () => loadAll(null));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        void loadAll(state.selectedId);
+      }
+    });
+
+    resetForm();
+    syncFormDependencies();
+    renderPreview();
+    startAutoRefresh();
+    loadAll();
+  </script>
+</body>
+</html>

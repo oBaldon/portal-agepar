@@ -47,6 +47,7 @@ from app.automations.whoisonline import router as whoisonline_router
 from app.automations.tasks import router as tasks_router, TASKS_VERSION as TASKS_VER
 from app.automations.support import router as support_router
 from app.automations.usuarios import router as usuarios_router
+from app.automations.avisos import router as avisos_router, AVISOS_VERSION as AVISOS_VER
 from app.notifications import router as notifications_router
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
@@ -139,6 +140,7 @@ def _startup() -> None:
     logger.info("PONTO_SALDO engine version: %s", PONTO_SALDO_VER)
     logger.info("ETP engine version: %s", ETP_VER)
     logger.info("TASKS engine version: %s", TASKS_VER)
+    logger.info("AVISOS engine version: %s", AVISOS_VER)
 
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
     """
@@ -497,6 +499,7 @@ def automations_index() -> Dict[str, Any]:
             {"kind": "support", "version": "1.0.0", "title": "Suporte & Feedback"},
             {"kind": "ponto_saldo", "version": PONTO_SALDO_VER, "title": "Saldo de Horas (PDF)"},
             {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
+            {"kind": "avisos", "version": AVISOS_VER, "title": "Admin — Avisos Globais"},
             {"kind": "whoisonline", "version": "0.1.0", "title": "Quem está online (Superuser)"},
             {"kind": "usuarios", "version": "1.0.0", "title": "Admin — Gestão de Usuários"},
         ]
@@ -513,6 +516,7 @@ APP.include_router(controle_tasks_router,  dependencies=[Depends(require_passwor
 APP.include_router(support_router,         dependencies=[Depends(require_password_changed)])
 APP.include_router(ponto_saldo_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(accounts_router,        dependencies=[Depends(require_password_changed)])
+APP.include_router(avisos_router,          dependencies=[Depends(require_password_changed)])
 APP.include_router(whoisonline_router,     dependencies=[Depends(require_password_changed)])
 APP.include_router(tasks_router,           dependencies=[Depends(require_password_changed)])
 APP.include_router(usuarios_router,        dependencies=[Depends(require_password_changed)])

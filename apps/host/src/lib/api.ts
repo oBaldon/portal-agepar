@@ -1,5 +1,5 @@
 // apps/host/src/lib/api.ts
-import type { User, Notification } from "@/types";
+import type { User, Notification, PendingAlertsResponse, PlatformAlertItem } from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const ENABLE_SELF_REGISTER = import.meta.env.VITE_ENABLE_SELF_REGISTER === "true";
@@ -352,4 +352,45 @@ export async function markAllNotificationsRead(): Promise<void> {
     credentials: "include",
   });
   await ensureOkOrThrow(res);
+}
+
+
+/* =========================
+ * Avisos globais pendentes
+ * ========================= */
+
+export async function getPendingAlerts(): Promise<PendingAlertsResponse> {
+  const res = await fetch(`${API_BASE}/automations/avisos/mine/pending`, {
+    credentials: "include",
+  });
+  return jsonOrThrow<PendingAlertsResponse>(res);
+}
+
+export async function markPendingAlertSeen(alertId: string): Promise<PlatformAlertItem> {
+  const res = await fetch(`${API_BASE}/automations/avisos/${encodeURIComponent(alertId)}/seen`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const data = await jsonOrThrow<{ ok: boolean; item: PlatformAlertItem }>(res);
+  return data.item;
+}
+
+export async function confirmPendingAlert(alertId: string): Promise<PlatformAlertItem> {
+  const res = await fetch(`${API_BASE}/automations/avisos/${encodeURIComponent(alertId)}/confirm`, {
+    method: "POST",
+    credentials: "include",
+  });
+  const data = await jsonOrThrow<{ ok: boolean; item: PlatformAlertItem }>(res);
+  return data.item;
+}
+
+export async function objectPendingAlert(alertId: string, message: string): Promise<PlatformAlertItem> {
+  const res = await fetch(`${API_BASE}/automations/avisos/${encodeURIComponent(alertId)}/object`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  const data = await jsonOrThrow<{ ok: boolean; item: PlatformAlertItem }>(res);
+  return data.item;
 }

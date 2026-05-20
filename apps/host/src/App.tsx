@@ -44,6 +44,7 @@ import {
 import { Bell } from "lucide-react";
 
 import { configureApiHandlers, pingEProtocolo, getUnreadNotificationCount } from "@/lib/api";
+import GlobalAlertCenter from "@/components/GlobalAlertCenter";
 import { loadCatalog } from "@/lib/catalog";
 
 import type { Catalog, Block, BlockRoute, User } from "@/types";
@@ -337,6 +338,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      <GlobalAlertCenter enabled={!!user} pathname={loc.pathname} />
 
       <Routes>
         <Route

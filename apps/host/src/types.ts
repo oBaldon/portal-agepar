@@ -147,6 +147,34 @@ export type Notification = {
   meta?: Record<string, unknown> | null;
 };
 
+export type PlatformAlertLevel = "info" | "warning" | "danger";
+export type PlatformAlertStatus = "pending" | "seen" | "confirmed" | "objected";
+
+export type PlatformAlertItem = {
+  id: string;
+  alertId: string;
+  title: string;
+  message: string;
+  level: PlatformAlertLevel;
+  status: PlatformAlertStatus;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  allowDismiss: boolean;
+  objectionEnabled: boolean;
+  objectionRequiresMessage: boolean;
+  tabBadgeEnabled: boolean;
+  firstSeenAt?: string | null;
+  respondedAt?: string | null;
+  confirmedAt?: string | null;
+  objectedAt?: string | null;
+  objectionMessage?: string | null;
+};
+
+export type PendingAlertsResponse = {
+  count: number;
+  items: PlatformAlertItem[];
+};
+
 /* =============================================================================
    Helpers (agrupamento, ordenação e RBAC simples)
    ============================================================================= */

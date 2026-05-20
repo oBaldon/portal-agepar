@@ -565,6 +565,39 @@
       "order": 6
     },
     {
+      "name": "avisos",
+      "displayName": "Avisos Globais",
+      "version": "0.1.0",
+      "categoryId": "governanca",
+      "description": "Publicar avisos globais com popup obrigatório, confirmação, objeção e acompanhamento por usuário.",
+      "ui": {
+        "type": "iframe",
+        "url": "/api/automations/avisos/ui"
+      },
+      "navigation": [
+        {
+          "label": "Avisos Globais",
+          "path": "/avisos",
+          "icon": "Bell"
+        }
+      ],
+      "routes": [
+        {
+          "path": "/avisos",
+          "kind": "iframe"
+        }
+      ],
+      "tags": [
+        "governança",
+        "comunicados",
+        "admin"
+      ],
+      "requiredRoles": [
+        "admin"
+      ],
+      "order": 12
+    },
+    {
       "name": "whoisonline",
       "displayName": "Admin — Usuários Online",
       "version": "0.1.0",
