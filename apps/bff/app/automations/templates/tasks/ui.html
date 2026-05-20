@@ -68,7 +68,38 @@
   .pri-media{background:#eff6ff}
   .pri-alta{background:#fff7ed}
   .pri-urgente{background:#fef2f2}
+  .status-a_fazer{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+  .status-em_andamento{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+  .status-em_revisao{background:#fff7ed;border-color:#fdba74;color:#c2410c}
+  .status-concluida{background:#f0fdf4;border-color:#86efac;color:#166534}
+  .status-cancelada{background:#fef2f2;border-color:#fecaca;color:#991b1b}
   .overdue{color:var(--danger);font-weight:700}
+  .assignee-picker{position:relative;display:grid;gap:8px}
+  .assignee-input{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid #cbd5e1;
+    border-radius:12px;
+    background:#fff;
+    font:inherit;
+  }
+  .assignee-input:focus{outline:2px solid transparent;border-color:#93c5fd;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .assignee-menu{
+    position:absolute;left:0;right:0;top:calc(100% - 2px);
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 14px 30px rgba(15,23,42,.12);
+    max-height:280px;overflow:auto;z-index:30;padding:6px;
+    display:none;
+  }
+  .assignee-menu.open{display:block}
+  .assignee-option{
+    width:100%;text-align:left;background:#fff;color:#0f172a;border:0;
+    border-radius:10px;padding:10px 12px;display:grid;gap:2px;
+  }
+  .assignee-option:hover,.assignee-option.active{background:#f8fafc}
+  .assignee-option .sub{font-size:11px;color:var(--muted)}
+  .assignee-empty{padding:10px 12px;color:var(--muted);font-size:12px}
+  .assignee-note{font-size:12px;color:var(--muted)}
   .row-actions{display:flex;gap:8px;flex-wrap:wrap}
   .empty{padding:22px;color:var(--muted);text-align:center}
   .board{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:12px}
@@ -343,8 +374,13 @@
                 <select id="priority"></select>
               </div>
               <div>
-                <label for="assignedTo">Responsável</label>
-                <select id="assignedTo"></select>
+                <label for="assignedToSearch">Responsável</label>
+                <div class="assignee-picker">
+                  <input id="assignedToSearch" class="assignee-input" autocomplete="off" placeholder="Clique para selecionar ou digite para filtrar"/>
+                  <input id="assignedTo" type="hidden"/>
+                  <div id="assignedToMenu" class="assignee-menu"></div>
+                  <div class="assignee-note">Por padrão, a tarefa nova fica com o próprio criador. Você pode trocar o responsável ou escolher “---- Sem responsável ----”.</div>
+                </div>
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -571,8 +607,106 @@ function renderMiniList(items){
 }
 function dd(v){ if(!v) return '—'; try{ return new Date(v+'T00:00:00').toLocaleDateString('pt-BR'); }catch{ return v; } }
 function priorityClass(p){ return 'pri-' + String(p || 'media'); }
+function statusClass(s){ return 'status-' + String(s || 'a_fazer'); }
 function statusLabel(v){ return STATUS_LABELS[v] || v; }
 function priorityLabel(v){ return PRIORITY_LABELS[v] || v; }
+function assigneeLabel(user){
+  return user?.email ? `${user.name} — ${user.email}` : String(user?.name || '');
+}
+function assigneeDisplay(userId){
+  if(!userId) return '---- Sem responsável ----';
+  return assigneeLabel(userById(userId));
+}
+function usersList(){ return state.config?.users || []; }
+function userById(id){ return usersList().find(u => String(u.id) === String(id)) || null; }
+function defaultAssigneeUserId(){
+  return state.config?.me?.id || '';
+}
+function setAssigneeValue(userId){
+  const hidden = document.getElementById('assignedTo');
+  const input = document.getElementById('assignedToSearch');
+  hidden.value = userId || '';
+  input.value = assigneeDisplay(userId || '');
+}
+function assigneeMatches(user, term){
+  if(!term) return true;
+  const normalized = String(term || '').trim().toLowerCase();
+  const name = String(user?.name || '').trim().toLowerCase();
+  const email = String(user?.email || '').trim().toLowerCase();
+  return name.startsWith(normalized) || email.startsWith(normalized);
+}
+function renderAssigneeMenu(term=''){
+  const menu = document.getElementById('assignedToMenu');
+  const normalized = String(term || '').trim().toLowerCase();
+  const users = usersList().filter(u => assigneeMatches(u, normalized));
+  const options = [
+    `<button class="assignee-option" type="button" data-assignee-value="">
+      <strong>---- Sem responsável ----</strong>
+      <span class="sub">Criar ou manter a tarefa sem responsável definido</span>
+    </button>`
+  ];
+  options.push(...users.map(u => `
+    <button class="assignee-option" type="button" data-assignee-value="${esc(u.id)}">
+      <strong>${esc(u.name || '')}</strong>
+      <span class="sub">${esc(u.email || '')}</span>
+    </button>
+  `));
+  menu.innerHTML = options.join('') || '<div class="assignee-empty">Nenhum usuário encontrado.</div>';
+  menu.classList.add('open');
+  menu.querySelectorAll('[data-assignee-value]').forEach(btn => {
+    btn.onclick = () => {
+      setAssigneeValue(btn.getAttribute('data-assignee-value') || '');
+      menu.classList.remove('open');
+    };
+  });
+}
+function syncAssigneeHiddenFromInput(){
+  const input = document.getElementById('assignedToSearch');
+  const value = String(input.value || '').trim();
+  if(!value || value === '---- Sem responsável ----'){
+    document.getElementById('assignedTo').value = '';
+    return;
+  }
+  const exact = usersList().find(u => assigneeLabel(u).toLowerCase() === value.toLowerCase() || String(u.name || '').trim().toLowerCase() === value.toLowerCase());
+  document.getElementById('assignedTo').value = exact ? exact.id : '';
+}
+function wireAssigneePicker(){
+  const input = document.getElementById('assignedToSearch');
+  const menu = document.getElementById('assignedToMenu');
+
+  input.addEventListener('focus', () => renderAssigneeMenu(''));
+  input.addEventListener('click', () => renderAssigneeMenu(''));
+  input.addEventListener('input', () => {
+    document.getElementById('assignedTo').value = '';
+    renderAssigneeMenu(input.value);
+  });
+  input.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Escape'){
+      menu.classList.remove('open');
+      input.blur();
+    }
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      const raw = String(input.value || '').trim();
+      const exact = usersList().find(u => assigneeLabel(u).toLowerCase() === raw.toLowerCase() || String(u.name || '').trim().toLowerCase() === raw.toLowerCase());
+      if(exact){
+        setAssigneeValue(exact.id);
+      }else if(!raw || raw === '---- Sem responsável ----'){
+        setAssigneeValue('');
+      }else{
+        setAssigneeValue(document.getElementById('assignedTo').value || defaultAssigneeUserId());
+      }
+      menu.classList.remove('open');
+    }, 120);
+  });
+
+  document.addEventListener('click', (ev) => {
+    if(!ev.target.closest('.assignee-picker')){
+      menu.classList.remove('open');
+    }
+  });
+}
 function statusFlow(){ return state.config?.statusFlow || STATUS_FLOW_FALLBACK; }
 function nextStatusAction(item){
   if(!item?.canChangeStatus) return null;
@@ -766,7 +900,7 @@ function renderList(){
         <span class="muted">${esc(shortText(item.description, 140))}</span>
         ${sourceLabel(item) ? `<div style="margin-top:6px"><span class="badge source-pill">${esc(sourceLabel(item))}</span></div>` : ''}
       </td>
-      <td><span class="badge">${esc(statusLabel(item.status))}</span></td>
+      <td><span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
       <td><span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span></td>
       <td>${esc(item.assignedToName || '—')}</td>
       <td>${item.isOverdue ? `<span class="overdue">${esc(dd(item.dueDate))}</span>` : esc(dd(item.dueDate))}</td>
@@ -797,6 +931,7 @@ function renderKanban(){
             <h4>${esc(item.title)}</h4>
             <p>${esc(shortText(item.description, 180))}</p>
             <div class="meta">
+              <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
               <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span>
               <span class="badge">${esc(item.assignedToName || 'Sem responsável')}</span>
               <span class="badge ${item.isOverdue ? 'overdue' : ''}">${esc(dd(item.dueDate))}</span>
@@ -836,6 +971,7 @@ function renderCalendarItem(item, entry){
     <div class="calendar-item kind-${esc(entry.kind)}" data-act="open" data-id="${esc(item.id)}">
       <div class="top">
         <span class="badge">${esc(entry.label)}</span>
+        <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
         <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span>
       </div>
       <div class="title truncate">${esc(item.title)}</div>
@@ -932,6 +1068,7 @@ function resetForm(){
   document.getElementById('taskId').value = '';
   document.getElementById('formTitle').textContent = 'Nova tarefa';
   document.getElementById('priority').value = 'media';
+  setAssigneeValue(defaultAssigneeUserId());
   syncFormMode('create');
 }
 
@@ -940,7 +1077,7 @@ function fillForm(item){
   document.getElementById('title').value = item.title || '';
   document.getElementById('description').value = item.description || '';
   document.getElementById('priority').value = item.priority || 'media';
-  document.getElementById('assignedTo').value = item.assignedToUserId || '';
+  setAssigneeValue(item.assignedToUserId || '');
   document.getElementById('startDate').value = item.startDate || '';
   document.getElementById('dueDate').value = item.dueDate || '';
   document.getElementById('formTitle').textContent = 'Editar tarefa';
@@ -969,8 +1106,9 @@ async function loadConfig(){
   const userOptions = '<option value="">Todos</option>' + cfg.users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   document.getElementById('assignedFilter').innerHTML = userOptions;
 
-  const assigned = document.getElementById('assignedTo');
-  assigned.innerHTML = '<option value="">—</option>' + cfg.users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  wireAssigneePicker();
+  setAssigneeValue(defaultAssigneeUserId());
+
   renderInsights();
   renderManagement();
 }
@@ -1078,7 +1216,8 @@ function renderDetail(item, comments){
   document.getElementById('detailTitle').textContent = item.title;
   document.getElementById('detailMeta').innerHTML = `
     Criada por <strong>${esc(item.createdByName || '—')}</strong> · Responsável: <strong>${esc(item.assignedToName || '—')}</strong><br>
-    Status: <strong>${esc(statusLabel(item.status))}</strong> · Prioridade: <strong>${esc(priorityLabel(item.priority))}</strong><br>
+    <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
+    <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span><br>
     Início: <strong>${esc(dd(item.startDate))}</strong> · Prazo: <strong>${item.isOverdue ? '<span class="overdue">' + esc(dd(item.dueDate)) + '</span>' : esc(dd(item.dueDate))}</strong><br>
     Origem: <strong>${esc(sourceLabel(item) || 'manual')}</strong>
   `;
@@ -1093,7 +1232,7 @@ function renderDetail(item, comments){
       </div>
     ` : ''}
     ${statuses.map(status => `
-      <button class="${status === item.status ? '' : 'ghost'}" data-status="${esc(status)}">${esc(statusLabel(status))}</button>
+      <button class="${status === item.status ? statusClass(status) : 'ghost'}" data-status="${esc(status)}">${esc(statusLabel(status))}</button>
     `).join('')}
   `;
 
@@ -1163,13 +1302,23 @@ async function loadHistory(taskId){
 
 async function onSubmit(ev){
   ev.preventDefault();
+
+  syncAssigneeHiddenFromInput();
+  const assigneeInput = document.getElementById('assignedToSearch').value.trim();
+  const assignedHidden = document.getElementById('assignedTo').value || '';
+  if(assigneeInput && assigneeInput !== '---- Sem responsável ----' && !assignedHidden){
+    alert('Selecione um responsável válido na lista ou escolha “---- Sem responsável ----”.');
+    document.getElementById('assignedToSearch').focus();
+    return;
+  }
+
   const payload = {
     title: document.getElementById('title').value.trim(),
     description: document.getElementById('description').value.trim(),
     priority: document.getElementById('priority').value,
     startDate: document.getElementById('startDate').value || null,
     dueDate: document.getElementById('dueDate').value || null,
-    assignedToUserId: document.getElementById('assignedTo').value || null,
+    assignedToUserId: assignedHidden || null,
   };
   const taskId = document.getElementById('taskId').value;
   if(taskId){

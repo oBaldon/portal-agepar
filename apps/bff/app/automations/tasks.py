@@ -647,6 +647,14 @@ class TaskCreateIn(BaseModel):
                 data[dst] = data[src]
         return data
 
+    @field_validator("assigned_to_user_id")
+    @classmethod
+    def _normalize_assigned_to_user_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value or None
+
     @field_validator("title")
     @classmethod
     def _validate_title(cls, value: str) -> str:
@@ -1347,7 +1355,12 @@ def list_tasks(
 @router.post("/tasks", status_code=201)
 def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_password_changed)) -> Dict[str, Any]:
     actor_id = _user_id_from_session(user)
-    assigned_to_uuid = _parse_uuid(payload.assigned_to_user_id, "assignedToUserId") if payload.assigned_to_user_id else None
+
+    if "assigned_to_user_id" in payload.model_fields_set:
+        assigned_to_uuid = _parse_uuid(payload.assigned_to_user_id, "assignedToUserId") if payload.assigned_to_user_id else None
+    else:
+        assigned_to_uuid = actor_id
+
     _validate_dates(payload.start_date, payload.due_date)
 
     completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
