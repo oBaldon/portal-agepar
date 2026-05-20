@@ -354,6 +354,22 @@ export async function markAllNotificationsRead(): Promise<void> {
   await ensureOkOrThrow(res);
 }
 
+export async function deleteNotification(notificationId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/${encodeURIComponent(notificationId)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await ensureOkOrThrow(res);
+}
+
+export async function deleteReadNotifications(): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/read`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await ensureOkOrThrow(res);
+}
+
 
 /* =========================
  * Avisos globais pendentes

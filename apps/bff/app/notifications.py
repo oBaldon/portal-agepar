@@ -675,6 +675,95 @@ def mark_all_read(user: Dict[str, Any] = Depends(require_auth)):
     return Response(status_code=204)
 
 
+@router.delete("/read", status_code=204, response_class=Response)
+def delete_all_read_notifications(request: Request, user: Dict[str, Any] = Depends(require_auth)):
+    uid = _user_uuid_from_session_user(user)
+    actor_user_id = _user_uuid_from_session_user(user)
+
+    with _pg_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM notification_recipients
+            WHERE user_id = %s
+              AND read_at IS NOT NULL
+            """,
+            (uid,),
+        )
+        removed = int(cur.rowcount or 0)
+
+        cur.execute(
+            """
+            DELETE FROM notifications n
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM notification_recipients r
+              WHERE r.notification_id = n.id
+            )
+            """
+        )
+
+        _insert_audit_event(
+            conn,
+            actor_user_id=actor_user_id,
+            action="delete",
+            obj_type="notification",
+            obj_id="bulk-read",
+            message="Notificações lidas removidas da caixa de entrada do usuário",
+            metadata={"removed": removed},
+            ip=request.client.host if request.client else None,
+            ua=request.headers.get("user-agent"),
+        )
+
+    return Response(status_code=204)
+
+
+@router.delete("/{notification_id}", status_code=204, response_class=Response)
+def delete_notification(notification_id: str, request: Request, user: Dict[str, Any] = Depends(require_auth)):
+    uid = _user_uuid_from_session_user(user)
+    actor_user_id = _user_uuid_from_session_user(user)
+    try:
+        nid = uuid.UUID(notification_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="invalid notification id")
+
+    with _pg_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM notification_recipients
+            WHERE user_id = %s AND notification_id = %s
+            """,
+            (uid, nid),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="notification not found for user")
+
+        cur.execute(
+            """
+            DELETE FROM notifications n
+            WHERE n.id = %s
+              AND NOT EXISTS (
+                SELECT 1
+                FROM notification_recipients r
+                WHERE r.notification_id = n.id
+              )
+            """,
+            (nid,),
+        )
+
+        _insert_audit_event(
+            conn,
+            actor_user_id=actor_user_id,
+            action="delete",
+            obj_type="notification",
+            obj_id=str(nid),
+            message="Notificação removida da caixa de entrada do usuário",
+            metadata={"notification_id": str(nid)},
+            ip=request.client.host if request.client else None,
+            ua=request.headers.get("user-agent"),
+        )
+
+    return Response(status_code=204)
+
 @router.post(
     "/send",
     response_model=SendNotificationOut,
