@@ -54,6 +54,7 @@
   .content-head h2,.side h2,.panel h2{font-size:17px;margin:0}
   .content-subtitle{font-size:12px;color:var(--muted)}
   .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+  .status-col{white-space:nowrap;width:1%}
   table{width:100%;border-collapse:collapse;background:#fff}
   th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}
   th{font-size:12px;color:#64748b;background:#f8fafc;position:sticky;top:0;z-index:1}
@@ -62,7 +63,18 @@
   .task-title{font-size:14px;font-weight:700}
   .task-desc{font-size:12px;color:var(--muted)}
   .meta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#334155}
-  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 8px;border:1px solid var(--line);font-size:11px;background:#fff}
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border-radius:999px;
+    padding:4px 10px;
+    border:1px solid var(--line);
+    font-size:11px;
+    background:#fff;
+    white-space:nowrap;
+    min-width:max-content;
+  }
   .source-pill{background:#f1f5f9;border-color:#cbd5e1}
   .pri-baixa{background:#f8fafc}
   .pri-media{background:#eff6ff}
@@ -101,6 +113,27 @@
   .assignee-empty{padding:10px 12px;color:var(--muted);font-size:12px}
   .assignee-note{font-size:12px;color:var(--muted)}
   .row-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .actions-col{white-space:nowrap;width:1%}
+  .table-actions{
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+    min-width:max-content;
+  }
+  .table-actions .action-btn{
+    min-height:34px;
+    padding:7px 10px;
+    border-radius:10px;
+    font-size:13px;
+    line-height:1;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    white-space:nowrap;
+  }
   .empty{padding:22px;color:var(--muted);text-align:center}
   .board{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:12px}
   .col{padding:12px}
@@ -319,11 +352,11 @@
             <thead>
               <tr>
                 <th>Tarefa</th>
-                <th>Status</th>
+                <th class="status-col">Status</th>
                 <th>Prioridade</th>
                 <th>Responsável</th>
                 <th>Prazo</th>
-                <th>Ações</th>
+                <th class="actions-col">Ações</th>
               </tr>
             </thead>
             <tbody id="listBody"></tbody>
@@ -900,15 +933,15 @@ function renderList(){
         <span class="muted">${esc(shortText(item.description, 140))}</span>
         ${sourceLabel(item) ? `<div style="margin-top:6px"><span class="badge source-pill">${esc(sourceLabel(item))}</span></div>` : ''}
       </td>
-      <td><span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
+      <td class="status-col"><span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
       <td><span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span></td>
       <td>${esc(item.assignedToName || '—')}</td>
       <td>${item.isOverdue ? `<span class="overdue">${esc(dd(item.dueDate))}</span>` : esc(dd(item.dueDate))}</td>
-      <td>
-        <div class="row-actions">
-          <button class="ghost" data-act="open" data-id="${esc(item.id)}">Abrir</button>
-          ${nextStatusAction(item) ? `<button class="next-btn" data-act="next" data-next="${esc(nextStatusAction(item).next)}" data-id="${esc(item.id)}">${esc(nextStatusAction(item).label)}</button>` : ''}
-          ${item.canEdit ? `<button class="secondary" data-act="edit" data-id="${esc(item.id)}">Editar</button>` : ''}
+      <td class="actions-col">
+        <div class="row-actions table-actions">
+          <button class="ghost action-btn" title="Abrir tarefa" data-act="open" data-id="${esc(item.id)}">Abrir</button>
+          ${nextStatusAction(item) ? `<button class="next-btn action-btn" title="${esc(nextStatusAction(item).label)}" data-act="next" data-next="${esc(nextStatusAction(item).next)}" data-id="${esc(item.id)}">${esc(nextStatusAction(item).label)}</button>` : ''}
+          ${item.canEdit ? `<button class="secondary action-btn" title="Editar tarefa" data-act="edit" data-id="${esc(item.id)}">Editar</button>` : ''}
         </div>
       </td>
     </tr>
