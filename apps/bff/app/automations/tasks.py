@@ -23,6 +23,7 @@ Observações
 """
 
 import logging
+import os
 import pathlib
 import uuid
 from datetime import date, datetime, timezone
@@ -599,6 +600,54 @@ def _validate_dates(start_date: Optional[date], due_date: Optional[date]) -> Non
         raise HTTPException(status_code=422, detail={"dueDate": "must be greater than or equal to startDate"})
 
 
+
+
+def _parse_default_roles() -> List[str]:
+    raw = os.getenv("AUTH_DEFAULT_ROLES", "")
+    out: List[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        role = str(part or "").strip().lower()
+        if not role or role in seen:
+            continue
+        seen.add(role)
+        out.append(role)
+    return out
+
+
+def _load_role_options() -> List[str]:
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT LOWER(TRIM(r.name)) AS role_name
+            FROM users u
+            JOIN user_roles ur ON ur.user_id = u.id
+            JOIN roles r ON r.id = ur.role_id
+            WHERE u.status = 'active'
+              AND r.name IS NOT NULL
+              AND BTRIM(r.name) <> ''
+            ORDER BY LOWER(TRIM(r.name)) ASC
+            """
+        )
+        rows = cur.fetchall() or []
+
+    seen: set[str] = set()
+    out: List[str] = []
+
+    for row in rows:
+        role_name = str(row["role_name"] or "").strip().lower()
+        if not role_name or role_name in seen:
+            continue
+        seen.add(role_name)
+        out.append(role_name)
+
+    for role_name in _parse_default_roles():
+        if role_name not in seen:
+            seen.add(role_name)
+            out.append(role_name)
+
+    return out
+
 def _load_users_for_picker(user: Dict[str, Any]) -> List[Dict[str, Any]]:
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(
@@ -814,6 +863,7 @@ def get_config(user: Dict[str, Any] = Depends(require_password_changed)) -> Dict
             "elevated": _is_elevated(user),
         },
         "users": _load_users_for_picker(user),
+        "roleOptions": _load_role_options(),
         "statusValues": list(_STATUS_VALUES),
         "statusFlow": _STATUS_FLOW,
         "priorityValues": sorted(_PRIORITY_VALUES),

@@ -112,7 +112,25 @@
   .assignee-option .sub{font-size:11px;color:var(--muted)}
   .assignee-empty{padding:10px 12px;color:var(--muted);font-size:12px}
   .assignee-note{font-size:12px;color:var(--muted)}
+
+  .role-select{width:100%}
+  .role-note{font-size:12px;color:var(--muted)}
   .row-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .role-note-warning{
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid #fecaca;
+    background:#fef2f2;
+    color:#7c2d12;
+    font-size:12px;
+    line-height:1.45;
+  }
+
+  .role-note-emphasis{
+    display:block;
+    margin-top:6px;
+    color:#b91c1c;
+  }
   .actions-col{white-space:nowrap;width:1%}
   .table-actions{
     display:flex;
@@ -379,6 +397,16 @@
                   <input id="assignedTo" type="hidden"/>
                   <div id="assignedToMenu" class="assignee-menu"></div>
                 </div>
+              </div>
+            </div>
+            <div style="margin-top:10px">
+              <label for="assignedRoleName">Cargo a notificar</label>
+              <select id="assignedRoleName" class="role-select"></select>
+              <div class="role-note role-note-warning" style="margin-top:6px">
+                Esse cargo receberá notificações da tarefa na plataforma e por e-mail, conforme as regras atuais do módulo.
+                <strong class="role-note-emphasis">
+                  Evite selecionar cargos que não estejam relacionados à sua chefia ou à área responsável, pois o sistema enviará e-mails para todas as pessoas que possuam esse cargo.
+                </strong>
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -1326,6 +1354,7 @@ function resetForm(){
   document.getElementById('formTitle').textContent = 'Nova tarefa';
   document.getElementById('priority').value = 'media';
   setAssigneeValue(defaultAssigneeUserId());
+  document.getElementById('assignedRoleName').value = '';
   syncFormMode('create');
 }
 
@@ -1335,6 +1364,7 @@ function fillForm(item){
   document.getElementById('description').value = item.description || '';
   document.getElementById('priority').value = item.priority || 'media';
   setAssigneeValue(item.assignedToUserId || '');
+  document.getElementById('assignedRoleName').value = item.assignedRoleName || '';
   document.getElementById('startDate').value = item.startDate || '';
   document.getElementById('dueDate').value = item.dueDate || '';
   document.getElementById('formTitle').textContent = 'Editar tarefa';
@@ -1363,8 +1393,13 @@ async function loadConfig(){
   const userOptions = '<option value="">Todos</option>' + cfg.users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   document.getElementById('assignedFilter').innerHTML = userOptions;
 
+  const roleOptions = ['<option value="">— Nenhum cargo —</option>']
+    .concat((cfg.roleOptions || []).map(roleName => `<option value="${esc(roleName)}">${esc(roleName)}</option>`));
+  document.getElementById('assignedRoleName').innerHTML = roleOptions.join('');
+
   wireAssigneePicker();
   setAssigneeValue(defaultAssigneeUserId());
+  document.getElementById('assignedRoleName').value = '';
 
   renderInsights();
   renderManagement();
@@ -1482,7 +1517,7 @@ function renderDetail(item, comments){
     <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
     <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span><br>
     Início: <strong>${esc(dd(item.startDate))}</strong> · Prazo: <strong>${item.isOverdue ? '<span class="overdue">' + esc(dd(item.dueDate)) + '</span>' : esc(dd(item.dueDate))}</strong><br>
-    Origem: <strong>${esc(sourceLabel(item) || 'manual')}</strong>
+    Origem: <strong>${esc(sourceLabel(item) || 'manual')}</strong> · Cargo notificado: <strong>${esc(item.assignedRoleName || '—')}</strong>
   `;
 
   const statuses = state.config.statusValues;
@@ -1582,6 +1617,7 @@ async function onSubmit(ev){
     startDate: document.getElementById('startDate').value || null,
     dueDate: document.getElementById('dueDate').value || null,
     assignedToUserId: assignedHidden || null,
+    assignedRoleName: document.getElementById('assignedRoleName').value || null,
   };
   const taskId = document.getElementById('taskId').value;
   if(taskId){
