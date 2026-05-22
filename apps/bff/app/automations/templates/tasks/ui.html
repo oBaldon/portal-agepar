@@ -47,7 +47,7 @@
   .stat{padding:16px}
   .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   .stat .v{font-size:28px;font-weight:800;margin-top:6px}
-  .layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(420px,.9fr);gap:16px;align-items:start}
+  .layout{display:grid;grid-template-columns:minmax(420px,.9fr) minmax(0,1.7fr);gap:16px;align-items:start}
   .content-card{padding:12px}
   .content-stack{display:grid;gap:16px}
   .content-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 6px 12px}
@@ -145,19 +145,31 @@
   .calendar-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px}
   .calendar-nav .nav-actions{display:flex;gap:8px;flex-wrap:wrap}
   .calendar-title{font-weight:700}
-  .week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
-  .week-day,.month-cell{padding:12px}
-  .week-day h3,.month-cell-head{margin:0 0 10px;font-size:13px}
+  .week-grid{display:block;overflow:auto}
+  .week-timeline{display:grid;gap:10px;min-width:920px}
+  .week-axis,.week-row-track{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+  .week-axis-day{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;display:grid;gap:2px;text-align:center}
+  .week-axis-day strong{font-size:13px;color:var(--fg)}
+  .week-row{display:block}
+  .week-row-track{align-items:center;min-height:54px}
+  .week-slot{grid-row:1;min-height:54px;border:1px dashed #e5e7eb;border-radius:12px;background:#fbfdff}
+  .week-row-bar{grid-row:1;position:relative;z-index:1;min-height:40px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:#fff;display:grid;gap:2px;align-content:center;cursor:pointer;overflow:hidden}
+  .week-row-bar .line1{font-size:12px;font-weight:700}
+  .week-row-bar .line2{font-size:11px;color:#334155}
+  .week-row-bar.is-overdue{box-shadow:inset 0 0 0 1px #fecaca}
   .day-list{display:flex;flex-direction:column;gap:8px}
   .calendar-item{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;cursor:pointer}
   .calendar-item .top{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px}
   .calendar-item .title{font-size:12px;font-weight:600}
   .calendar-item .sub{font-size:11px;color:var(--muted)}
+  .calendar-item.kind-range{border-left:4px solid #0ea5e9}
   .calendar-item.kind-start{border-left:4px solid #16a34a}
+  .calendar-item.kind-completed{border-left:4px solid #16a34a}
   .calendar-item.kind-due{border-left:4px solid #2563eb}
   .calendar-item.kind-created{border-left:4px solid #64748b}
+  .calendar-item.kind-single{border-left:4px solid #64748b}
   .month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
-  .month-cell{min-height:180px}
+  .month-cell{padding:12px;min-height:190px}
   .month-cell.other-month{opacity:.55;background:#f8fafc}
   .month-cell-num{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .month-cell-num strong{font-size:13px}
@@ -262,6 +274,15 @@
     </div>
   </section>
 
+  <section class="stats panel">
+    <div class="card stat"><div class="k">Ativas</div><div class="v" id="statActive">0</div></div>
+    <div class="card stat"><div class="k">Atribuídas a mim</div><div class="v" id="statAssignedToMe">0</div></div>
+    <div class="card stat"><div class="k">Atrasadas</div><div class="v" id="statOverdue">0</div></div>
+    <div class="card stat"><div class="k">Próximas 7 dias</div><div class="v" id="statDueSoon">0</div></div>
+  </section>
+
+  
+
   <section class="card panel filter-shell">
     <div class="filter-top">
       <div class="field">
@@ -321,62 +342,7 @@
     </div>
   </section>
 
-  <section class="stats panel">
-    <div class="card stat"><div class="k">Ativas</div><div class="v" id="statActive">0</div></div>
-    <div class="card stat"><div class="k">Atribuídas a mim</div><div class="v" id="statAssignedToMe">0</div></div>
-    <div class="card stat"><div class="k">Atrasadas</div><div class="v" id="statOverdue">0</div></div>
-    <div class="card stat"><div class="k">Próximas 7 dias</div><div class="v" id="statDueSoon">0</div></div>
-  </section>
-
   <section class="layout panel">
-    <div class="content-stack">
-      <div id="calendarNav" class="card calendar-nav hidden">
-        <div class="nav-actions">
-          <button id="calendarPrevBtn" class="ghost" type="button">Anterior</button>
-          <button id="calendarTodayBtn" class="secondary" type="button">Hoje</button>
-          <button id="calendarNextBtn" class="ghost" type="button">Próximo</button>
-        </div>
-        <div class="calendar-title" id="calendarTitle">Calendário</div>
-        <div class="tiny" id="calendarSubtitle"></div>
-      </div>
-
-      <div id="listView" class="card content-card">
-        <div class="content-head">
-          <div>
-            <h2>Tarefas</h2>
-            <div class="content-subtitle">Visão em tabela para leitura rápida e ações diretas.</div>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Tarefa</th>
-                <th class="status-col">Status</th>
-                <th>Prioridade</th>
-                <th>Responsável</th>
-                <th>Prazo</th>
-                <th class="actions-col">Ações</th>
-              </tr>
-            </thead>
-            <tbody id="listBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div id="kanbanView" class="hidden">
-        <div class="board" id="kanbanBoard"></div>
-      </div>
-
-      <div id="weekView" class="hidden">
-        <div class="week-grid" id="weekGrid"></div>
-      </div>
-
-      <div id="monthView" class="hidden">
-        <div class="month-grid" id="monthGrid"></div>
-      </div>
-    </div>
-
     <div class="side-stack">
       <section class="card side-panel sticky">
         <div class="tabs">
@@ -412,7 +378,6 @@
                   <input id="assignedToSearch" class="assignee-input" autocomplete="off" placeholder="Clique para selecionar ou digite para filtrar"/>
                   <input id="assignedTo" type="hidden"/>
                   <div id="assignedToMenu" class="assignee-menu"></div>
-                  <div class="assignee-note">Por padrão, a tarefa nova fica com o próprio criador. Você pode trocar o responsável ou escolher “---- Sem responsável ----”.</div>
                 </div>
               </div>
             </div>
@@ -471,6 +436,56 @@
       </section>
 
     </div>
+
+    <div class="content-stack">
+      <div id="calendarNav" class="card calendar-nav hidden">
+        <div class="nav-actions">
+          <button id="calendarPrevBtn" class="ghost" type="button">Anterior</button>
+          <button id="calendarTodayBtn" class="secondary" type="button">Hoje</button>
+          <button id="calendarNextBtn" class="ghost" type="button">Próximo</button>
+        </div>
+        <div class="calendar-title" id="calendarTitle">Calendário</div>
+        <div class="tiny" id="calendarSubtitle"></div>
+      </div>
+
+      <div id="listView" class="card content-card">
+        <div class="content-head">
+          <div>
+            <h2>Tarefas</h2>
+            <div class="content-subtitle">Visão em tabela para leitura rápida e ações diretas.</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarefa</th>
+                <th class="status-col">Status</th>
+                <th>Prioridade</th>
+                <th>Responsável</th>
+                <th>Prazo</th>
+                <th class="actions-col">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="listBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="kanbanView" class="hidden">
+        <div class="board" id="kanbanBoard"></div>
+      </div>
+
+      <div id="weekView" class="hidden">
+        <div class="week-grid" id="weekGrid"></div>
+      </div>
+
+      <div id="monthView" class="hidden">
+        <div class="month-grid" id="monthGrid"></div>
+      </div>
+    </div>
+
+    
   </section>
 
   <section class="panel">
@@ -981,34 +996,223 @@ function renderKanban(){
   }).join('');
 }
 
-function calendarEntriesForItem(item){
-  const entries = [];
-  if(item.startDate){
-    entries.push({ date: item.startDate, kind: 'start', label: 'Início' });
-  }
-  if(item.dueDate && item.dueDate !== item.startDate){
-    entries.push({ date: item.dueDate, kind: 'due', label: 'Prazo' });
-  }
-  if(!entries.length){
-    const fallback = (item.createdAt || '').slice(0, 10);
-    if(fallback) entries.push({ date: fallback, kind: 'created', label: 'Criada' });
-  }
-  return entries;
+function calendarDateOnly(v){
+  return String(v || '').slice(0, 10);
 }
 
-function renderCalendarItem(item, entry){
-  const subtitleParts = [];
-  if(item.assignedToName) subtitleParts.push(item.assignedToName);
-  if(item.dueDate) subtitleParts.push(`Prazo ${dd(item.dueDate)}`);
+function compareDateKeys(a, b){
+  return String(a || '').localeCompare(String(b || ''));
+}
+
+function shortDayMonth(key){
+  if(!key) return '—';
+  try{
+    return parseDateKey(key).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' }).replace('.', '');
+  }catch{
+    return key;
+  }
+}
+
+function buildRangeSummary(startKey, endKey){
+  if(!startKey && !endKey) return '';
+  if(!startKey || !endKey || startKey === endKey) return shortDayMonth(startKey || endKey);
+  return `${shortDayMonth(startKey)} → ${shortDayMonth(endKey)}`;
+}
+
+function taskCalendarModel(item){
+  const explicitStart = calendarDateOnly(item.startDate);
+  const completed = calendarDateOnly(item.completedAt);
+  const due = calendarDateOnly(item.dueDate);
+  const created = calendarDateOnly(item.createdAt);
+
+  if(explicitStart && (completed || due)){
+    let rangeStart = explicitStart;
+    let rangeEnd = completed || due;
+    if(compareDateKeys(rangeEnd, rangeStart) < 0){
+      const tmp = rangeStart;
+      rangeStart = rangeEnd;
+      rangeEnd = tmp;
+    }
+    return {
+      mode: 'range',
+      rangeStart,
+      rangeEnd,
+      anchorKey: rangeStart,
+      pointKey: '',
+      kind: completed ? 'completed' : 'range',
+      label: completed ? 'Concluída' : 'Período',
+      summary: buildRangeSummary(rangeStart, rangeEnd),
+      explicitStart,
+      completed,
+      due,
+      created,
+    };
+  }
+
+  if(explicitStart){
+    return {
+      mode: 'point',
+      pointKey: explicitStart,
+      anchorKey: explicitStart,
+      kind: 'start',
+      label: 'Início',
+      summary: buildRangeSummary(explicitStart, explicitStart),
+      explicitStart,
+      completed,
+      due,
+      created,
+    };
+  }
+
+  if(completed){
+    return {
+      mode: 'point',
+      pointKey: completed,
+      anchorKey: completed,
+      kind: 'completed',
+      label: 'Concluída',
+      summary: buildRangeSummary(completed, completed),
+      explicitStart,
+      completed,
+      due,
+      created,
+    };
+  }
+
+  if(due){
+    return {
+      mode: 'point',
+      pointKey: due,
+      anchorKey: due,
+      kind: 'due',
+      label: 'Prazo',
+      summary: buildRangeSummary(due, due),
+      explicitStart,
+      completed,
+      due,
+      created,
+    };
+  }
+
+  return {
+    mode: 'point',
+    pointKey: created,
+    anchorKey: created,
+    kind: 'created',
+    label: 'Criada',
+    summary: buildRangeSummary(created, created),
+    explicitStart,
+    completed,
+    due,
+    created,
+  };
+}
+
+function calendarPriorityRank(priority){
+  return ({ urgente:1, alta:2, media:3, baixa:4 })[String(priority || 'media')] || 99;
+}
+
+function sortCalendarRows(rows){
+  rows.sort((a, b) => {
+    const keyA = a.model.mode === 'range' ? a.model.rangeStart : a.model.pointKey;
+    const keyB = b.model.mode === 'range' ? b.model.rangeStart : b.model.pointKey;
+    const dateCompare = compareDateKeys(keyA, keyB);
+    if(dateCompare !== 0) return dateCompare;
+
+    const priorityCompare = calendarPriorityRank(a.item?.priority) - calendarPriorityRank(b.item?.priority);
+    if(priorityCompare !== 0) return priorityCompare;
+
+    return String(a.item?.title || '').localeCompare(String(b.item?.title || ''), 'pt-BR');
+  });
+  return rows;
+}
+
+function modelIntersectsWeek(model, weekStartKey, weekEndKey){
+  if(model.mode === 'range'){
+    return compareDateKeys(model.rangeEnd, weekStartKey) >= 0 && compareDateKeys(model.rangeStart, weekEndKey) <= 0;
+  }
+  return compareDateKeys(model.pointKey, weekStartKey) >= 0 && compareDateKeys(model.pointKey, weekEndKey) <= 0;
+}
+
+function weekPlacement(model, weekStartKey, weekEndKey){
+  if(model.mode === 'range'){
+    const startKey = compareDateKeys(model.rangeStart, weekStartKey) < 0 ? weekStartKey : model.rangeStart;
+    const endKey = compareDateKeys(model.rangeEnd, weekEndKey) > 0 ? weekEndKey : model.rangeEnd;
+    const startIndex = Math.max(0, Math.floor((parseDateKey(startKey) - parseDateKey(weekStartKey)) / 86400000));
+    const endIndex = Math.max(startIndex, Math.floor((parseDateKey(endKey) - parseDateKey(weekStartKey)) / 86400000));
+    return { colStart: startIndex + 1, colEnd: endIndex + 2 };
+  }
+
+  const idx = Math.max(0, Math.floor((parseDateKey(model.pointKey) - parseDateKey(weekStartKey)) / 86400000));
+  return { colStart: idx + 1, colEnd: idx + 2 };
+}
+
+function weekRowMeta(item, model){
+  const parts = [];
+  if(item.assignedToName) parts.push(item.assignedToName);
+  parts.push(priorityLabel(item.priority));
+  if(model.summary) parts.push(model.summary);
+  return parts.join(' · ');
+}
+
+function renderWeekRow(item, model, weekStartKey, weekEndKey){
+  const placement = weekPlacement(model, weekStartKey, weekEndKey);
+  const barLabel = model.mode === 'range' ? model.summary : `${model.label} · ${model.summary}`;
+  return `
+    <div class="week-row">
+      <div class="week-row-track">
+        ${Array.from({ length: 7 }, () => '<div class="week-slot"></div>').join('')}
+        <div
+          class="week-row-bar ${statusClass(item.status)} ${item.isOverdue ? 'is-overdue' : ''}"
+          style="grid-column:${placement.colStart} / ${placement.colEnd}"
+          data-act="open"
+          data-id="${esc(item.id)}"
+        >
+          <div class="line1 truncate">${esc(item.title)}</div>
+          <div class="line2 truncate">${esc(barLabel)}${weekRowMeta(item, model) ? ' · ' + esc(weekRowMeta(item, model)) : ''}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function monthEntryForItem(item, model, monthStartKey, monthEndKey, gridStartKey, gridEndKey){
+  if(model.mode === 'range'){
+    if(compareDateKeys(model.rangeEnd, gridStartKey) < 0 || compareDateKeys(model.rangeStart, gridEndKey) > 0){
+      return null;
+    }
+    const anchorKey = compareDateKeys(model.rangeStart, monthStartKey) < 0 ? monthStartKey : model.rangeStart;
+    return {
+      date: anchorKey,
+      kind: 'range',
+      label: 'Período',
+      summary: model.summary,
+      order: 1,
+    };
+  }
+
+  if(compareDateKeys(model.pointKey, gridStartKey) < 0 || compareDateKeys(model.pointKey, gridEndKey) > 0){
+    return null;
+  }
+
+  return {
+    date: model.pointKey,
+    kind: model.kind,
+    label: model.label,
+    summary: model.summary,
+    order: model.kind === 'due' ? 3 : model.kind === 'completed' ? 4 : 5,
+  };
+}
+
+function renderMonthEntry(item, entry){
+  const subtitle = [entry.summary, item.assignedToName].filter(Boolean).join(' · ');
   return `
     <div class="calendar-item kind-${esc(entry.kind)}" data-act="open" data-id="${esc(item.id)}">
       <div class="top">
-        <span class="badge">${esc(entry.label)}</span>
         <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
-        <span class="badge ${priorityClass(item.priority)}">${esc(priorityLabel(item.priority))}</span>
       </div>
       <div class="title truncate">${esc(item.title)}</div>
-      <div class="sub truncate">${esc(subtitleParts.join(' · ') || statusLabel(item.status))}</div>
+      <div class="sub truncate">${esc(subtitle || statusLabel(item.status))}</div>
     </div>
   `;
 }
@@ -1017,28 +1221,31 @@ function renderWeek(){
   const mount = document.getElementById('weekGrid');
   const start = startOfWeek(state.calendarAnchor);
   const days = Array.from({length:7}, (_,i) => addDays(start, i));
+  const weekStartKey = dateKey(days[0]);
+  const weekEndKey = dateKey(days[6]);
+
   document.getElementById('calendarTitle').textContent = 'Calendário semanal';
   document.getElementById('calendarSubtitle').textContent = weekTitle(days[0], days[6]);
 
-  mount.innerHTML = days.map(day => {
-    const key = dateKey(day);
-    const items = [];
-    for(const item of state.items){
-      for(const entry of calendarEntriesForItem(item)){
-        if(entry.date === key){
-          items.push({ item, entry });
-        }
-      }
-    }
-    return `
-      <div class="card week-day">
-        <h3>${esc(day.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' }))}</h3>
-        <div class="day-list">
-          ${items.length ? items.map(x => renderCalendarItem(x.item, x.entry)).join('') : '<div class="empty">Sem tarefas</div>'}
-        </div>
+  const rows = state.items
+    .map(item => ({ item, model: taskCalendarModel(item) }))
+    .filter(row => modelIntersectsWeek(row.model, weekStartKey, weekEndKey));
+
+  sortCalendarRows(rows);
+
+  mount.innerHTML = rows.length ? `
+    <div class="week-timeline">
+      <div class="week-axis">
+        ${days.map(day => `
+          <div class="week-axis-day">
+            <span class="tiny">${esc(day.toLocaleDateString('pt-BR', { weekday:'short' }))}</span>
+            <strong>${esc(day.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }))}</strong>
+          </div>
+        `).join('')}
       </div>
-    `;
-  }).join('');
+      ${rows.map(row => renderWeekRow(row.item, row.model, weekStartKey, weekEndKey)).join('')}
+    </div>
+  ` : '<div class="card"><div class="empty">Sem tarefas na semana selecionada.</div></div>';
 }
 
 function renderMonth(){
@@ -1047,20 +1254,36 @@ function renderMonth(){
   const monthEnd = endOfMonth(state.calendarAnchor);
   const gridStart = startOfWeek(monthStart);
   const gridEnd = addDays(startOfWeek(addDays(monthEnd, 6)), 6);
+  const monthStartKey = dateKey(monthStart);
+  const monthEndKey = dateKey(monthEnd);
+  const gridStartKey = dateKey(gridStart);
+  const gridEndKey = dateKey(gridEnd);
+
   document.getElementById('calendarTitle').textContent = 'Calendário mensal';
   document.getElementById('calendarSubtitle').textContent = monthTitle(state.calendarAnchor);
 
   const cells = [];
   for(let d = cloneDate(gridStart); d <= gridEnd; d = addDays(d, 1)){
     const key = dateKey(d);
-    const items = [];
-    for(const item of state.items){
-      for(const entry of calendarEntriesForItem(item)){
-        if(entry.date === key){
-          items.push({ item, entry });
-        }
-      }
-    }
+    const items = state.items
+      .map(item => {
+        const model = taskCalendarModel(item);
+        const entry = monthEntryForItem(item, model, monthStartKey, monthEndKey, gridStartKey, gridEndKey);
+        return entry && entry.date === key ? { item, entry } : null;
+      })
+      .filter(Boolean);
+
+    items.sort((a, b) => {
+      const orderDiff = Number(a.entry?.order || 99) - Number(b.entry?.order || 99);
+      if(orderDiff !== 0) return orderDiff;
+      const priorityDiff = calendarPriorityRank(a.item?.priority) - calendarPriorityRank(b.item?.priority);
+      if(priorityDiff !== 0) return priorityDiff;
+      return String(a.item?.title || '').localeCompare(String(b.item?.title || ''), 'pt-BR');
+    });
+
+    const visibleItems = items.slice(0, 4);
+    const hiddenCount = Math.max(0, items.length - visibleItems.length);
+
     cells.push(`
       <div class="card month-cell ${sameMonth(d, state.calendarAnchor) ? '' : 'other-month'}">
         <div class="month-cell-num">
@@ -1068,7 +1291,8 @@ function renderMonth(){
           ${key === todayKey() ? '<span class="badge">Hoje</span>' : ''}
         </div>
         <div class="day-list">
-          ${items.length ? items.map(x => renderCalendarItem(x.item, x.entry)).join('') : '<div class="tiny">Sem tarefas</div>'}
+          ${visibleItems.length ? visibleItems.map(x => renderMonthEntry(x.item, x.entry)).join('') : '<div class="tiny">Sem tarefas</div>'}
+          ${hiddenCount ? `<div class="tiny">+ ${hiddenCount} mais</div>` : ''}
         </div>
       </div>
     `);
@@ -1228,20 +1452,26 @@ function bindActionDelegates(){
     if(act === 'open') await openTask(id);
     if(act === 'next') await applyStatusChange(id, btn.getAttribute('data-next'));
     if(act === 'edit'){
-      const item = state.items.find(x => x.id === id);
+      const item = await selectTaskContext(id);
       if(item){
         fillForm(item);
         switchTab(false);
+        document.getElementById('title').focus();
       }
     }
   });
 }
 
-async function openTask(id){
+async function selectTaskContext(id){
   const data = await api('/api/automations/tasks/tasks/' + encodeURIComponent(id));
   state.current = data.item;
   renderDetail(data.item, data.comments || []);
   await loadHistory(id);
+  return data.item;
+}
+
+async function openTask(id){
+  await selectTaskContext(id);
   switchTab(true);
 }
 
@@ -1402,10 +1632,17 @@ async function boot(){
   document.getElementById('calendarNextBtn').onclick = () => moveCalendar(1);
   document.getElementById('calendarTodayBtn').onclick = () => { state.calendarAnchor = new Date(); updateCalendar(); };
   document.getElementById('tabForm').onclick = () => {
+    if(state.current){
+      fillForm(state.current);
+    } else if(!document.getElementById('taskId').value){
+      resetForm();
+    }
     switchTab(false);
     document.getElementById('title').focus();
   };
-  document.getElementById('tabDetail').onclick = () => { if(state.current) switchTab(true); };
+  document.getElementById('tabDetail').onclick = async () => {
+    if(state.current) await openTask(state.current.id);
+  };
   document.getElementById('cancelEditBtn').onclick = () => {
     const wasEditing = !!document.getElementById('taskId').value;
     resetForm();
