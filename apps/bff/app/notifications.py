@@ -495,6 +495,12 @@ def send_notification(
 
         recipients: Set[uuid.UUID] = set(role_user_ids) | set(direct_user_ids)
         if not recipients:
+            if role_names_l and not user_ids_l:
+                logger.info(
+                    "[NOTIFICATIONS] Nenhum destinatário ativo resolvido para os papéis; notificação ignorada | roles=%s",
+                    ",".join(sorted({str(role).strip().lower() for role in role_names_l if str(role).strip()})) or "-",
+                )
+                return "", 0
             raise HTTPException(status_code=422, detail="targets produced no recipients")
 
         email_targets, email_skips = _resolve_email_targets(conn, list(recipients))

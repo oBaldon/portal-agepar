@@ -277,9 +277,12 @@ def init_db() -> None:
       UPDATE tasks
          SET status = 'a_fazer'
        WHERE status = 'backlog';
+            UPDATE tasks
+                 SET status = 'concluida'
+             WHERE status = 'em_revisao';
       ALTER TABLE tasks
         ADD CONSTRAINT chk_tasks_status
-        CHECK (status IN ('a_fazer','em_andamento','em_revisao','concluida','cancelada'));
+                CHECK (status IN ('a_fazer','em_andamento','concluida','cancelada'));
 
       IF NOT EXISTS (
         SELECT 1

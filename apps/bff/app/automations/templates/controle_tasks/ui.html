@@ -200,7 +200,7 @@
 
   .kpis{
     display:grid;
-    grid-template-columns:repeat(5,minmax(0,1fr));
+    grid-template-columns:repeat(4,minmax(0,1fr));
     gap:12px;
   }
 
@@ -523,10 +523,6 @@
       <div class="label">Atrasadas</div>
       <div class="value" id="kpiOverdue">0</div>
     </div>
-    <div class="card kpi warn">
-      <div class="label">Em revisão</div>
-      <div class="value" id="kpiReview">0</div>
-    </div>
     <div class="card kpi ok">
       <div class="label">Concluídas no período</div>
       <div class="value" id="kpiCompleted">0</div>
@@ -706,7 +702,6 @@ const appState = {
 const STATUS_LABELS = {
   a_fazer: 'A fazer',
   em_andamento: 'Em andamento',
-  em_revisao: 'Em revisão',
   concluida: 'Concluída',
   cancelada: 'Cancelada',
 };
@@ -742,7 +737,6 @@ function sevClass(sev){
 function labelClass(status){
   const s = String(status || '').toLowerCase();
   if(['cancelada'].includes(s)) return 'danger';
-  if(['em_revisao'].includes(s)) return 'warn';
   if(['concluida'].includes(s)) return 'ok';
   return '';
 }
@@ -867,7 +861,6 @@ function renderOverview(data){
   qs('#kpiCompleted').textContent = totals.completedInPeriod ?? 0;
   qs('#kpiOverdue').textContent = totals.overdue ?? 0;
   qs('#kpiDueSoon').textContent = totals.dueSoon ?? 0;
-  qs('#kpiReview').textContent = totals.inReview ?? 0;
   qs('#kpiCompletionRate').textContent = totals.completionRatePercent ?? 0;
   qs('#kpiLead').textContent = totals.avgLeadHours ?? 0;
 

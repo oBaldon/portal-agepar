@@ -162,7 +162,6 @@ def get_overview(
               COUNT(*) FILTER (WHERE t.completed_at IS NOT NULL AND t.completed_at >= now() - (%s || ' days')::interval) AS completed_in_period,
               COUNT(*) FILTER (WHERE t.completed_at IS NULL AND t.due_date < CURRENT_DATE AND t.status <> 'cancelada') AS overdue_tasks,
               COUNT(*) FILTER (WHERE t.completed_at IS NULL AND t.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days' AND t.status <> 'cancelada') AS due_soon_tasks,
-              COUNT(*) FILTER (WHERE t.completed_at IS NULL AND t.status = 'em_revisao') AS in_review_tasks,
               COALESCE(AVG(EXTRACT(EPOCH FROM (t.completed_at - t.created_at))) FILTER (WHERE t.completed_at IS NOT NULL AND t.completed_at >= now() - (%s || ' days')::interval), 0) AS avg_lead_seconds
             FROM tasks t
             WHERE {where_sql}
@@ -318,7 +317,6 @@ def get_overview(
             "completedInPeriod": completed_in_period,
             "overdue": int(totals["overdue_tasks"] or 0),
             "dueSoon": int(totals["due_soon_tasks"] or 0),
-            "inReview": int(totals["in_review_tasks"] or 0),
             "avgLeadHours": round(float(totals["avg_lead_seconds"] or 0) / 3600, 2),
             "completionRatePercent": completion_rate,
         },

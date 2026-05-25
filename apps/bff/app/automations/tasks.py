@@ -86,7 +86,6 @@ _EVENT_CATALOG: Dict[str, Dict[str, str]] = {
     "task_deleted": {"label": "Tarefa excluída logicamente", "category": "lifecycle", "severity": "danger"},
     "task_restored": {"label": "Tarefa restaurada", "category": "lifecycle", "severity": "success"},
     "task_comment_added": {"label": "Comentário adicionado", "category": "collaboration", "severity": "info"},
-    "task_in_review": {"label": "Tarefa em revisão", "category": "workflow", "severity": "warning"},
     "task_due_date_changed": {"label": "Prazo alterado", "category": "change", "severity": "warning"},
 }
 
@@ -139,13 +138,6 @@ _TASK_NOTIFICATION_RULES: Dict[str, Dict[str, Any]] = {
         "notifyAssignedRole": False,
         "notifyCreator": False,
         "title": "Novo comentário em tarefa",
-    },
-    "task_in_review": {
-        "enabled": False,
-        "notifyAssignee": False,
-        "notifyAssignedRole": False,
-        "notifyCreator": False,
-        "title": "Tarefa em revisão",
     },
 }
 
@@ -605,7 +597,7 @@ def _dispatch_task_notification(
     notif_level = "info"
     if event_type in {"task_completed", "task_restored"}:
         notif_level = "success"
-    elif event_type in {"task_cancelled", "task_in_review", "task_due_date_changed"}:
+    elif event_type in {"task_cancelled", "task_due_date_changed"}:
         notif_level = "warning"
 
     try:
@@ -1122,7 +1114,6 @@ def get_management_overview(
               COUNT(*) FILTER (WHERE t.deleted_at IS NULL AND t.completed_at IS NOT NULL AND t.completed_at >= now() - (%s || ' days')::interval) AS completed_in_period,
               COUNT(*) FILTER (WHERE t.deleted_at IS NULL AND t.completed_at IS NULL AND t.due_date < CURRENT_DATE AND t.status <> 'cancelada') AS overdue_tasks,
               COUNT(*) FILTER (WHERE t.deleted_at IS NULL AND t.completed_at IS NULL AND t.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days' AND t.status <> 'cancelada') AS due_soon_tasks,
-              COUNT(*) FILTER (WHERE t.deleted_at IS NULL AND t.completed_at IS NULL AND t.status = 'em_revisao') AS in_review_tasks,
               COALESCE(AVG(EXTRACT(EPOCH FROM (t.completed_at - t.created_at))) FILTER (WHERE t.deleted_at IS NULL AND t.completed_at IS NOT NULL AND t.completed_at >= now() - (%s || ' days')::interval), 0) AS avg_lead_seconds
             FROM tasks t
             """,
@@ -1247,7 +1238,6 @@ def get_management_overview(
             "completedInPeriod": completed_in_period,
             "overdue": int(totals["overdue_tasks"] or 0),
             "dueSoon": int(totals["due_soon_tasks"] or 0),
-            "inReview": int(totals["in_review_tasks"] or 0),
             "avgLeadHours": round(float(totals["avg_lead_seconds"] or 0) / 3600, 2),
             "completionRatePercent": completion_rate,
         },
@@ -1456,8 +1446,7 @@ def list_tasks(
                 WHEN 'a_fazer' THEN 2
                 WHEN 'backlog' THEN 3
                 WHEN 'concluida' THEN 4
-                WHEN 'em_revisao' THEN 5
-                WHEN 'cancelada' THEN 6
+                                WHEN 'cancelada' THEN 5
                 ELSE 99
               END ASC,
               t.due_date ASC NULLS LAST,
