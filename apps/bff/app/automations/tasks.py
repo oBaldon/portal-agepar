@@ -56,6 +56,11 @@ _STATUS_SET = set(_STATUS_VALUES)
 _PRIORITY_VALUES = {"baixa", "media", "alta", "urgente"}
 _DIRECTORATE_ROLE_OPTIONS = ("daf", "dp", "dfq", "dnr", "dre")
 _DIRECTORATE_ROLE_SET = set(_DIRECTORATE_ROLE_OPTIONS)
+
+# Compatibilidade com nomes antigos usados em patches/containers anteriores.
+_TASK_TRACKING_ROLE_OPTIONS = _DIRECTORATE_ROLE_OPTIONS
+_TASK_TRACKING_ROLE_SET = _DIRECTORATE_ROLE_SET
+
 _STATUS_LABELS = {
     "a_fazer": "A fazer",
     "em_andamento": "Em andamento",
