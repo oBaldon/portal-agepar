@@ -579,6 +579,18 @@ def _dispatch_task_notification(
         task=task,
         actor_user_id=actor_user_id,
     )
+
+    if role_names:
+        resolved_role_user_ids = _resolve_tracking_role_user_ids(role_names)
+        if not resolved_role_user_ids:
+            logger.info(
+                "[TASKS] Cargo de acompanhamento sem usuários ativos; notificação por cargo ignorada | task=%s | event=%s | roles=%s",
+                task.get("id"),
+                event_type,
+                ",".join(role_names),
+            )
+            role_names = []
+
     if not user_ids and not role_names:
         return
 
@@ -654,6 +666,40 @@ def _normalize_assigned_role_name(value: Optional[str]) -> Optional[str]:
             detail={"assignedRoleName": f"invalid (use {list(_DIRECTORATE_ROLE_OPTIONS)})"},
         )
     return role_name
+
+
+def _resolve_tracking_role_user_ids(role_names: List[str]) -> set[uuid.UUID]:
+    wanted = {str(role or "").strip().lower() for role in role_names if str(role or "").strip()}
+    if not wanted:
+        return set()
+
+    default_roles = set(_parse_default_roles())
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              u.id,
+              u.is_superuser,
+              COALESCE(array_agg(r.name) FILTER (WHERE r.name IS NOT NULL), ARRAY[]::text[]) AS roles
+            FROM users u
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN roles r ON r.id = ur.role_id
+            WHERE u.status = 'active'
+            GROUP BY u.id, u.is_superuser
+            """
+        )
+        rows = cur.fetchall() or []
+
+    out: set[uuid.UUID] = set()
+    for row in rows:
+        eff = {str(r).strip().lower() for r in (row["roles"] or []) if str(r).strip()} | default_roles
+        if row["is_superuser"]:
+            eff.add("admin")
+        if eff.intersection(wanted):
+            out.add(row["id"])
+
+    return out
 
 
 def _load_role_options() -> List[str]:
