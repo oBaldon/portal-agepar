@@ -1392,8 +1392,15 @@ async function loadConfig(){
   const userOptions = '<option value="">Todos</option>' + cfg.users.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   document.getElementById('assignedFilter').innerHTML = userOptions;
 
+  const directorateRoleOptions = [
+    { value: 'daf', label: 'DAF' },
+    { value: 'dp', label: 'DP' },
+    { value: 'dfq', label: 'DFQ' },
+    { value: 'dnr', label: 'DNR' },
+    { value: 'dre', label: 'DRE' },
+  ];
   const roleOptions = ['<option value="">— Nenhum cargo —</option>']
-    .concat((cfg.roleOptions || []).map(roleName => `<option value="${esc(roleName)}">${esc(roleName)}</option>`));
+    .concat(directorateRoleOptions.map(role => `<option value="${esc(role.value)}">${esc(role.label)}</option>`));
   document.getElementById('assignedRoleName').innerHTML = roleOptions.join('');
 
   wireAssigneePicker();

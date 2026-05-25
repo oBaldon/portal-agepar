@@ -54,6 +54,8 @@ _TEMPLATES_DIR = pathlib.Path(__file__).parent / "templates" / "tasks"
 _STATUS_VALUES = ("a_fazer", "em_andamento", "concluida", "cancelada")
 _STATUS_SET = set(_STATUS_VALUES)
 _PRIORITY_VALUES = {"baixa", "media", "alta", "urgente"}
+_DIRECTORATE_ROLE_OPTIONS = ("daf", "dp", "dfq", "dnr", "dre")
+_DIRECTORATE_ROLE_SET = set(_DIRECTORATE_ROLE_OPTIONS)
 _STATUS_LABELS = {
     "a_fazer": "A fazer",
     "em_andamento": "Em andamento",
@@ -642,38 +644,20 @@ def _parse_default_roles() -> List[str]:
     return out
 
 
-def _load_role_options() -> List[str]:
-    with _pg() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT DISTINCT LOWER(TRIM(r.name)) AS role_name
-            FROM users u
-            JOIN user_roles ur ON ur.user_id = u.id
-            JOIN roles r ON r.id = ur.role_id
-            WHERE u.status = 'active'
-              AND r.name IS NOT NULL
-              AND BTRIM(r.name) <> ''
-            ORDER BY LOWER(TRIM(r.name)) ASC
-            """
+def _normalize_assigned_role_name(value: Optional[str]) -> Optional[str]:
+    role_name = str(value or "").strip().lower()
+    if not role_name:
+        return None
+    if role_name not in _DIRECTORATE_ROLE_SET:
+        raise HTTPException(
+            status_code=422,
+            detail={"assignedRoleName": f"invalid (use {list(_DIRECTORATE_ROLE_OPTIONS)})"},
         )
-        rows = cur.fetchall() or []
+    return role_name
 
-    seen: set[str] = set()
-    out: List[str] = []
 
-    for row in rows:
-        role_name = str(row["role_name"] or "").strip().lower()
-        if not role_name or role_name in seen:
-            continue
-        seen.add(role_name)
-        out.append(role_name)
-
-    for role_name in _parse_default_roles():
-        if role_name not in seen:
-            seen.add(role_name)
-            out.append(role_name)
-
-    return out
+def _load_role_options() -> List[str]:
+    return list(_DIRECTORATE_ROLE_OPTIONS)
 
 def _load_users_for_picker(user: Dict[str, Any]) -> List[Dict[str, Any]]:
     with _pg() as conn, conn.cursor() as cur:
@@ -744,11 +728,16 @@ class TaskCreateIn(BaseModel):
     def _validate_description(cls, value: Optional[str]) -> str:
         return str(value or "").strip()
 
-    @field_validator("source_kind", "source_id", "assigned_role_name")
+    @field_validator("source_kind", "source_id")
     @classmethod
     def _validate_optional_refs(cls, value: Optional[str]) -> Optional[str]:
         value = str(value or "").strip()
         return value or None
+
+    @field_validator("assigned_role_name")
+    @classmethod
+    def _validate_assigned_role_name(cls, value: Optional[str]) -> Optional[str]:
+        return _normalize_assigned_role_name(value)
 
     @field_validator("priority")
     @classmethod
@@ -818,13 +807,20 @@ class TaskUpdateIn(BaseModel):
             return None
         return str(value).strip()
 
-    @field_validator("source_kind", "source_id", "assigned_role_name")
+    @field_validator("source_kind", "source_id")
     @classmethod
     def _validate_optional_refs(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         value = str(value).strip()
         return value or None
+
+    @field_validator("assigned_role_name")
+    @classmethod
+    def _validate_assigned_role_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return _normalize_assigned_role_name(value)
 
     @field_validator("priority")
     @classmethod

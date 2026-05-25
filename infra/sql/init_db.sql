@@ -264,6 +264,22 @@ INSERT INTO roles(name)
 SELECT 'daf'
 WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='daf');
 
+INSERT INTO roles(name)
+SELECT 'dp'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='dp');
+
+INSERT INTO roles(name)
+SELECT 'dfq'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='dfq');
+
+INSERT INTO roles(name)
+SELECT 'dre'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='dre');
+
+INSERT INTO roles(name)
+SELECT 'dnr'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='dnr');
+
 -- ===============================
 -- Estrutura organizacional e RH
 -- ===============================
