@@ -90,55 +90,55 @@ _TASK_NOTIFICATION_RULES: Dict[str, Dict[str, Any]] = {
         "notifyAssignee": True,
         "notifyAssignedRole": True,
         "notifyCreator": False,
-        "title": "Nova tarefa atribuída",
+        "title": "Nova tarefa criada",
     },
     "task_assigned": {
         "enabled": True,
         "notifyAssignee": True,
-        "notifyAssignedRole": True,
+        "notifyAssignedRole": False,
         "notifyCreator": False,
-        "title": "Você recebeu uma tarefa",
+        "title": "Tarefa atribuída a você",
     },
     "task_reassigned": {
         "enabled": True,
         "notifyAssignee": True,
-        "notifyAssignedRole": True,
+        "notifyAssignedRole": False,
         "notifyCreator": False,
-        "title": "Tarefa reatribuída",
+        "title": "Tarefa reatribuída a você",
     },
     "task_completed": {
         "enabled": True,
         "notifyAssignee": False,
-        "notifyAssignedRole": False,
+        "notifyAssignedRole": True,
         "notifyCreator": True,
         "title": "Tarefa concluída",
     },
     "task_cancelled": {
-        "enabled": True,
-        "notifyAssignee": True,
-        "notifyAssignedRole": True,
-        "notifyCreator": True,
+        "enabled": False,
+        "notifyAssignee": False,
+        "notifyAssignedRole": False,
+        "notifyCreator": False,
         "title": "Tarefa cancelada",
     },
     "task_restored": {
-        "enabled": True,
-        "notifyAssignee": True,
-        "notifyAssignedRole": True,
-        "notifyCreator": True,
+        "enabled": False,
+        "notifyAssignee": False,
+        "notifyAssignedRole": False,
+        "notifyCreator": False,
         "title": "Tarefa restaurada",
     },
     "task_comment_added": {
         "enabled": True,
         "notifyAssignee": True,
         "notifyAssignedRole": False,
-        "notifyCreator": True,
+        "notifyCreator": False,
         "title": "Novo comentário em tarefa",
     },
     "task_in_review": {
-        "enabled": True,
+        "enabled": False,
         "notifyAssignee": False,
-        "notifyAssignedRole": True,
-        "notifyCreator": True,
+        "notifyAssignedRole": False,
+        "notifyCreator": False,
         "title": "Tarefa em revisão",
     },
 }
@@ -511,27 +511,55 @@ def _task_notification_message(
     actor: Dict[str, Any],
 ) -> str:
     title = str(task.get("title") or "").strip() or "Sem título"
-    due_date = _iso_date(task.get("due_date"))
     actor_name = str(actor.get("nome") or actor.get("name") or "um usuário").strip() or "um usuário"
+    assignee_name = str(task.get("assigned_to_name") or "").strip()
+    creator_name = str(task.get("created_by_name") or "").strip()
+    role_name = str(task.get("assigned_role_name") or "").strip()
+    due_date = _iso_date(task.get("due_date"))
+    source_kind = str(task.get("source_kind") or "").strip()
+    source_id = str(task.get("source_id") or "").strip()
 
-    if event_type in {"task_created", "task_assigned", "task_reassigned"}:
-        base = f'A tarefa "{title}" foi atribuída para acompanhamento.'
+    details: list[str] = []
+
+    if event_type == "task_created":
+        base = f'{actor_name} criou a tarefa "{title}".'
+        if assignee_name:
+            details.append(f"Responsável: {assignee_name}.")
+        if role_name:
+            details.append(f"Cargo de acompanhamento: {role_name}.")
+    elif event_type == "task_assigned":
+        base = f'{actor_name} atribuiu a você a tarefa "{title}".'
+        if role_name:
+            details.append(f"Cargo de acompanhamento: {role_name}.")
+    elif event_type == "task_reassigned":
+        base = f'{actor_name} reatribuiu para você a tarefa "{title}".'
+        if role_name:
+            details.append(f"Cargo de acompanhamento: {role_name}.")
     elif event_type == "task_completed":
-        base = f'A tarefa "{title}" foi concluída por {actor_name}.'
+        base = f'{actor_name} concluiu a tarefa "{title}".'
+        if creator_name:
+            details.append(f"Criada por: {creator_name}.")
+        if assignee_name:
+            details.append(f"Responsável: {assignee_name}.")
+        if role_name:
+            details.append(f"Cargo de acompanhamento: {role_name}.")
     elif event_type == "task_cancelled":
-        base = f'A tarefa "{title}" foi cancelada por {actor_name}.'
+        base = f'{actor_name} cancelou a tarefa "{title}".'
     elif event_type == "task_restored":
-        base = f'A tarefa "{title}" foi restaurada por {actor_name}.'
+        base = f'{actor_name} restaurou a tarefa "{title}".'
     elif event_type == "task_comment_added":
         base = f'{actor_name} adicionou um comentário na tarefa "{title}".'
     else:
         base = f'Houve uma atualização na tarefa "{title}".'
 
     if due_date:
-        base += f" Prazo: {due_date}."
-    if task.get("source_kind"):
-        base += f" Origem: {task.get('source_kind')}."
-    return base
+        details.append(f"Prazo: {due_date}.")
+    if source_kind and source_id:
+        details.append(f"Origem: {source_kind} ({source_id}).")
+    elif source_kind:
+        details.append(f"Origem: {source_kind}.")
+
+    return " ".join([base, *details]).strip()
 
 
 def _dispatch_task_notification(

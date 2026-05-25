@@ -248,12 +248,24 @@ def _notification_email_body(
     message: str,
     level: str,
     action_url: Optional[str],
+    meta: Optional[Dict[str, Any]] = None,
 ) -> str:
     opened_url = _absolute_action_url(action_url)
+    meta_obj = meta or {}
+    kind = str(meta_obj.get("kind") or "").strip().lower()
+    task_event = str(meta_obj.get("taskEvent") or "").strip().lower()
+
+    intro = "Você recebeu uma nova notificação na Plataforma AGEPAR."
+    if kind == "tasks":
+        if task_event in {"task_assigned", "task_reassigned", "task_created", "task_completed"}:
+            intro = "Você recebeu uma atualização do módulo de Gestão de Tarefas da Plataforma AGEPAR."
+        else:
+            intro = "Você recebeu uma notificação do módulo de Gestão de Tarefas da Plataforma AGEPAR."
+
     lines = [
         f"Olá, {recipient_name or 'servidor(a)'}.",
         "",
-        "Você recebeu uma nova notificação na Plataforma AGEPAR.",
+        intro,
         "",
         f"Título: {title}",
         f"Mensagem: {message}",
@@ -283,6 +295,7 @@ def _dispatch_notification_emails(
     level: str,
     action_url: Optional[str],
     email_targets: Sequence[Dict[str, str]],
+    meta: Optional[Dict[str, Any]] = None,
 ) -> None:
     client = get_expresso_mail_client()
     if not client.enabled:
@@ -304,6 +317,7 @@ def _dispatch_notification_emails(
             message=message,
             level=level,
             action_url=action_url,
+            meta=meta,
         )
         body_html = build_notification_email_html(body_plain)
 
@@ -352,6 +366,7 @@ def _dispatch_notification_emails_async(
     level: str,
     action_url: Optional[str],
     email_targets: Sequence[Dict[str, str]],
+    meta: Optional[Dict[str, Any]] = None,
 ) -> None:
     if not email_targets:
         return
@@ -365,6 +380,7 @@ def _dispatch_notification_emails_async(
             "level": level,
             "action_url": action_url,
             "email_targets": list(email_targets),
+            "meta": meta,
         },
         name=f"notif-email-{notification_id[:8]}",
         daemon=True,
@@ -568,6 +584,7 @@ def send_notification(
             level=lv,
             action_url=action_url,
             email_targets=email_targets,
+            meta=meta,
         )
 
         return str(notif_id), len(recipients)

@@ -260,6 +260,10 @@ INSERT INTO roles(name)
 SELECT 'rh'
 WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='rh');
 
+INSERT INTO roles(name)
+SELECT 'daf'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='daf');
+
 -- ===============================
 -- Estrutura organizacional e RH
 -- ===============================
