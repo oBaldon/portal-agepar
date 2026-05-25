@@ -643,8 +643,7 @@ const STATUS_LABELS = {
 const STATUS_FLOW_FALLBACK = {
   a_fazer: { next: 'em_andamento', label: 'Iniciar' },
   em_andamento: { next: 'concluida', label: 'Concluir' },
-  concluida: { next: 'em_revisao', label: 'Revisar' },
-  em_revisao: { next: 'concluida', label: 'Aprovar revisão' },
+  concluida: null,
   cancelada: null,
 };
 
@@ -993,7 +992,7 @@ function renderList(){
 
 function renderKanban(){
   const mount = document.getElementById('kanbanBoard');
-  const cols = ['a_fazer','em_andamento','em_revisao','concluida','cancelada'];
+  const cols = ['a_fazer','em_andamento','concluida','cancelada'];
   mount.innerHTML = cols.map(status => {
     const items = state.items.filter(i => i.status === status);
     return `

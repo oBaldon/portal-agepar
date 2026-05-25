@@ -51,7 +51,7 @@ router = APIRouter(
 
 _TEMPLATES_DIR = pathlib.Path(__file__).parent / "templates" / "tasks"
 
-_STATUS_VALUES = ("a_fazer", "em_andamento", "em_revisao", "concluida", "cancelada")
+_STATUS_VALUES = ("a_fazer", "em_andamento", "concluida", "cancelada")
 _STATUS_SET = set(_STATUS_VALUES)
 _PRIORITY_VALUES = {"baixa", "media", "alta", "urgente"}
 _STATUS_LABELS = {
@@ -64,8 +64,7 @@ _STATUS_LABELS = {
 _STATUS_FLOW = {
     "a_fazer": {"next": "em_andamento", "label": "Iniciar"},
     "em_andamento": {"next": "concluida", "label": "Concluir"},
-    "concluida": {"next": "em_revisao", "label": "Revisar"},
-    "em_revisao": {"next": "concluida", "label": "Aprovar revisão"},
+    "concluida": None,
     "cancelada": None,
 }
 
@@ -329,7 +328,7 @@ def _task_flags(task: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, bool]:
 
 def _task_to_out(task: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
     flags = _task_flags(task, user)
-    task_status = "a_fazer" if task.get("status") == "backlog" else task.get("status")
+    task_status = "a_fazer" if task.get("status") == "backlog" else ("concluida" if task.get("status") == "em_revisao" else task.get("status"))
     due_date = task.get("due_date")
     is_overdue = (
         due_date is not None
@@ -836,7 +835,7 @@ class TaskUpdateIn(BaseModel):
 
 
 class TaskStatusIn(BaseModel):
-    status: Literal["a_fazer", "em_andamento", "em_revisao", "concluida", "cancelada"]
+    status: Literal["a_fazer", "em_andamento", "concluida", "cancelada"]
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -1407,10 +1406,10 @@ def list_tasks(
             ORDER BY
               CASE t.status
                 WHEN 'em_andamento' THEN 1
-                WHEN 'em_revisao' THEN 2
-                WHEN 'a_fazer' THEN 3
-                WHEN 'backlog' THEN 4
-                WHEN 'concluida' THEN 5
+                WHEN 'a_fazer' THEN 2
+                WHEN 'backlog' THEN 3
+                WHEN 'concluida' THEN 4
+                WHEN 'em_revisao' THEN 5
                 WHEN 'cancelada' THEN 6
                 ELSE 99
               END ASC,
@@ -1718,15 +1717,6 @@ def update_task_status(task_id: str, payload: TaskStatusIn, user: Dict[str, Any]
             new_value={"status": "cancelada"},
         )
         _dispatch_task_notification(event_type="task_cancelled", task=updated, actor=user)
-    elif new_status == "em_revisao":
-        _record_task_event(
-            task_id=task_uuid,
-            actor_user_id=actor_id,
-            event_type="task_in_review",
-            new_value={"status": "em_revisao"},
-        )
-        _dispatch_task_notification(event_type="task_in_review", task=updated, actor=user)
-
     add_audit(KIND, "status", user, {"task_id": str(task_uuid), "old_status": old_status, "new_status": new_status})
     logger.info("[TASKS] Status alterado | task=%s | from=%s | to=%s | actor=%s", task_uuid, old_status, new_status, actor_id)
 
