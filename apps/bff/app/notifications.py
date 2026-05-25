@@ -148,13 +148,12 @@ def _select_recipient_email(
     email_institucional: Optional[str],
 ) -> Tuple[Optional[str], Optional[str]]:
     email_inst_raw = (email_institucional or "").strip()
-    if not email_inst_raw:
-        return None, "email_institucional_blank"
 
     preferred = _normalize_email_address(email)
     if preferred:
         return preferred, None
 
+    email_inst_raw = (email_institucional or "").strip()
     fallback = _normalize_email_address(email_inst_raw)
     if fallback:
         if (email or "").strip():
@@ -163,7 +162,9 @@ def _select_recipient_email(
 
     if (email or "").strip():
         return None, "email_invalid_and_email_institucional_invalid"
-    return None, "email_institucional_invalid"
+    if email_inst_raw:
+        return None, "email_institucional_invalid"
+    return None, "email_blank_and_email_institucional_blank"
 
 
 def _resolve_email_targets(

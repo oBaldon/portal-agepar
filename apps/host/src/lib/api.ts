@@ -334,8 +334,8 @@ export async function listNotifications(params?: {
 
 export async function getUnreadNotificationCount(): Promise<number> {
   const res = await fetch(`${API_BASE}/notifications/unread-count`, { credentials: "include" });
-  const data = await jsonOrThrow<{ unread: number }>(res);
-  return Number(data.unread || 0);
+  const data = await jsonOrThrow<{ unread: number }>(res, { suppress403: true });
+  return Number(data?.unread || 0);
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
@@ -379,7 +379,7 @@ export async function getPendingAlerts(): Promise<PendingAlertsResponse> {
   const res = await fetch(`${API_BASE}/automations/avisos/mine/pending`, {
     credentials: "include",
   });
-  return jsonOrThrow<PendingAlertsResponse>(res);
+  return jsonOrThrow<PendingAlertsResponse>(res, { suppress403: true });
 }
 
 export async function markPendingAlertSeen(alertId: string): Promise<PlatformAlertItem> {

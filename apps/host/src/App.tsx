@@ -105,6 +105,7 @@ export default function App() {
   const nav = useNavigate();
   const loc = useLocation();
   const isPublicPath = (p: string) => p === "/login" || p === "/registrar" || p === "/403";
+  const canUsePrivilegedPolling = !!user && user.must_change_password !== true;
 
   useEffect(() => {
     configureApiHandlers({
@@ -115,6 +116,7 @@ export default function App() {
         }
       },
       onForbidden: () => {
+        if (user?.must_change_password === true) return;
         nav("/403", { replace: true });
       },
     });
@@ -142,7 +144,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    if (!canUsePrivilegedPolling) {
       setUnreadNotifications(0);
       return;
     }
@@ -165,7 +167,7 @@ export default function App() {
       alive = false;
       window.clearInterval(t);
     };
-  }, [user?.id, user?.cpf]);
+  }, [canUsePrivilegedPolling, user?.id, user?.cpf]);
 
   useEffect(() => {
     if (!user) {
@@ -339,7 +341,7 @@ export default function App() {
         </div>
       </header>
 
-      <GlobalAlertCenter enabled={!!user} pathname={loc.pathname} />
+      <GlobalAlertCenter enabled={canUsePrivilegedPolling} pathname={loc.pathname} />
 
       <Routes>
         <Route
