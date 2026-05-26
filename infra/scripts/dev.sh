@@ -10,7 +10,7 @@ shopt -s extglob
 # - up -d --build --pull always --remove-orphans
 # - impressão de URLs e docker compose images
 #
-# Ações: up | restart | stop | down | reset | logs | ps | menu
+# Ações: up | restart | stop | down | reset | logs | ps | migrate-init | menu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -67,6 +67,7 @@ Ações:
   reset        Derruba e REMOVE volumes (apaga dados). Pede confirmação.
   logs         Segue logs agregados (-f).
   ps           Lista containers.
+  migrate-init Reaplica infra/sql/init_db.sql no banco atual, sem resetar volumes.
   menu         Modo interativo.
 
 Opções:
@@ -182,6 +183,24 @@ action_ps() {
   compose_with_extra ps
 }
 
+action_migrate_init() {
+  validate_files
+  check_postgres
+
+  local init_sql="${INFRA_DIR}/sql/init_db.sql"
+  [[ -f "$init_sql" ]] || { echo "❌ Não encontrei ${init_sql}"; exit 1; }
+
+  echo "ℹ️  Reaplicando ${init_sql} no banco atual (sem resetar volumes)..."
+  compose_cmd exec -T postgres psql \
+    -X \
+    -v ON_ERROR_STOP=1 \
+    -U "$PGUSER" \
+    -d "$PGDATABASE" \
+    -f /docker-entrypoint-initdb.d/init_db.sql
+
+  echo "✅ init_db.sql reaplicado em ${PGDATABASE}."
+}
+
 action_menu() {
   echo "Selecione a operação:"
   echo "  1) up        - subir (build + pull always)"
@@ -191,6 +210,7 @@ action_menu() {
   echo "  5) reset     - derrubar e remover volumes (APAGA dados)"
   echo "  6) logs      - seguir logs"
   echo "  7) ps        - listar"
+  echo "  8) migrate-init - reaplicar init_db.sql sem resetar dados"
   echo "  0) sair"
   read -r -p "> " opt
   case "$opt" in
@@ -201,6 +221,7 @@ action_menu() {
     5) action_reset ;;
     6) action_logs ;;
     7) action_ps ;;
+    8) action_migrate_init ;;
     0) exit 0 ;;
     *) echo "Opção inválida."; exit 1 ;;
   esac
@@ -215,6 +236,7 @@ case "$ACTION" in
   reset) action_reset ;;
   logs) action_logs ;;
   ps) action_ps ;;
+  migrate-init) action_migrate_init ;;
   menu) action_menu ;;
   *) echo "Ação inválida: $ACTION"; echo; usage; exit 2 ;;
 esac

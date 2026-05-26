@@ -60,28 +60,72 @@ ALTER TABLE users
 
 -- Unicidade: substituir índices antigos por constraints canônicas
 DO $$
+DECLARE
+  has_email_dupes BOOLEAN;
+  has_cpf_dupes   BOOLEAN;
 BEGIN
-  IF to_regclass('public.uq_users_email') IS NOT NULL THEN
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE email IS NOT NULL
+    GROUP BY email
+    HAVING COUNT(*) > 1
+  )
+  INTO has_email_dupes;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE cpf IS NOT NULL
+    GROUP BY cpf
+    HAVING COUNT(*) > 1
+  )
+  INTO has_cpf_dupes;
+
+  IF to_regclass('public.uq_users_email') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.users'::regclass AND conname = 'uq_users_email'
+     ) THEN
     EXECUTE 'DROP INDEX IF EXISTS public.uq_users_email';
   END IF;
-  IF to_regclass('public.uq_users_email_nocase') IS NOT NULL THEN
+
+  IF to_regclass('public.uq_users_email_nocase') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.users'::regclass AND conname = 'uq_users_email'
+     ) THEN
     EXECUTE 'DROP INDEX IF EXISTS public.uq_users_email_nocase';
   END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'public.users'::regclass AND conname = 'uq_users_email'
   ) THEN
-    EXECUTE 'ALTER TABLE public.users ADD CONSTRAINT uq_users_email UNIQUE (email)';
+    IF has_email_dupes THEN
+      RAISE WARNING 'Skipping uq_users_email creation: duplicate non-null email values already exist in public.users.';
+    ELSE
+      EXECUTE 'ALTER TABLE public.users ADD CONSTRAINT uq_users_email UNIQUE (email)';
+    END IF;
   END IF;
 
-  IF to_regclass('public.uq_users_cpf') IS NOT NULL THEN
+  IF to_regclass('public.uq_users_cpf') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+       WHERE conrelid = 'public.users'::regclass AND conname = 'uq_users_cpf'
+     ) THEN
     EXECUTE 'DROP INDEX IF EXISTS public.uq_users_cpf';
   END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'public.users'::regclass AND conname = 'uq_users_cpf'
   ) THEN
-    EXECUTE 'ALTER TABLE public.users ADD CONSTRAINT uq_users_cpf UNIQUE (cpf)';
+    IF has_cpf_dupes THEN
+      RAISE WARNING 'Skipping uq_users_cpf creation: duplicate non-null cpf values already exist in public.users.';
+    ELSE
+      EXECUTE 'ALTER TABLE public.users ADD CONSTRAINT uq_users_cpf UNIQUE (cpf)';
+    END IF;
   END IF;
 END $$;
 
@@ -164,9 +208,16 @@ CREATE INDEX IF NOT EXISTS ix_platform_alerts_status_published_at
   ON platform_alerts (status, published_at DESC);
 CREATE INDEX IF NOT EXISTS ix_platform_alerts_expires_at
   ON platform_alerts (expires_at);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_platform_alerts_single_published
-  ON platform_alerts ((1))
-  WHERE status = 'published';
+DO $$
+BEGIN
+  IF to_regclass('public.ux_platform_alerts_single_published') IS NULL THEN
+    IF (SELECT COUNT(*) FROM public.platform_alerts WHERE status = 'published') > 1 THEN
+      RAISE WARNING 'Skipping ux_platform_alerts_single_published creation: multiple published platform_alerts rows already exist.';
+    ELSE
+      EXECUTE 'CREATE UNIQUE INDEX ux_platform_alerts_single_published ON public.platform_alerts ((1)) WHERE status = ''published''';
+    END IF;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS ix_platform_alert_recipients_user_status
   ON platform_alert_recipients (user_id, status, delivered_at DESC);
@@ -239,17 +290,35 @@ INSERT INTO roles (name, description)
 VALUES ('admin','Acesso administrativo'), ('coordenador','Papel de coordenação')
 ON CONFLICT (name) DO NOTHING;
 
-WITH upsert AS (
-  INSERT INTO users (name, email, status, source, is_superuser, must_change_password, attrs)
-  VALUES ('Dev Admin', 'dev@local', 'active', 'local', TRUE, FALSE, '{"seed": true}')
-  ON CONFLICT (email) DO UPDATE SET
-    name = EXCLUDED.name,
-    status = EXCLUDED.status,
-    source = EXCLUDED.source,
-    is_superuser = EXCLUDED.is_superuser,
-    must_change_password = EXCLUDED.must_change_password,
-    attrs = EXCLUDED.attrs
+WITH existing AS (
+  SELECT id
+  FROM users
+  WHERE email = 'dev@local'
+  ORDER BY created_at ASC NULLS LAST, id ASC
+  LIMIT 1
+),
+updated AS (
+  UPDATE users
+  SET
+    name = 'Dev Admin',
+    status = 'active',
+    source = 'local',
+    is_superuser = TRUE,
+    must_change_password = FALSE,
+    attrs = '{"seed": true}'
+  WHERE id IN (SELECT id FROM existing)
   RETURNING id
+),
+inserted AS (
+  INSERT INTO users (name, email, status, source, is_superuser, must_change_password, attrs)
+  SELECT 'Dev Admin', 'dev@local', 'active', 'local', TRUE, FALSE, '{"seed": true}'
+  WHERE NOT EXISTS (SELECT 1 FROM existing)
+  RETURNING id
+),
+upsert AS (
+  SELECT id FROM updated
+  UNION ALL
+  SELECT id FROM inserted
 )
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id FROM upsert u
