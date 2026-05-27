@@ -502,6 +502,35 @@ def _task_notification_targets(
     return user_ids, role_names
 
 
+def _task_notification_email_user_ids(
+    *,
+    event_type: str,
+    task: Dict[str, Any],
+    actor_user_id: Optional[uuid.UUID],
+) -> list[str]:
+    actor_raw = str(actor_user_id) if actor_user_id else None
+    assignee_raw = str(task["assigned_to_user_id"]) if task.get("assigned_to_user_id") else None
+
+    # Etapa 1 da refatoração:
+    # mantemos somente o e-mail de "atividade atribuída a mim".
+    # Os fluxos transacionais abaixo deixam de enviar e-mail, mas a notificação
+    # interna continua existindo via send_notification(..., send_email=False).
+    #
+    # Comportamentos antigos removidos do e-mail:
+    # - task_created -> notifyAssignedRole
+    # - task_completed -> notifyAssignedRole / notifyCreator
+    # - task_comment_added -> notifyAssignee
+    # - task_restored -> notifyAssignee
+    #
+    # Exceção preservada:
+    # - task_created com responsável diferente do ator = atribuição no ato da criação
+    # - task_assigned / task_reassigned = atribuição explícita posterior
+    if event_type in {"task_created", "task_assigned", "task_reassigned"} and assignee_raw and assignee_raw != actor_raw:
+        return [assignee_raw]
+
+    return []
+
+
 def _task_notification_message(
     *,
     event_type: str,
@@ -601,6 +630,12 @@ def _dispatch_task_notification(
         notif_level = "warning"
 
     try:
+        email_user_ids = _task_notification_email_user_ids(
+            event_type=event_type,
+            task=task,
+            actor_user_id=actor_user_id,
+        )
+
         notif_id, delivered = send_notification(
             actor=actor,
             title=notif_title,
@@ -617,6 +652,8 @@ def _dispatch_task_notification(
                 "sourceId": task.get("source_id"),
                 "assignedRoleName": task.get("assigned_role_name"),
             },
+            send_email=bool(email_user_ids),
+            email_user_ids=email_user_ids,
         )
         logger.info(
             "[TASKS] Notificação disparada | task=%s | event=%s | notif=%s | delivered=%d",

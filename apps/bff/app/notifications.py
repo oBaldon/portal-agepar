@@ -468,6 +468,8 @@ def send_notification(
     conn: Optional[psycopg.Connection] = None,
     ip: Optional[str] = None,
     ua: Optional[str] = None,
+    send_email: bool = True,
+    email_user_ids: Optional[Iterable[str]] = None,
 ) -> Tuple[str, int]:
     ttl = (title or "").strip()
     msg = (message or "").strip()
@@ -503,7 +505,26 @@ def send_notification(
                 return "", 0
             raise HTTPException(status_code=422, detail="targets produced no recipients")
 
-        email_targets, email_skips = _resolve_email_targets(conn, list(recipients))
+        email_targets: List[Dict[str, str]] = []
+        email_skips: List[Dict[str, str]] = []
+
+        if send_email:
+            if email_user_ids is None:
+                email_recipient_ids = list(recipients)
+            else:
+                email_direct_user_ids, invalid_or_missing_email_users = _validate_user_ids(conn, list(email_user_ids))
+                if invalid_or_missing_email_users:
+                    raise HTTPException(
+                        status_code=422,
+                        detail={"emailUserIds": {"invalid_or_missing": invalid_or_missing_email_users}},
+                    )
+                email_recipient_ids = [uid for uid in email_direct_user_ids if uid in recipients]
+
+            if email_recipient_ids:
+                email_targets, email_skips = _resolve_email_targets(conn, email_recipient_ids)
+        # Etapa de refatoração das tasks:
+        # quando send_email=False a notificação interna permanece registrada,
+        # mas o disparo de e-mail fica explicitamente desabilitado.
 
         actor_user_id = None
         actor_cpf = None
@@ -574,25 +595,27 @@ def send_notification(
                 "level": lv,
                 "action_url": action_url,
                 "email": {
+                    "enabled": bool(send_email),
                     "planned": len(email_targets),
                     "skipped": len(email_skips),
                     "skip_reasons": sorted({item.get("reason", "unknown") for item in email_skips}),
-                    "integration_enabled": get_expresso_mail_client().enabled,
+                    "integration_enabled": get_expresso_mail_client().enabled if send_email else False,
                 },
             },
             ip=ip,
             ua=ua,
         )
 
-        _dispatch_notification_emails_async(
-            notification_id=str(notif_id),
-            title=ttl,
-            message=msg,
-            level=lv,
-            action_url=action_url,
-            email_targets=email_targets,
-            meta=meta,
-        )
+        if send_email and email_targets:
+            _dispatch_notification_emails_async(
+                notification_id=str(notif_id),
+                title=ttl,
+                message=msg,
+                level=lv,
+                action_url=action_url,
+                email_targets=email_targets,
+                meta=meta,
+            )
 
         return str(notif_id), len(recipients)
     finally:
