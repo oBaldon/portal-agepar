@@ -391,6 +391,63 @@
     gap:12px;
   }
 
+
+  .spotlight-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+  }
+
+  .lane-list{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:12px;
+  }
+
+  .lane-item{
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px;
+    background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+    display:grid;
+    gap:10px;
+  }
+
+  .lane-head{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    align-items:flex-start;
+  }
+
+  .lane-metrics{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .lane-task-list{
+    display:grid;
+    gap:8px;
+  }
+
+  .lane-task{
+    border:1px solid #e5edf8;
+    border-radius:12px;
+    padding:10px 12px;
+    background:#fff;
+  }
+
+  .lane-task strong{
+    display:block;
+    font-size:13px;
+    margin-bottom:4px;
+  }
+
+  .lane-task .meta{
+    font-size:12px;
+  }
+
   .footer-spacer{height:4px}
 
   @media (max-width:1320px){
@@ -398,7 +455,7 @@
     .actions-col{justify-content:flex-start}
     .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
     .secondary-kpis{grid-template-columns:1fr}
-    .dashboard-grid,.master-detail,.two-col{grid-template-columns:1fr}
+    .dashboard-grid,.master-detail,.two-col,.spotlight-grid{grid-template-columns:1fr}
   }
 
   @media (max-width:860px){
@@ -429,7 +486,8 @@
         <a class="tab active" href="/api/automations/controle/tarefas/ui">Tarefas</a>
       </nav>
     </div>
-  </section>
+  </section>  
+  
 
   <section class="card panel filter-shell">
     <div class="filter-head">
@@ -563,10 +621,22 @@
     <div class="section-head">
       <div>
         <h2>Painel gerencial</h2>
-        <div class="note">Visão agrupada por responsável, status, origem, prioridade, papel atribuído e série diária.</div>
+        <div class="note">Leitura executiva para acompanhar quem está com demanda, em que fase a tarefa está e o que foi concluído no período.</div>
       </div>
     </div>
 
+    <div class="spotlight-grid">
+      <div class="card panel-body">
+        <div class="section-head">
+          <div>
+            <h3>Quem está fazendo o quê agora</h3>
+            <div class="note">Cada bloco mostra o servidor, em que fase estão as tarefas dele e quais entregas precisam de atenção imediata.</div>
+          </div>
+        </div>
+        <div class="lane-list" id="activeAssignmentsList"><div class="note">Carregando…</div></div>
+      </div>
+    </div>
+    <br/>
     <div class="dashboard-grid">
       <div class="stack">
         <div class="card panel-body">
@@ -605,26 +675,14 @@
       </div>
 
       <div class="stack">
-        <div class="two-col">
-          <div class="card panel-body">
-            <div class="section-head"><h3>Por status</h3></div>
-            <div class="list" id="byStatusList"><div class="note">Carregando…</div></div>
-          </div>
-          <div class="card panel-body">
-            <div class="section-head"><h3>Por origem</h3></div>
-            <div class="list" id="bySourceList"><div class="note">Carregando…</div></div>
-          </div>
+        <div class="card panel-body">
+          <div class="section-head"><h3>Por status</h3></div>
+          <div class="list" id="byStatusList"><div class="note">Carregando…</div></div>
         </div>
 
-        <div class="two-col">
-          <div class="card panel-body">
-            <div class="section-head"><h3>Por prioridade</h3></div>
-            <div class="list" id="byPriorityList"><div class="note">Carregando…</div></div>
-          </div>
-          <div class="card panel-body">
-            <div class="section-head"><h3>Por papel atribuído</h3></div>
-            <div class="list" id="byAssignedRoleList"><div class="note">Carregando…</div></div>
-          </div>
+        <div class="card panel-body">
+          <div class="section-head"><h3>Por prioridade</h3></div>
+          <div class="list" id="byPriorityList"><div class="note">Carregando…</div></div>
         </div>
 
         <div class="card panel-body">
@@ -650,10 +708,10 @@
           <thead>
             <tr>
               <th>Tarefa</th>
-              <th>Status</th>
-              <th>Responsável</th>
+              <th>Fase atual</th>
+              <th>Servidor</th>
               <th>Prazo</th>
-              <th>Origem</th>
+              <th>Leitura rápida</th>
             </tr>
           </thead>
           <tbody id="tasksBody"><tr><td colspan="5"><small>Carregando…</small></td></tr></tbody>
@@ -671,7 +729,7 @@
         </div>
 
         <div id="selectedTaskBox" class="detail-box">
-          <div class="detail-empty">Clique em uma tarefa no drill-down para ver os detalhes e o histórico.</div>
+          <div class="detail-empty">Clique em uma tarefa no mapa detalhado para ver o resumo executivo e o histórico completo.</div>
         </div>
       </div>
     </div>
@@ -754,6 +812,126 @@ function priorityLabel(priority){
 function sourceLabel(value){
   const txt = String(value || '').trim();
   return txt || 'Manual';
+}
+
+function statusNarrative(status){
+  const s = String(status || '').toLowerCase();
+  if(['concluida'].includes(s)) return 'Concluída';
+  if(['em_andamento'].includes(s)) return 'Em andamento';
+  if(['a_fazer'].includes(s)) return 'A fazer';
+  if(['cancelada'].includes(s)) return 'Cancelada';
+  return statusLabel(status);
+}
+
+function dueNarrative(item){
+  if(!item || !item.dueDate) return 'Sem prazo';
+  const now = new Date();
+  const d = new Date(String(item.dueDate));
+  if(isNaN(d)) return String(item.dueDate);
+  const days = Math.ceil((d - now) / (1000*60*60*24));
+  if(days < 0) return `Atrasada ${Math.abs(days)} dia(s)`;
+  if(days === 0) return 'Vence hoje';
+  return `Vence em ${days} dia(s)`;
+}
+
+function summarizeUserTasks(tasks){
+  const groups = {};
+  (tasks || []).forEach(t => {
+    const key = t.assignedToName || 'Sem responsável';
+    groups[key] = groups[key] || { count:0, overdue:0, open:0, done:0 };
+    groups[key].count += 1;
+    const s = String(t.status || '').toLowerCase();
+    if(s === 'concluida') groups[key].done += 1;
+    else groups[key].open += 1;
+    if(t.dueDate){
+      const d = new Date(String(t.dueDate));
+      if(!isNaN(d) && d < new Date()) groups[key].overdue += 1;
+    }
+  });
+  return groups;
+}
+
+function renderOperationalSnapshot(tasks, overview){
+  try{
+    const activeMount = qs('#activeAssignmentsList');
+    const groups = {};
+    (tasks || []).forEach(t => {
+      const key = t.assignedToName || 'Sem responsável';
+      if(!groups[key]){
+        groups[key] = {
+          name: key,
+          total: 0,
+          aFazer: 0,
+          andamento: 0,
+          concluidas: 0,
+          atrasadas: 0,
+          items: [],
+        };
+      }
+      const bucket = groups[key];
+      bucket.total += 1;
+      const status = String(t.status || '').toLowerCase();
+      if(status === 'em_andamento') bucket.andamento += 1;
+      else if(status === 'concluida') bucket.concluidas += 1;
+      else bucket.aFazer += 1;
+
+      if(t.dueDate){
+        const due = new Date(String(t.dueDate));
+        if(!isNaN(due) && due < new Date() && status !== 'concluida' && status !== 'cancelada'){
+          bucket.atrasadas += 1;
+        }
+      }
+
+      bucket.items.push(t);
+    });
+
+    const cards = Object.values(groups)
+      .sort((a, b) => (b.andamento + b.atrasadas) - (a.andamento + a.atrasadas) || b.total - a.total || a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, 12);
+
+    activeMount.innerHTML = cards.length ? cards.map(group => {
+      const highlights = group.items
+        .slice()
+        .sort((a, b) => {
+          const score = item => {
+            const status = String(item.status || '').toLowerCase();
+            const overdue = /Atrasada/.test(dueNarrative(item)) ? 10 : 0;
+            const andamento = status === 'em_andamento' ? 5 : 0;
+            const aFazer = status === 'a_fazer' ? 3 : 0;
+            return overdue + andamento + aFazer;
+          };
+          return score(b) - score(a);
+        })
+        .slice(0, 2);
+
+      return `
+        <div class="lane-item">
+          <div class="lane-head">
+            <div>
+              <strong>${esc(group.name)}</strong>
+              <div class="meta">${group.total} tarefa(s) no painel</div>
+            </div>
+            ${group.atrasadas ? `<span class="pill danger">${group.atrasadas} atrasada(s)</span>` : '<span class="pill ok">sem atraso</span>'}
+          </div>
+          <div class="lane-metrics">
+            <span class="pill">${group.aFazer} a fazer</span>
+            <span class="pill active">${group.andamento} em andamento</span>
+            <span class="pill ok">${group.concluidas} concluída(s)</span>
+          </div>
+          <div class="lane-task-list">
+            ${highlights.length ? highlights.map(item => `
+              <div class="lane-task">
+                <strong>${esc(item.title)}</strong>
+                <div class="meta">${esc(statusLabel(item.status))} • ${esc(dueNarrative(item))}</div>
+              </div>
+            `).join('') : '<div class="note">Sem tarefas destacadas no momento.</div>'}
+          </div>
+        </div>
+      `;
+    }).join('') : '<div class="note">Sem dados por servidor no período selecionado.</div>';
+  }catch(err){
+    console.error('renderOperationalSnapshot', err);
+  }
 }
 
 function setStatus(msg){
@@ -948,29 +1126,6 @@ function renderOverview(data){
     </div>
   `).join('') || '<div class="note">Nenhuma prioridade encontrada.</div>';
 
-  qs('#bySourceList').innerHTML = (data.bySource || []).map(item => {
-    const rawSource = item.sourceKind || item.label || 'manual';
-    return `
-      <div class="row-item clickable" data-filter-source="${esc(rawSource)}">
-        <div>
-          <div><strong>${esc(item.label || sourceLabel(rawSource))}</strong></div>
-          <div class="meta">Origem</div>
-        </div>
-        <span class="pill">${item.total ?? 0}</span>
-      </div>
-    `;
-  }).join('') || '<div class="note">Nenhuma origem encontrada.</div>';
-
-  qs('#byAssignedRoleList').innerHTML = (data.byAssignedRole || []).map(item => `
-    <div class="row-item">
-      <div>
-        <div><strong>${esc(item.label || item.roleName || 'Sem papel')}</strong></div>
-        <div class="meta">Papel atribuído</div>
-      </div>
-      <span class="pill">${item.total ?? 0}</span>
-    </div>
-  `).join('') || '<div class="note">Nenhum papel atribuído encontrado.</div>';
-
   qs('#dailySeriesBody').innerHTML = (data.dailySeries || []).map(item => `
     <tr>
       <td>${esc(item.date)}</td>
@@ -1010,7 +1165,7 @@ function renderSelectedTask(){
 
   if(!item){
     qs('#historyTaskLabel').textContent = 'Nenhuma tarefa selecionada.';
-    mount.innerHTML = '<div class="detail-empty">Clique em uma tarefa no drill-down para ver os detalhes e o histórico.</div>';
+    mount.innerHTML = '<div class="detail-empty">Clique em uma tarefa no mapa detalhado para ver o resumo executivo e o histórico completo.</div>';
     return;
   }
 
@@ -1069,18 +1224,33 @@ function renderTasks(data){
   qs('#tasksCount').textContent = `${items.length} item(ns)`;
 
   qs('#tasksBody').innerHTML = items.map(item => `
-    <tr
-      class="clickable ${appState.selectedTaskId === item.id ? 'selected-row' : ''}"
-      data-task-id="${esc(item.id)}"
-    >
+    <tr data-task-id="${esc(item.id)}">
       <td>
-        <span class="title-link">${esc(item.title)}</span>
-        <div class="meta">${esc(priorityLabel(item.priority))} • ${esc(item.createdByName || '-')}</div>
+        <div class="task-row-main">
+          <strong class="title-link">${esc(item.title)}</strong>
+          <div class="task-row-sub">${esc(priorityLabel(item.priority))} • aberta por ${esc(item.createdByName || '-')}</div>
+        </div>
       </td>
-      <td><span class="pill ${labelClass(item.status)}">${esc(statusLabel(item.status))}</span></td>
-      <td>${esc(item.assignedToName || 'Sem responsável')}</td>
-      <td>${esc(item.dueDate ? fmtDate(item.dueDate) : 'Sem prazo')}</td>
-      <td>${esc(sourceLabel(item.sourceKind))}</td>
+      <td>
+        <div class="phase-cell">
+          <span class="pill ${labelClass(item.status)}">${esc(statusNarrative(item.status))}</span>
+          <div class="phase-note">${esc(statusLabel(item.status))}</div>
+        </div>
+      </td>
+      <td>
+        <strong>${esc(item.assignedToName || 'Sem responsável')}</strong>
+        <div class="meta">${esc((item.assignedRoleName || '').trim() || 'Sem cargo vinculado')}</div>
+      </td>
+      <td>
+        <strong>${esc(item.dueDate ? fmtDate(item.dueDate) : 'Sem prazo')}</strong>
+        <div class="meta">${esc(dueNarrative(item))}</div>
+      </td>
+      <td>
+        <div class="phase-cell">
+          <strong>${esc(sourceLabel(item.sourceKind))}</strong>
+          <div class="phase-note">${esc(item.updatedAt ? `Última atualização: ${fmtTs(item.updatedAt)}` : 'Sem atualização recente')}</div>
+        </div>
+      </td>
     </tr>
   `).join('') || '<tr><td colspan="5"><small>Nenhuma tarefa encontrada.</small></td></tr>';
 
@@ -1225,6 +1395,7 @@ async function refreshAll(){
 
     renderOverview(overview);
     renderActivity(activity);
+    renderOperationalSnapshot(tasks.items || [], overview);
     renderTasks(tasks);
 
     if(appState.selectedTaskId){

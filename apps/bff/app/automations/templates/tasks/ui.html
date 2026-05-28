@@ -85,6 +85,32 @@
   .status-em_revisao{background:#fff7ed;border-color:#fdba74;color:#c2410c}
   .status-concluida{background:#f0fdf4;border-color:#86efac;color:#166534}
   .status-cancelada{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+
+  tbody tr.is-complete td{background:#f1f5f9;color:#475569}
+  tbody tr.is-complete:hover td{background:#e2e8f0}
+  tbody tr.is-complete .task-title,
+  tbody tr.is-complete strong{color:#334155}
+  .task.is-complete,
+  .week-row-bar.is-complete,
+  .calendar-item.is-complete{
+    background:#f1f5f9;
+    border-color:#cbd5e1;
+    color:#475569;
+    box-shadow:none;
+  }
+  .task.is-complete h4,
+  .week-row-bar.is-complete .line1,
+  .calendar-item.is-complete .title{color:#334155}
+  .task.is-complete p,
+  .week-row-bar.is-complete .line2,
+  .calendar-item.is-complete .sub{color:#64748b}
+  .task.is-complete .badge.status-concluida,
+  .week-row-bar.is-complete .badge.status-concluida,
+  .calendar-item.is-complete .badge.status-concluida{
+    background:#e2e8f0;
+    border-color:#cbd5e1;
+    color:#475569;
+  }
   .overdue{color:var(--danger);font-weight:700}
   .assignee-picker{position:relative;display:grid;gap:8px}
   .assignee-input{
@@ -685,6 +711,7 @@ function priorityClass(p){ return 'pri-' + String(p || 'media'); }
 function statusClass(s){ return 'status-' + String(s || 'a_fazer'); }
 function statusLabel(v){ return STATUS_LABELS[v] || v; }
 function priorityLabel(v){ return PRIORITY_LABELS[v] || v; }
+function isCompleted(item){ return String(item?.status || '') === 'concluida'; }
 function assigneeLabel(user){
   return user?.email ? `${user.name} — ${user.email}` : String(user?.name || '');
 }
@@ -969,7 +996,7 @@ function renderList(){
     return;
   }
   body.innerHTML = state.items.map(item => `
-    <tr>
+    <tr class="${isCompleted(item) ? 'is-complete' : ''}">
       <td>
         <strong>${esc(item.title)}</strong><br>
         <span class="muted">${esc(shortText(item.description, 140))}</span>
@@ -1002,7 +1029,7 @@ function renderKanban(){
           <span class="badge">${items.length}</span>
         </div>
         ${items.length ? items.map(item => `
-          <div class="task">
+          <div class="task ${isCompleted(item) ? 'is-complete' : ''}">
             <h4>${esc(item.title)}</h4>
             <p>${esc(shortText(item.description, 180))}</p>
             <div class="meta">
@@ -1190,7 +1217,7 @@ function renderWeekRow(item, model, weekStartKey, weekEndKey){
       <div class="week-row-track">
         ${Array.from({ length: 7 }, () => '<div class="week-slot"></div>').join('')}
         <div
-          class="week-row-bar ${statusClass(item.status)} ${item.isOverdue ? 'is-overdue' : ''}"
+          class="week-row-bar ${statusClass(item.status)} ${isCompleted(item) ? 'is-complete' : ''} ${item.isOverdue ? 'is-overdue' : ''}"
           style="grid-column:${placement.colStart} / ${placement.colEnd}"
           data-act="open"
           data-id="${esc(item.id)}"
@@ -1234,7 +1261,7 @@ function monthEntryForItem(item, model, monthStartKey, monthEndKey, gridStartKey
 function renderMonthEntry(item, entry){
   const subtitle = [entry.summary, item.assignedToName].filter(Boolean).join(' · ');
   return `
-    <div class="calendar-item kind-${esc(entry.kind)}" data-act="open" data-id="${esc(item.id)}">
+    <div class="calendar-item kind-${esc(entry.kind)} ${isCompleted(item) ? 'is-complete' : ''}" data-act="open" data-id="${esc(item.id)}">
       <div class="top">
         <span class="badge ${statusClass(item.status)}">${esc(statusLabel(item.status))}</span>
       </div>
