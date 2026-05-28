@@ -11,7 +11,8 @@ Fornece uma UI simples e endpoints para consulta e exportação de:
 Segurança
 ---------
 - Todos os endpoints são protegidos por RBAC e exigem **qualquer um** dos seguintes:
-  `coordenador`, `admin` **ou** usuário com `is_superuser == true`.
+  `coordenador`, `admin`, cargos diretivos elegíveis (`daf`, `dfq`, `dre`, `dnr`, `dp`)
+  **ou** usuário com `is_superuser == true`.
 
 Compatibilidade
 ---------------
@@ -56,18 +57,25 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.auth.rbac import require_roles_any  # segue utilizado em alguns pontos
+from app.auth.rbac import require_password_changed, require_roles_any  # segue utilizado em alguns pontos
+from app.automations import tasks as tasks_automation
 from app import db as db
 
 logger = logging.getLogger(__name__)
 
+_CONTROL_ALLOWED_ROLES = {
+    "admin",
+    "coordenador",
+    *{str(role).strip().lower() for role in tasks_automation._load_role_options()},
+}
+
 def require_admin_coord_or_superuser(request: Request) -> Dict[str, Any]:
     """
-    Autoriza se o usuário for superuser OU tiver 'admin' OU 'coordenador'.
+    Autoriza se o usuário for superuser ou tiver papel elegível no Painel de Controle.
     """
-    user = (getattr(request, "session", {}) or {}).get("user") or {}
-    roles = set((user.get("roles") or []))
-    if user.get("is_superuser") is True or "admin" in roles or "coordenador" in roles:
+    user = require_password_changed(request)
+    roles = {str(role).strip().lower() for role in (user.get("roles") or []) if str(role).strip()}
+    if user.get("is_superuser") is True or not roles.isdisjoint(_CONTROL_ALLOWED_ROLES):
         return user
     raise HTTPException(status_code=403, detail="forbidden")
 
@@ -204,8 +212,8 @@ def get_schema():
             "offset": {"type": "integer", "minimum": 0, "default": 0},
         },
         "notes": (
-            "Painel de controle é somente leitura. "
-            "Downloads devem ser feitos na automação de origem; a ação 'ver' usa o próprio Controle."
+            "Painel de controle em modo somente leitura para auditoria e consulta. "
+            "Os módulos especializados podem oferecer exportações próprias, como o compilado semanal de tarefas."
         ),
     }
 

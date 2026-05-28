@@ -14,7 +14,7 @@ Normaliza submissões do tipo "ferias" em eventos padronizados e expõe:
 Segurança
 ---------
 Todos os endpoints são protegidos por RBAC e exigem pelo menos um dos papéis:
-`"coordenador"`, `"admin"` ou `"rh"`.
+`"coordenador"`, `"admin"`, `"rh"` ou um dos cargos diretivos (`"daf"`, `"dfq"`, `"dre"`, `"dnr"`, `"dp"`).
 
 Detalhes de implementação
 -------------------------
@@ -44,10 +44,12 @@ from app import db as db
 
 logger = logging.getLogger(__name__)
 
+_CONTROL_FERIAS_ALLOWED_ROLES = ("coordenador", "admin", "rh", "daf", "dfq", "dre", "dnr", "dp")
+
 router = APIRouter(
     prefix="/api/automations/controle/ferias",
     tags=["automations", "controle", "ferias"],
-    dependencies=[Depends(require_roles_any("coordenador", "admin", "rh"))],
+    dependencies=[Depends(require_roles_any(*_CONTROL_FERIAS_ALLOWED_ROLES))],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))

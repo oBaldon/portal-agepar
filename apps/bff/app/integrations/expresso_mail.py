@@ -11,6 +11,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+AttachmentPayload = Mapping[str, Any]
+
 
 def _is_truthy(value: str | None) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
@@ -124,17 +126,37 @@ class ExpressoMailClient:
 
         return dict(payload_json)
 
-    def _post_form_rpc(self, route: str, params: Mapping[str, Any]) -> dict[str, Any]:
+    def _post_form_rpc(
+        self,
+        route: str,
+        params: Mapping[str, Any],
+        *,
+        attachments: Optional[Sequence[AttachmentPayload]] = None,
+    ) -> dict[str, Any]:
         url = f"{self.base_url}/{route.lstrip('/')}"
         payload = {
             "id": str(self._next_rpc_id()),
             "params": json.dumps(dict(params), ensure_ascii=False),
         }
+
+        files = []
+        for attachment in attachments or ():
+            filename = str(attachment.get("filename") or "").strip()
+            if not filename:
+                raise ExpressoMailError("attachment filename is required")
+            content = attachment.get("content")
+            if content is None:
+                raise ExpressoMailError(f"attachment content is required ({filename})")
+            if isinstance(content, str):
+                content = content.encode("utf-8")
+            content_type = str(attachment.get("content_type") or "application/octet-stream").strip()
+            files.append(("attachments[]", (filename, content, content_type)))
         try:
             with httpx.Client(timeout=self.timeout_seconds, follow_redirects=True) as client:
                 response = client.post(
                     url,
                     data=payload,
+                    files=files or None,
                     headers={"Accept": "application/json"},
                 )
                 response.raise_for_status()
@@ -193,6 +215,7 @@ class ExpressoMailClient:
         subject: str,
         body: str,
         msg_type: str = "plain",
+        attachments: Optional[Sequence[AttachmentPayload]] = None,
     ) -> dict[str, Any]:
         recipients = [to] if isinstance(to, str) else [item for item in to if str(item or "").strip()]
         recipients = [str(item).strip() for item in recipients if str(item or "").strip()]
@@ -212,6 +235,7 @@ class ExpressoMailClient:
                     "msgBody": body,
                     "msgType": msg_type,
                 },
+                attachments=attachments,
             )
             if payload.get("result") is not True:
                 raise ExpressoMailError(f"Expresso Mail/Send sem sucesso explicito: {payload}")

@@ -6,17 +6,19 @@ Painel de Controle — Tarefas (visão consolidada refinada).
 
 Propósito
 ---------
-Fornece uma UI e endpoints read-only para a visão consolidada do módulo de
-tarefas dentro do Painel de Controle/Auditoria, reutilizando e ampliando a
-camada gerencial da automação `tasks`.
+Fornece uma UI e endpoints para a visão consolidada do módulo de tarefas dentro
+do Painel de Controle/Auditoria, reutilizando e ampliando a camada gerencial da
+automação `tasks`.
 
-Escopo desta etapa
-------------------
+Escopo atual
+------------
 - UI HTML com visão gerencial refinada.
 - API JSON para overview com filtros gerenciais.
 - API JSON para atividade recente com filtros.
 - API JSON para listagem drill-down de tarefas.
 - API JSON para histórico de tarefa.
+- Exportação semanal do compilado por cargo a notificar.
+- Disparo manual controlado do e-mail semanal (admin/superuser).
 """
 
 import logging
@@ -26,19 +28,37 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from app.auth.rbac import require_password_changed
 from app.automations import tasks as tasks_automation
+from app.automations.task_weekly_report import build_weekly_export_context, generate_weekly_task_report
+from app.automations.task_weekly_email import send_weekly_task_emails
 from app.db import _pg
 
 logger = logging.getLogger(__name__)
 
 
-def require_admin_coord_or_superuser(request: Request) -> Dict[str, Any]:
-    user = (getattr(request, "session", {}) or {}).get("user") or {}
+_CONTROL_TASKS_ALLOWED_ROLES = {
+    "admin",
+    "coordenador",
+    *{str(role).strip().lower() for role in tasks_automation._load_role_options()},
+}
+
+
+def require_control_tasks_access(request: Request) -> Dict[str, Any]:
+    user = require_password_changed(request)
     roles = {str(r).strip().lower() for r in (user.get("roles") or []) if str(r).strip()}
-    if user.get("is_superuser") is True or "admin" in roles or "coordenador" in roles:
+    if user.get("is_superuser") is True or not roles.isdisjoint(_CONTROL_TASKS_ALLOWED_ROLES):
+        return user
+    raise HTTPException(status_code=403, detail="forbidden")
+
+
+def require_control_tasks_email_admin(request: Request) -> Dict[str, Any]:
+    user = require_control_tasks_access(request)
+    roles = {str(r).strip().lower() for r in (user.get("roles") or []) if str(r).strip()}
+    if user.get("is_superuser") is True or "admin" in roles:
         return user
     raise HTTPException(status_code=403, detail="forbidden")
 
@@ -46,7 +66,7 @@ def require_admin_coord_or_superuser(request: Request) -> Dict[str, Any]:
 router = APIRouter(
     prefix="/api/automations/controle/tarefas",
     tags=["automations", "controle", "tarefas"],
-    dependencies=[Depends(require_admin_coord_or_superuser)],
+    dependencies=[Depends(require_control_tasks_access)],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -61,41 +81,93 @@ def _parse_optional_uuid(value: Optional[str], field: str) -> Optional[UUID]:
         raise HTTPException(status_code=422, detail={field: "invalid uuid"})
 
 
+def _parse_required_uuid(value: str, field: str) -> UUID:
+    parsed = _parse_optional_uuid(value, field)
+    if parsed is None:
+        raise HTTPException(status_code=422, detail={field: "required"})
+    return parsed
+
+
+def _control_scope_context(user: Dict[str, Any]) -> Dict[str, Any]:
+    return build_weekly_export_context(user)
+
+
+def _control_scope_role_names(user: Dict[str, Any]) -> list[str]:
+    context = _control_scope_context(user)
+    return [str(role).strip().lower() for role in (context.get("roleNames") or []) if str(role).strip()]
+
+
+def _has_full_control_scope(user: Dict[str, Any]) -> bool:
+    return _control_scope_context(user).get("scope") == "full"
+
+
+def _control_scope_where(user: Dict[str, Any], *, table_alias: str = "t") -> tuple[list[str], list[Any]]:
+    if _has_full_control_scope(user):
+        return ["TRUE"], []
+
+    role_names = _control_scope_role_names(user)
+    if not role_names:
+        return ["FALSE"], []
+
+    placeholders = ", ".join(["%s"] * len(role_names))
+    return [f"COALESCE({table_alias}.assigned_role_name, '') IN ({placeholders})"], [*role_names]
+
+
+def _task_is_in_control_scope(task: Dict[str, Any], user: Dict[str, Any]) -> bool:
+    if _has_full_control_scope(user):
+        return True
+
+    task_role = str(task.get("assigned_role_name") or "").strip().lower()
+    if not task_role:
+        return False
+
+    return task_role in set(_control_scope_role_names(user))
+
+
+def _ensure_control_scope_visible(task: Dict[str, Any], user: Dict[str, Any]) -> None:
+    if _task_is_in_control_scope(task, user):
+        return
+    raise HTTPException(status_code=403, detail="forbidden")
+
+
 def _build_task_filters(
     *,
+    user: Dict[str, Any],
     q: Optional[str] = None,
     status: Optional[str] = None,
     assigned_to_user_id: Optional[str] = None,
     source_kind: Optional[str] = None,
     overdue_only: bool = False,
     include_deleted: bool = False,
+    table_alias: str = "t",
 ) -> tuple[list[str], list[Any]]:
-    clauses: list[str] = ["TRUE"]
-    params: list[Any] = []
+    clauses, params = _control_scope_where(user, table_alias=table_alias)
 
     if not include_deleted:
-        clauses.append("t.deleted_at IS NULL")
+        clauses.append(f"{table_alias}.deleted_at IS NULL")
 
     if q and str(q).strip():
         like = f"%{str(q).strip()}%"
-        clauses.append("(t.title ILIKE %s OR COALESCE(t.description, '') ILIKE %s)")
+        clauses.append(f"({table_alias}.title ILIKE %s OR COALESCE({table_alias}.description, '') ILIKE %s)")
         params.extend([like, like])
 
     if status and str(status).strip():
-        clauses.append("t.status = %s")
+        clauses.append(f"{table_alias}.status = %s")
         params.append(tasks_automation._normalize_status(status))
 
     parsed_assignee = _parse_optional_uuid(assigned_to_user_id, "assignedToUserId")
     if parsed_assignee:
-        clauses.append("t.assigned_to_user_id = %s")
+        clauses.append(f"{table_alias}.assigned_to_user_id = %s")
         params.append(parsed_assignee)
 
     if source_kind and str(source_kind).strip():
-        clauses.append("COALESCE(t.source_kind, '') = %s")
+        clauses.append(f"COALESCE({table_alias}.source_kind, '') = %s")
         params.append(str(source_kind).strip())
 
     if overdue_only:
-        clauses.append("t.completed_at IS NULL AND t.status <> 'cancelada' AND t.due_date < CURRENT_DATE")
+        clauses.append(
+            f"{table_alias}.completed_at IS NULL AND {table_alias}.status <> 'cancelada' AND {table_alias}.due_date < CURRENT_DATE"
+        )
 
     return clauses, params
 
@@ -109,25 +181,41 @@ def get_ui(request: Request):
 def get_schema() -> Dict[str, Any]:
     return {
         "kind": "controle-tarefas",
-        "phase": "2B-refined",
-        "views": ["overview", "activity", "drilldown", "history"],
+        "phase": "3-weekly-export-and-email",
+        "views": ["overview", "activity", "drilldown", "history", "weekly-export", "weekly-email"],
         "sourceAutomation": "tasks",
         "notes": (
-            "Visão consolidada refinada do módulo de tarefas dentro do Painel de Controle. "
-            "Somente leitura nesta etapa."
+            "Visão consolidada refinada do módulo de tarefas dentro do Painel de Controle, "
+            "com exportação semanal por cargo a notificar e disparo manual controlado do e-mail semanal."
         ),
+        "weeklyEmail": {
+            "manualTriggerRequires": ["admin", "superuser"],
+            "manualTriggerBehavior": (
+                "Um envio manual real (dryRun=false) marca o cargo/período como já enviado. "
+                "O scheduler automático poderá ignorar esse mesmo cargo na mesma semana, salvo uso de force=true."
+            ),
+        },
     }
 
 
 @router.get("/config")
-def get_config(user: Dict[str, Any] = Depends(require_admin_coord_or_superuser)) -> Dict[str, Any]:
+def get_config(user: Dict[str, Any] = Depends(require_control_tasks_access)) -> Dict[str, Any]:
     base = tasks_automation.get_config(user=user)
     return {
+        "me": base.get("me", {}),
         "users": base.get("users", []),
         "statusValues": base.get("statusValues", []),
         "priorityValues": base.get("priorityValues", []),
         "eventCatalog": base.get("eventCatalog", {}),
         "defaultPeriodDays": 30,
+        "weeklyExport": build_weekly_export_context(user),
+        "weeklyEmail": {
+            "manualTriggerRequires": ["admin", "superuser"],
+            "manualTriggerBehavior": (
+                "Envio manual real (dryRun=false) marca o cargo/período como já enviado. "
+                "O scheduler automático poderá ignorar esse mesmo cargo na mesma semana, salvo uso de force=true."
+            ),
+        },
     }
 
 
@@ -141,9 +229,10 @@ def get_overview(
     source_kind: Optional[str] = Query(default=None, alias="sourceKind"),
     overdue_only: bool = Query(default=False, alias="overdueOnly"),
     include_deleted: bool = Query(default=False, alias="includeDeleted"),
-    user: Dict[str, Any] = Depends(require_admin_coord_or_superuser),
+    user: Dict[str, Any] = Depends(require_control_tasks_access),
 ):
     clauses, params = _build_task_filters(
+        user=user,
         q=q,
         status=status,
         assigned_to_user_id=assigned_to_user_id,
@@ -384,13 +473,15 @@ def get_activity(
     status: Optional[str] = None,
     assigned_to_user_id: Optional[str] = Query(default=None, alias="assignedToUserId"),
     event_type: Optional[str] = Query(default=None, alias="eventType"),
-    user: Dict[str, Any] = Depends(require_admin_coord_or_superuser),
+    user: Dict[str, Any] = Depends(require_control_tasks_access),
 ):
     clauses, params = _build_task_filters(
+        user=user,
         q=q,
         status=status,
         assigned_to_user_id=assigned_to_user_id,
         include_deleted=True,
+        table_alias="t",
     )
     clauses.append("e.created_at >= now() - (%s || ' days')::interval")
     params.append(period_days)
@@ -470,26 +561,186 @@ def get_tasks(
     date_from: Optional[date] = Query(default=None, alias="dateFrom"),
     date_to: Optional[date] = Query(default=None, alias="dateTo"),
     include_deleted: bool = Query(default=False, alias="includeDeleted"),
-    user: Dict[str, Any] = Depends(require_admin_coord_or_superuser),
+    user: Dict[str, Any] = Depends(require_control_tasks_access),
 ):
-    return tasks_automation.list_tasks(
+    clauses, params = _build_task_filters(
+        user=user,
         q=q,
         status=status,
-        priority=priority,
-        mine=mine,
-        created_by_me=created_by_me,
-        assigned_to_me=assigned_to_me,
         assigned_to_user_id=assigned_to_user_id,
         source_kind=source_kind,
-        source_id=source_id,
         overdue_only=overdue_only,
-        date_from=date_from,
-        date_to=date_to,
         include_deleted=include_deleted,
-        user=user,
+        table_alias="t",
+    )
+
+    if priority and str(priority).strip():
+        clauses.append("t.priority = %s")
+        params.append(tasks_automation._normalize_priority(priority))
+
+    if source_id and str(source_id).strip():
+        clauses.append("COALESCE(t.source_id, '') = %s")
+        params.append(str(source_id).strip())
+
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status_code=422, detail={"dateRange": "dateFrom must be less than or equal to dateTo"})
+
+    effective_start_expr = "COALESCE(t.start_date, t.due_date, DATE(t.created_at))"
+    effective_end_expr = "COALESCE(t.due_date, t.start_date, DATE(t.created_at))"
+    if date_from:
+        clauses.append(f"{effective_end_expr} >= %s")
+        params.append(date_from)
+    if date_to:
+        clauses.append(f"{effective_start_expr} <= %s")
+        params.append(date_to)
+
+    uid = tasks_automation._user_id_from_session(user)
+    if mine:
+        clauses.append("(t.created_by_user_id = %s OR t.assigned_to_user_id = %s)")
+        params.extend([uid, uid])
+    if created_by_me:
+        clauses.append("t.created_by_user_id = %s")
+        params.append(uid)
+    if assigned_to_me:
+        clauses.append("t.assigned_to_user_id = %s")
+        params.append(uid)
+
+    where_sql = " AND ".join(clauses) if clauses else "TRUE"
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT
+              t.*,
+              cu.name AS created_by_name,
+              au.name AS assigned_to_name,
+              lu.name AS last_updated_by_name,
+              du.name AS deleted_by_name,
+              COALESCE(cc.comment_count, 0) AS comment_count
+            FROM tasks t
+            LEFT JOIN users cu ON cu.id = t.created_by_user_id
+            LEFT JOIN users au ON au.id = t.assigned_to_user_id
+            LEFT JOIN users lu ON lu.id = t.last_updated_by_user_id
+            LEFT JOIN users du ON du.id = t.deleted_by_user_id
+            LEFT JOIN (
+              SELECT task_id, COUNT(*)::int AS comment_count
+              FROM task_comments
+              GROUP BY task_id
+            ) cc ON cc.task_id = t.id
+            WHERE {where_sql}
+            ORDER BY
+              CASE t.status
+                WHEN 'em_andamento' THEN 1
+                WHEN 'a_fazer' THEN 2
+                WHEN 'backlog' THEN 3
+                WHEN 'concluida' THEN 4
+                WHEN 'cancelada' THEN 5
+                ELSE 99
+              END ASC,
+              t.due_date ASC NULLS LAST,
+              t.updated_at DESC
+            """,
+            params,
+        )
+        rows = cur.fetchall() or []
+
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = tasks_automation._task_to_out(row, user)
+        item["commentCount"] = int(row.get("comment_count") or 0)
+        items.append(item)
+
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/export-weekly")
+def export_weekly_report(user: Dict[str, Any] = Depends(require_control_tasks_access)) -> Response:
+    content, filename, _context = generate_weekly_task_report(user)
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
+
+
+@router.post("/weekly-email/send")
+def trigger_weekly_email_send(
+    role_name: Optional[str] = Query(default=None, alias="roleName"),
+    dry_run: bool = Query(default=False, alias="dryRun"),
+    force: bool = Query(default=False),
+    user: Dict[str, Any] = Depends(require_control_tasks_email_admin),
+) -> Dict[str, Any]:
+    return send_weekly_task_emails(
+        actor=user,
+        role_name=role_name,
+        dry_run=dry_run,
+        force=force,
     )
 
 
 @router.get("/tasks/{task_id}/history")
-def get_task_history(task_id: str, user: Dict[str, Any] = Depends(require_admin_coord_or_superuser)):
-    return tasks_automation.get_task_history(task_id=task_id, user=user)
+def get_task_history(task_id: str, user: Dict[str, Any] = Depends(require_control_tasks_access)):
+    task_uuid = _parse_required_uuid(task_id, "task id")
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              t.*,
+              cu.name AS created_by_name,
+              au.name AS assigned_to_name,
+              lu.name AS last_updated_by_name,
+              du.name AS deleted_by_name
+            FROM tasks t
+            LEFT JOIN users cu ON cu.id = t.created_by_user_id
+            LEFT JOIN users au ON au.id = t.assigned_to_user_id
+            LEFT JOIN users lu ON lu.id = t.last_updated_by_user_id
+            LEFT JOIN users du ON du.id = t.deleted_by_user_id
+            WHERE t.id = %s
+            """,
+            (task_uuid,),
+        )
+        task = cur.fetchone()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task not found")
+
+        _ensure_control_scope_visible(task, user)
+
+        cur.execute(
+            """
+            SELECT e.id, e.event_type, e.old_value, e.new_value, e.metadata, e.created_at, e.actor_user_id, u.name AS actor_name
+            FROM task_events e
+            LEFT JOIN users u ON u.id = e.actor_user_id
+            WHERE e.task_id = %s
+            ORDER BY e.created_at DESC, e.id DESC
+            """,
+            (task_uuid,),
+        )
+        rows = cur.fetchall() or []
+
+    return {
+        "items": [
+            {
+                "id": int(r["id"]),
+                "eventType": r["event_type"],
+                "eventLabel": tasks_automation._event_descriptor(r["event_type"]).get("label"),
+                "eventCategory": tasks_automation._event_descriptor(r["event_type"]).get("category"),
+                "eventSeverity": tasks_automation._event_descriptor(r["event_type"]).get("severity"),
+                "summary": tasks_automation._event_summary(
+                    r["event_type"],
+                    r.get("old_value"),
+                    r.get("new_value"),
+                    r.get("metadata"),
+                ),
+                "oldValue": r.get("old_value"),
+                "newValue": r.get("new_value"),
+                "metadata": r.get("metadata"),
+                "createdAt": tasks_automation._iso_dt(r["created_at"]),
+                "actorUserId": str(r["actor_user_id"]) if r.get("actor_user_id") else None,
+                "actorName": r.get("actor_name"),
+            }
+            for r in rows
+        ]
+    }

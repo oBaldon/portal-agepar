@@ -36,6 +36,8 @@ services:
       EXPRESSO_MAIL_TIMEOUT_SECONDS: "10"
       EXPRESSO_MAIL_AUTH_CACHE_SECONDS: "600"
       PORTAL_PUBLIC_BASE_URL: "http://10.59.1.81:5173/"
+      TASK_WEEKLY_EMAIL_SCHEDULER_ENABLED: "true"
+      TASK_WEEKLY_EMAIL_SCHEDULER_POLL_SECONDS: "60"
     volumes:
       - ../apps/bff:/app
       - ../catalog:/catalog:ro

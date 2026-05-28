@@ -465,6 +465,7 @@
         <select id="statusFilter"><option value="">Todos</option></select>
       </div>
       <div class="actions-col">
+        <button id="btnWeeklyExport" class="btn secondary" type="button">Baixar compilado semanal</button>
         <button id="btnReset" class="btn secondary" type="button">Limpar</button>
         <button id="btnReload" class="btn" type="button">Atualizar</button>
       </div>
@@ -510,6 +511,7 @@
       <div>
         <div class="chips" id="activeChips"></div>
         <div class="status" id="status" style="margin-top:8px">Pronto.</div>
+        <div class="note" id="weeklyExportNote" style="margin-top:8px"></div>
       </div>
     </div>
   </section>
@@ -757,6 +759,56 @@ function sourceLabel(value){
 function setStatus(msg){
   qs('#status').textContent = msg || '';
 }
+function weeklyExportConfig(){
+  return appState.config?.weeklyExport || null;
+}
+
+function weeklyExportLabel(){
+  const cfg = weeklyExportConfig();
+  if(!cfg?.enabled) return 'Compilado semanal indisponível';
+  if(cfg.scope === 'full') return 'Baixar compilado semanal geral';
+  const labels = Array.isArray(cfg.sheetLabels) ? cfg.sheetLabels.filter(Boolean) : [];
+  if(labels.length === 1) return `Baixar compilado semanal (${labels[0]})`;
+  if(labels.length > 1) return 'Baixar compilado semanal (múltiplas abas)';
+  return 'Baixar compilado semanal';
+}
+
+function renderWeeklyExportState(){
+  const btn = qs('#btnWeeklyExport');
+  const note = qs('#weeklyExportNote');
+  const cfg = weeklyExportConfig();
+
+  btn.textContent = weeklyExportLabel();
+  btn.disabled = !(cfg && cfg.enabled);
+
+  if(!cfg){
+    note.textContent = 'Compilado semanal indisponível no momento.';
+    return;
+  }
+
+  const pieces = [
+    `Recorte atual: ${cfg.weekStart ? fmtDate(cfg.weekStart) : '—'} a ${cfg.weekEnd ? fmtDate(cfg.weekEnd) : '—'} (${cfg.timezone || 'America/Sao_Paulo'}).`,
+  ];
+
+  if(cfg.enabled){
+    pieces.push(`Escopo do download: ${cfg.scopeLabel || '—'}.`);
+    if(Array.isArray(cfg.sheetLabels) && cfg.sheetLabels.length){
+      pieces.push(`Abas: ${cfg.sheetLabels.join(', ')}.`);
+    }
+  }else{
+    pieces.push('Seu usuário não possui escopo elegível para exportação semanal.');
+  }
+
+  note.textContent = pieces.join(' ');
+}
+
+function extractFilenameFromDisposition(disposition){
+  if(!disposition) return '';
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if(utf8Match && utf8Match[1]) return decodeURIComponent(utf8Match[1]);
+  const plainMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return plainMatch && plainMatch[1] ? plainMatch[1] : '';
+}
 
 function currentFilters(){
   return {
@@ -808,6 +860,8 @@ async function loadConfig(){
   qs('#eventType').innerHTML =
     '<option value="">Todos</option>' +
     Object.entries(catalog).map(([k,v]) => `<option value="${esc(k)}">${esc(v.label || k)}</option>`).join('');
+
+  renderWeeklyExportState();
 }
 
 function renderActiveChips(filters){
@@ -1114,6 +1168,49 @@ async function loadHistory(){
   }
 }
 
+async function downloadWeeklyReport(){
+  const btn = qs('#btnWeeklyExport');
+  const baseLabel = weeklyExportLabel();
+  if(btn.disabled) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Gerando compilado…';
+  setStatus('Gerando compilado semanal…');
+
+  try{
+    const res = await fetch('/api/automations/controle/tarefas/export-weekly', { credentials:'include' });
+    if(!res.ok){
+      let detail = `${res.status} export-weekly`;
+      try{
+        const data = await res.json();
+        if(data?.detail){
+          detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        }
+      }catch(_err){}
+      throw new Error(detail);
+    }
+
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const filename = extractFilenameFromDisposition(disposition) || 'controle_tarefas_compilado_semanal.xlsx';
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setStatus('Compilado semanal gerado com sucesso.');
+  }catch(err){
+    console.error(err);
+    setStatus('Falha ao gerar compilado semanal.');
+  }finally{
+    btn.disabled = !(weeklyExportConfig()?.enabled);
+    btn.textContent = baseLabel;
+  }
+}
+
 async function refreshAll(){
   const filters = currentFilters();
   renderActiveChips(filters);
@@ -1173,6 +1270,7 @@ function resetFilters(){
 
 qs('#btnReload').addEventListener('click', refreshAll);
 qs('#btnReset').addEventListener('click', resetFilters);
+qs('#btnWeeklyExport').addEventListener('click', downloadWeeklyReport);
 
 ['#periodDays','#assignedToUserId','#statusFilter','#limit','#activityLimit','#eventType'].forEach(sel => {
   qs(sel).addEventListener('change', refreshAll);

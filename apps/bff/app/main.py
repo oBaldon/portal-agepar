@@ -49,6 +49,7 @@ from app.automations.support import router as support_router
 from app.automations.usuarios import router as usuarios_router
 from app.automations.avisos import router as avisos_router, AVISOS_VERSION as AVISOS_VER
 from app.notifications import router as notifications_router
+from app.automations.task_weekly_email import start_weekly_task_email_scheduler
 from app.games.snake import router as snake_router
 from app.auth.routes import router as auth_router
 from app.auth.middleware import DbSessionMiddleware
@@ -141,6 +142,7 @@ def _startup() -> None:
     logger.info("ETP engine version: %s", ETP_VER)
     logger.info("TASKS engine version: %s", TASKS_VER)
     logger.info("AVISOS engine version: %s", AVISOS_VER)
+    start_weekly_task_email_scheduler()
 
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
     """

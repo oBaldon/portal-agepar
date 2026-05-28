@@ -44,7 +44,12 @@
       "icon": "Shield",
       "requiredRoles": [
         "admin",
-        "coordenador"
+        "coordenador",
+        "daf",
+        "dfq",
+        "dre",
+        "dnr",
+        "dp"
       ]
     }
   ],
@@ -207,7 +212,12 @@
       ],
       "requiredRoles": [
         "coordenador",
-        "admin"
+        "admin",
+        "daf",
+        "dfq",
+        "dre",
+        "dnr",
+        "dp"
       ],
       "order": 1
     },

@@ -188,7 +188,15 @@ def _resolve_email_targets(
     ready: List[Dict[str, str]] = []
     skipped: List[Dict[str, str]] = []
 
-    for user_id, name, email, email_institucional in rows:
+    for row in rows:
+        if isinstance(row, dict):
+            user_id = row.get("id")
+            name = row.get("name")
+            email = row.get("email")
+            email_institucional = row.get("email_institucional")
+        else:
+            user_id, name, email, email_institucional = row
+
         selected, reason = _select_recipient_email(
             email=email,
             email_institucional=email_institucional,
