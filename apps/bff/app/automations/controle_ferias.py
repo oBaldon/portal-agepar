@@ -334,7 +334,7 @@ def cancel_submission(
     sid: str,
     body: CancelFeriasIn,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("coordenador", "admin", "rh")),
+    user: Dict[str, Any] = Depends(require_roles_any(*_CONTROL_FERIAS_ALLOWED_ROLES)),
 ):
     """
     Cancela (soft delete) um registro de férias a partir do painel de controle.
