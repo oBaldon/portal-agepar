@@ -482,6 +482,7 @@
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+            <button id="copyCurrentBtn" class="ghost" type="button">Copiar</button>
             <button id="editCurrentBtn" class="secondary" type="button">Editar</button>
             <button id="restoreCurrentBtn" class="ghost hidden" type="button">Restaurar</button>
             <button id="deleteCurrentBtn" class="danger" type="button">Excluir</button>
@@ -968,6 +969,17 @@ function syncFormMode(mode, item=null){
     return;
   }
 
+  if(mode === 'copy' && item){
+    box.classList.remove('editing');
+    badge.textContent = 'Copiando';
+    title.textContent = `Você está criando uma nova tarefa a partir de: ${item.title}`;
+    text.textContent = 'Os campos foram preenchidos com base na tarefa selecionada. Ajuste o que for necessário e clique em "Criar cópia".';
+    saveBtn.textContent = 'Criar cópia';
+    cancelBtn.textContent = 'Limpar formulário';
+    backBtn.classList.add('hidden');
+    return;
+  }
+
   box.classList.remove('editing');
   badge.textContent = 'Criando';
   title.textContent = 'Você está criando uma nova tarefa.';
@@ -1009,6 +1021,7 @@ function renderList(){
       <td class="actions-col">
         <div class="row-actions table-actions">
           <button class="ghost action-btn" title="Abrir tarefa" data-act="open" data-id="${esc(item.id)}">Abrir</button>
+          <button class="ghost action-btn" title="Copiar tarefa" data-act="copy" data-id="${esc(item.id)}">Copiar</button>
           ${nextStatusAction(item) ? `<button class="next-btn action-btn" title="${esc(nextStatusAction(item).label)}" data-act="next" data-next="${esc(nextStatusAction(item).next)}" data-id="${esc(item.id)}">${esc(nextStatusAction(item).label)}</button>` : ''}
           ${item.canEdit ? `<button class="secondary action-btn" title="Editar tarefa" data-act="edit" data-id="${esc(item.id)}">Editar</button>` : ''}
         </div>
@@ -1041,6 +1054,7 @@ function renderKanban(){
             </div>
             <div class="row-actions" style="margin-top:10px">
               <button class="ghost" data-act="open" data-id="${esc(item.id)}">Abrir</button>
+              <button class="ghost" data-act="copy" data-id="${esc(item.id)}">Copiar</button>
               ${nextStatusAction(item) ? `<button class="next-btn" data-act="next" data-next="${esc(nextStatusAction(item).next)}" data-id="${esc(item.id)}">${esc(nextStatusAction(item).label)}</button>` : ''}
               ${item.canEdit ? `<button class="secondary" data-act="edit" data-id="${esc(item.id)}">Editar</button>` : ''}
             </div>
@@ -1397,6 +1411,29 @@ function fillForm(item){
   syncFormMode('edit', item);
 }
 
+function fillFormForCopy(item){
+  document.getElementById('taskId').value = '';
+  document.getElementById('title').value = item.title || '';
+  document.getElementById('description').value = item.description || '';
+  document.getElementById('priority').value = item.priority || 'media';
+  setAssigneeValue(item.assignedToUserId || '');
+  document.getElementById('assignedRoleName').value = item.assignedRoleName || '';
+  document.getElementById('startDate').value = item.startDate || '';
+  document.getElementById('dueDate').value = item.dueDate || '';
+  document.getElementById('formTitle').textContent = 'Copiar tarefa';
+  syncFormMode('copy', item);
+}
+
+function startCopyTask(item){
+  if(!item) return;
+  fillFormForCopy(item);
+  switchTab(false);
+  const titleInput = document.getElementById('title');
+  titleInput.focus();
+  titleInput.select();
+  titleInput.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
 function switchTab(detail=false){
   document.getElementById('detailPane').classList.toggle('show', detail);
   document.getElementById('formPane').classList.toggle('hidden', detail);
@@ -1519,6 +1556,12 @@ function bindActionDelegates(){
     const act = btn.getAttribute('data-act');
     if(act === 'open') await openTask(id);
     if(act === 'next') await applyStatusChange(id, btn.getAttribute('data-next'));
+    if(act === 'copy'){
+      const item = state.items.find(task => task.id === id) || await api('/api/automations/tasks/tasks/' + encodeURIComponent(id)).then(data => data.item);
+      if(item){
+        startCopyTask(item);
+      }
+    }
     if(act === 'edit'){
       const item = await selectTaskContext(id);
       if(item){
@@ -1583,6 +1626,10 @@ function renderDetail(item, comments){
   document.getElementById('deleteCurrentBtn').disabled = !item.canDelete;
   document.getElementById('restoreCurrentBtn').disabled = !item.canRestore;
   document.getElementById('restoreCurrentBtn').classList.toggle('hidden', !item.canRestore);
+
+  document.getElementById('copyCurrentBtn').onclick = () => {
+    startCopyTask(item);
+  };
 
   document.getElementById('editCurrentBtn').onclick = () => {
     fillForm(item);
