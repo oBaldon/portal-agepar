@@ -823,15 +823,41 @@ function statusNarrative(status){
   return statusLabel(status);
 }
 
+function parseLocalDateOnly(value){
+  const raw = String(value || '').trim();
+  if(!raw) return null;
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(match){
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  const parsed = new Date(raw);
+  if(isNaN(parsed)) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function dueDiffDays(value){
+  const due = parseLocalDateOnly(value);
+  if(!due) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((due - today) / (1000 * 60 * 60 * 24));
+}
+
+function isTaskOverdue(item){
+  if(!item || !item.dueDate) return false;
+  const status = String(item.status || '').toLowerCase();
+  if(status === 'concluida' || status === 'cancelada') return false;
+  const diff = dueDiffDays(item.dueDate);
+  return diff !== null && diff < 0;
+}
+
 function dueNarrative(item){
   if(!item || !item.dueDate) return 'Sem prazo';
-  const now = new Date();
-  const d = new Date(String(item.dueDate));
-  if(isNaN(d)) return String(item.dueDate);
-  const days = Math.ceil((d - now) / (1000*60*60*24));
-  if(days < 0) return `Atrasada ${Math.abs(days)} dia(s)`;
-  if(days === 0) return 'Vence hoje';
-  return `Vence em ${days} dia(s)`;
+  const diff = dueDiffDays(item.dueDate);
+  if(diff === null) return String(item.dueDate);
+  if(diff < 0) return `Atrasada ${Math.abs(diff)} dia(s)`;
+  if(diff === 0) return 'Vence hoje';
+  return `Vence em ${diff} dia(s)`;
 }
 
 function summarizeUserTasks(tasks){
@@ -843,9 +869,8 @@ function summarizeUserTasks(tasks){
     const s = String(t.status || '').toLowerCase();
     if(s === 'concluida') groups[key].done += 1;
     else groups[key].open += 1;
-    if(t.dueDate){
-      const d = new Date(String(t.dueDate));
-      if(!isNaN(d) && d < new Date()) groups[key].overdue += 1;
+    if(isTaskOverdue(t)){
+      groups[key].overdue += 1;
     }
   });
   return groups;
@@ -875,11 +900,8 @@ function renderOperationalSnapshot(tasks, overview){
       else if(status === 'concluida') bucket.concluidas += 1;
       else bucket.aFazer += 1;
 
-      if(t.dueDate){
-        const due = new Date(String(t.dueDate));
-        if(!isNaN(due) && due < new Date() && status !== 'concluida' && status !== 'cancelada'){
-          bucket.atrasadas += 1;
-        }
+      if(isTaskOverdue(t)){
+        bucket.atrasadas += 1;
       }
 
       bucket.items.push(t);
