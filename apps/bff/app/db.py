@@ -59,6 +59,24 @@ def _pg():
     return psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row)
 
 
+def _pg_tx():
+    """
+    Abre uma conexão Postgres transacional (autocommit desativado), usando
+    `dict_row`.
+
+    Uso recomendado para operações em lote que precisam ser atômicas:
+    - cria vários registros relacionados no mesmo fluxo;
+    - confirma tudo ao final;
+    - faz rollback integral em caso de erro.
+
+    Retorna
+    -------
+    psycopg.Connection
+        Conexão configurada para transações explícitas.
+    """
+    return psycopg.connect(DATABASE_URL, autocommit=False, row_factory=dict_row)
+
+
 def init_db() -> None:
     """
     Cria tabelas e índices idempotentes (IF NOT EXISTS) e garante:

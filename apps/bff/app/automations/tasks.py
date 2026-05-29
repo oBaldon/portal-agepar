@@ -35,7 +35,7 @@ from psycopg.types.json import Json
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 from app.auth.rbac import require_password_changed
-from app.db import _pg, add_audit
+from app.db import _pg, _pg_tx, add_audit
 from app.notifications import send_notification
 
 logger = logging.getLogger(__name__)
@@ -313,6 +313,55 @@ def _insert_task_row(
         ),
     )
     return cur.fetchone()["id"]
+
+
+def _insert_task_event_row(
+    cur: Any,
+    *,
+    task_id: uuid.UUID,
+    actor_user_id: Optional[uuid.UUID],
+    event_type: str,
+    old_value: Optional[Dict[str, Any]] = None,
+    new_value: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    cur.execute(
+        """
+        INSERT INTO task_events (task_id, actor_user_id, event_type, old_value, new_value, metadata)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (
+            task_id,
+            actor_user_id,
+            event_type,
+            _serialize_json(old_value),
+            _serialize_json(new_value),
+            Json(metadata or {}),
+        ),
+    )
+
+
+def _insert_automation_audit_row(
+    cur: Any,
+    *,
+    kind: str,
+    action: str,
+    actor: Dict[str, Any],
+    meta: Dict[str, Any],
+) -> None:
+    cur.execute(
+        """
+        INSERT INTO automation_audits (actor_cpf, actor_nome, kind, action, meta)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (
+            actor.get("cpf"),
+            actor.get("nome") or actor.get("name"),
+            kind,
+            action,
+            Json(meta or {}),
+        ),
+    )
 
 
 def _ensure_visible(task: Dict[str, Any], user: Dict[str, Any]) -> None:
@@ -1656,21 +1705,53 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
     if not is_daily_batch:
         _validate_dates(payload.start_date, payload.due_date)
 
+    created_specs: List[Dict[str, Any]] = []
+    if is_daily_batch:
+        for scheduled_date in scheduled_dates:
+            completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
+            created_specs.append(
+                {
+                    "start_date": scheduled_date,
+                    "due_date": scheduled_date,
+                    "completed_at": completed_at,
+                }
+            )
+    else:
+        completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
+        created_specs.append(
+            {
+                "start_date": payload.start_date,
+                "due_date": payload.due_date,
+                "completed_at": completed_at,
+            }
+        )
+
     created_ids: List[uuid.UUID] = []
-    with _pg() as conn, conn.cursor() as cur:
-        if is_daily_batch:
-            for scheduled_date in scheduled_dates:
-                completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
-                created_ids.append(
-                    _insert_task_row(
+    audit_meta = {
+        "task_id": None,
+        "created_count": len(created_specs),
+        "status": payload.status,
+        "assigned_to_user_id": str(assigned_to_uuid) if assigned_to_uuid else None,
+        "source_kind": payload.source_kind,
+        "source_id": payload.source_id,
+        "assigned_role_name": payload.assigned_role_name,
+        "daily_task": is_daily_batch,
+        "scheduled_dates": [d.isoformat() for d in scheduled_dates],
+    }
+
+    with _pg_tx() as conn:
+        try:
+            with conn.cursor() as cur:
+                for spec in created_specs:
+                    task_id = _insert_task_row(
                         cur,
                         title=payload.title.strip(),
                         description=payload.description or "",
                         status=payload.status,
                         priority=payload.priority,
-                        start_date_value=scheduled_date,
-                        due_date_value=scheduled_date,
-                        completed_at_value=completed_at,
+                        start_date_value=spec["start_date"],
+                        due_date_value=spec["due_date"],
+                        completed_at_value=spec["completed_at"],
                         created_by_user_id=actor_id,
                         assigned_to_user_id=assigned_to_uuid,
                         last_updated_by_user_id=actor_id,
@@ -1678,58 +1759,51 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
                         source_id=payload.source_id,
                         assigned_role_name=payload.assigned_role_name,
                     )
-                )
-        else:
-            completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
-            created_ids.append(
-                _insert_task_row(
-                    cur,
-                    title=payload.title.strip(),
-                    description=payload.description or "",
-                    status=payload.status,
-                    priority=payload.priority,
-                    start_date_value=payload.start_date,
-                    due_date_value=payload.due_date,
-                    completed_at_value=completed_at,
-                    created_by_user_id=actor_id,
-                    assigned_to_user_id=assigned_to_uuid,
-                    last_updated_by_user_id=actor_id,
-                    source_kind=payload.source_kind,
-                    source_id=payload.source_id,
-                    assigned_role_name=payload.assigned_role_name,
-                )
-            )
+                    created_ids.append(task_id)
+                    snapshot = {
+                        "title": payload.title.strip(),
+                        "description": payload.description or "",
+                        "status": payload.status,
+                        "priority": payload.priority,
+                        "startDate": _iso_date(spec["start_date"]),
+                        "dueDate": _iso_date(spec["due_date"]),
+                        "completedAt": _iso_dt(spec["completed_at"]),
+                        "assignedToUserId": str(assigned_to_uuid) if assigned_to_uuid else None,
+                        "assignedRoleName": payload.assigned_role_name,
+                        "sourceKind": payload.source_kind,
+                        "sourceId": payload.source_id,
+                        "deletedAt": None,
+                    }
+                    _insert_task_event_row(
+                        cur,
+                        task_id=task_id,
+                        actor_user_id=actor_id,
+                        event_type="task_created",
+                        new_value=snapshot,
+                    )
 
+                if created_ids:
+                    audit_meta["task_id"] = str(created_ids[0])
+
+                _insert_automation_audit_row(
+                    cur,
+                    kind=KIND,
+                    action="create",
+                    actor=user,
+                    meta=audit_meta,
+                )
+
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
     created_tasks: List[Dict[str, Any]] = []
     for task_id in created_ids:
         task = _load_task_row(task_id)
         if not task:
             raise HTTPException(status_code=500, detail="task was created but could not be loaded")
         created_tasks.append(task)
-        _record_task_event(
-            task_id=task_id,
-            actor_user_id=actor_id,
-            event_type="task_created",
-            new_value=_task_snapshot(task),
-        )
         _dispatch_task_notification(event_type="task_created", task=task, actor=user)
-
-    add_audit(
-        KIND,
-        "create",
-        user,
-        {
-            "task_id": str(created_ids[0]) if created_ids else None,
-            "created_count": len(created_ids),
-            "status": payload.status,
-            "assigned_to_user_id": str(assigned_to_uuid) if assigned_to_uuid else None,
-            "source_kind": payload.source_kind,
-            "source_id": payload.source_id,
-            "assigned_role_name": payload.assigned_role_name,
-            "daily_task": is_daily_batch,
-            "scheduled_dates": [d.isoformat() for d in scheduled_dates],
-        },
-    )
     logger.info(
         "[TASKS] Tarefa%s criada%s | count=%s | actor=%s",
         "s" if len(created_ids) != 1 else "",
