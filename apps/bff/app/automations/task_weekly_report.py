@@ -271,10 +271,10 @@ def _sheet_rows(role_label: str, rows: list[dict[str, Any]]) -> list[list[Any]]:
     for row in rows:
         output.append(
             [
+                row.get("assigned_to_name") or "Sem responsável",
                 row.get("title") or "",
                 tasks_automation._status_label(row.get("status")),
                 str(row.get("priority") or "").capitalize() or "",
-                row.get("assigned_to_name") or "Sem responsável",
                 row.get("created_by_name") or "—",
                 role_label,
                 _localize_datetime(row.get("created_in_week_at")),
@@ -308,10 +308,10 @@ def _build_workbook(
     wb.remove(default_sheet)
 
     headers = [
+        "Responsável",
         "Título",
         "Status Atual",
         "Prioridade",
-        "Responsável",
         "Criador",
         "Cargo a Notificar",
         "Criada na Semana",
