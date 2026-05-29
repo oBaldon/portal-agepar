@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from psycopg.types.json import Json
-from pydantic import BaseModel, ConfigDict, model_validator, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 from app.auth.rbac import require_password_changed
 from app.db import _pg, add_audit
@@ -267,6 +267,52 @@ def _load_task_row(task_id: uuid.UUID) -> Optional[Dict[str, Any]]:
             (task_id,),
         )
         return cur.fetchone()
+
+
+def _insert_task_row(
+    cur: Any,
+    *,
+    title: str,
+    description: str,
+    status: str,
+    priority: str,
+    start_date_value: Optional[date],
+    due_date_value: Optional[date],
+    completed_at_value: Optional[datetime],
+    created_by_user_id: uuid.UUID,
+    assigned_to_user_id: Optional[uuid.UUID],
+    last_updated_by_user_id: uuid.UUID,
+    source_kind: Optional[str],
+    source_id: Optional[str],
+    assigned_role_name: Optional[str],
+) -> uuid.UUID:
+    cur.execute(
+        """
+        INSERT INTO tasks (
+          title, description, status, priority, start_date, due_date, completed_at,
+          created_by_user_id, assigned_to_user_id, last_updated_by_user_id,
+          source_kind, source_id, assigned_role_name
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (
+            title,
+            description,
+            status,
+            priority,
+            start_date_value,
+            due_date_value,
+            completed_at_value,
+            created_by_user_id,
+            assigned_to_user_id,
+            last_updated_by_user_id,
+            source_kind,
+            source_id,
+            assigned_role_name,
+        ),
+    )
+    return cur.fetchone()["id"]
 
 
 def _ensure_visible(task: Dict[str, Any], user: Dict[str, Any]) -> None:
@@ -835,6 +881,8 @@ class TaskCreateIn(BaseModel):
     source_kind: Optional[str] = None
     source_id: Optional[str] = None
     assigned_role_name: Optional[str] = None
+    daily_task: bool = False
+    scheduled_dates: List[date] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -851,6 +899,8 @@ class TaskCreateIn(BaseModel):
             "sourceKind": "source_kind",
             "sourceId": "source_id",
             "assignedRoleName": "assigned_role_name",
+            "dailyTask": "daily_task",
+            "scheduledDates": "scheduled_dates",
         }
         for src, dst in key_map.items():
             if src in data and dst not in data:
@@ -898,6 +948,11 @@ class TaskCreateIn(BaseModel):
     @classmethod
     def _validate_status(cls, value: Optional[str]) -> str:
         return _normalize_status(value)
+
+    @field_validator("scheduled_dates")
+    @classmethod
+    def _validate_scheduled_dates(cls, value: Optional[List[date]]) -> List[date]:
+        return sorted({v for v in (value or [])})
 
 
 class TaskUpdateIn(BaseModel):
@@ -1592,67 +1647,104 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
     else:
         assigned_to_uuid = actor_id
 
-    _validate_dates(payload.start_date, payload.due_date)
+    scheduled_dates = sorted(set(payload.scheduled_dates or []))
+    is_daily_batch = bool(payload.daily_task or scheduled_dates)
 
-    completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
+    if is_daily_batch and not scheduled_dates:
+        raise HTTPException(status_code=422, detail={"scheduledDates": "required when dailyTask is true"})
 
+    if not is_daily_batch:
+        _validate_dates(payload.start_date, payload.due_date)
+
+    created_ids: List[uuid.UUID] = []
     with _pg() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO tasks (
-              title, description, status, priority, start_date, due_date, completed_at,
-              created_by_user_id, assigned_to_user_id, last_updated_by_user_id,
-              source_kind, source_id, assigned_role_name
+        if is_daily_batch:
+            for scheduled_date in scheduled_dates:
+                completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
+                created_ids.append(
+                    _insert_task_row(
+                        cur,
+                        title=payload.title.strip(),
+                        description=payload.description or "",
+                        status=payload.status,
+                        priority=payload.priority,
+                        start_date_value=scheduled_date,
+                        due_date_value=scheduled_date,
+                        completed_at_value=completed_at,
+                        created_by_user_id=actor_id,
+                        assigned_to_user_id=assigned_to_uuid,
+                        last_updated_by_user_id=actor_id,
+                        source_kind=payload.source_kind,
+                        source_id=payload.source_id,
+                        assigned_role_name=payload.assigned_role_name,
+                    )
+                )
+        else:
+            completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
+            created_ids.append(
+                _insert_task_row(
+                    cur,
+                    title=payload.title.strip(),
+                    description=payload.description or "",
+                    status=payload.status,
+                    priority=payload.priority,
+                    start_date_value=payload.start_date,
+                    due_date_value=payload.due_date,
+                    completed_at_value=completed_at,
+                    created_by_user_id=actor_id,
+                    assigned_to_user_id=assigned_to_uuid,
+                    last_updated_by_user_id=actor_id,
+                    source_kind=payload.source_kind,
+                    source_id=payload.source_id,
+                    assigned_role_name=payload.assigned_role_name,
+                )
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
-            """,
-            (
-                payload.title.strip(),
-                payload.description or "",
-                payload.status,
-                payload.priority,
-                payload.start_date,
-                payload.due_date,
-                completed_at,
-                actor_id,
-                assigned_to_uuid,
-                actor_id,
-                payload.source_kind,
-                payload.source_id,
-                payload.assigned_role_name,
-            ),
+
+    created_tasks: List[Dict[str, Any]] = []
+    for task_id in created_ids:
+        task = _load_task_row(task_id)
+        if not task:
+            raise HTTPException(status_code=500, detail="task was created but could not be loaded")
+        created_tasks.append(task)
+        _record_task_event(
+            task_id=task_id,
+            actor_user_id=actor_id,
+            event_type="task_created",
+            new_value=_task_snapshot(task),
         )
-        task_id = cur.fetchone()["id"]
-
-    task = _load_task_row(task_id)
-    if not task:
-        raise HTTPException(status_code=500, detail="task was created but could not be loaded")
-
-    _record_task_event(
-        task_id=task_id,
-        actor_user_id=actor_id,
-        event_type="task_created",
-        new_value=_task_snapshot(task),
-    )
-    _dispatch_task_notification(event_type="task_created", task=task, actor=user)
+        _dispatch_task_notification(event_type="task_created", task=task, actor=user)
 
     add_audit(
         KIND,
         "create",
         user,
         {
-            "task_id": str(task_id),
-            "status": task["status"],
+            "task_id": str(created_ids[0]) if created_ids else None,
+            "created_count": len(created_ids),
+            "status": payload.status,
             "assigned_to_user_id": str(assigned_to_uuid) if assigned_to_uuid else None,
             "source_kind": payload.source_kind,
             "source_id": payload.source_id,
             "assigned_role_name": payload.assigned_role_name,
+            "daily_task": is_daily_batch,
+            "scheduled_dates": [d.isoformat() for d in scheduled_dates],
         },
     )
-    logger.info("[TASKS] Tarefa criada | task=%s | actor=%s", task_id, actor_id)
+    logger.info(
+        "[TASKS] Tarefa%s criada%s | count=%s | actor=%s",
+        "s" if len(created_ids) != 1 else "",
+        " em lote" if is_daily_batch else "",
+        len(created_ids),
+        actor_id,
+    )
 
-    return {"item": _task_to_out(task, user)}
+    out_items = [_task_to_out(task, user) for task in created_tasks]
+    return {
+        "item": out_items[0],
+        "items": out_items,
+        "createdCount": len(out_items),
+        "dailyTask": is_daily_batch,
+    }
 
 
 @router.get("/tasks/{task_id}")

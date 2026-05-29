@@ -283,6 +283,41 @@
   .sev-warning{color:#b45309;font-weight:600}
   .sev-danger{color:var(--danger);font-weight:600}
   .history-launch{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px;border:1px dashed var(--line);border-radius:14px;background:#fafcff}
+
+  .daily-scheduler{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:16px;background:#fafcff;display:grid;gap:12px}
+  .daily-scheduler-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .daily-scheduler-title{font-size:13px;font-weight:700;color:var(--fg);margin:0 0 4px}
+  .daily-scheduler-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .daily-selection-summary{display:grid;gap:10px}
+  .daily-selection-empty{font-size:12px;color:var(--muted)}
+  .daily-selection-note{font-size:12px;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 12px}
+  .selected-date-list{display:flex;flex-wrap:wrap;gap:8px}
+  .selected-date-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:12px;font-weight:600}
+  .selected-date-count{font-size:12px;color:#334155;font-weight:600}
+  .field-hint{font-size:12px;color:var(--muted);margin-top:10px}
+  .field-hint.field-hint-active{color:#1d4ed8;font-weight:600}
+  .date-picker-shell{display:grid;gap:14px}
+  .date-picker-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .date-picker-month{font-size:22px;font-weight:800;text-transform:capitalize}
+  .date-picker-nav{display:flex;gap:8px;flex-wrap:wrap}
+  .date-picker-weekdays,.date-picker-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+  .date-picker-weekday{font-size:12px;font-weight:700;color:#64748b;text-align:center;padding:4px 0}
+  .date-picker-grid{align-items:stretch}
+  .date-cell{min-height:78px;border:1px solid var(--line);border-radius:16px;background:#fff;color:#0f172a;padding:10px 8px;display:grid;align-content:space-between;justify-items:start;gap:8px;text-align:left;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .date-cell:hover{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+  .date-cell .day-number{font-size:15px;font-weight:700}
+  .date-cell .day-meta{font-size:11px;color:var(--muted)}
+  .date-cell.is-outside{background:#f8fafc;color:#94a3b8}
+  .date-cell.is-outside .day-meta{color:#94a3b8}
+  .date-cell.is-selected{background:#2563eb;border-color:#2563eb;color:#fff;box-shadow:0 10px 24px rgba(37,99,235,.22)}
+  .date-cell.is-selected .day-meta{color:rgba(255,255,255,.88)}
+  .date-cell.is-today:not(.is-selected){border-color:#93c5fd;background:#f8fbff}
+  .picker-summary{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#f8fafc}
+  .picker-summary strong{font-size:13px}
+  .picker-summary .help{margin:0}
+  .picker-actions{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .picker-actions-left,.picker-actions-right{display:flex;gap:8px;flex-wrap:wrap}
+  .modal-card.calendar-picker-modal{width:min(860px,96vw)}
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(15,23,42,.48);
     display:none; align-items:center; justify-content:center; padding:18px; z-index:9999;
@@ -460,7 +495,20 @@
                 <input id="dueDate" type="date"/>
               </div>
             </div>
-            <div class="help" style="margin-top:10px">O calendário usa as datas de início e prazo quando disponíveis. Sem datas, a tarefa aparece pelo dia de criação.</div>
+            <div id="dateFieldsHint" class="field-hint">O calendário usa as datas de início e prazo quando disponíveis. Sem datas, a tarefa aparece pelo dia de criação.</div>
+            <div id="dailySchedulerBox" class="daily-scheduler">
+              <div class="daily-scheduler-head">
+                <div>
+                  <div class="daily-scheduler-title">Tarefa diária</div>
+                  <div class="help">Selecione vários dias quando quiser criar uma tarefa igual para datas específicas. O sistema criará uma nova tarefa por dia selecionado.</div>
+                </div>
+                <div class="daily-scheduler-actions">
+                  <button type="button" id="openDailyPickerBtn" class="secondary">Selecionar dias</button>
+                  <button type="button" id="clearDailyDatesBtn" class="ghost hidden">Limpar dias</button>
+                </div>
+              </div>
+              <div id="dailySelectionSummary" class="daily-selection-summary"></div>
+            </div>
             <div class="form-actions">
               <button type="submit" id="saveBtn">Criar tarefa</button>
               <button type="button" id="cancelEditBtn" class="secondary">Limpar formulário</button>
@@ -663,6 +711,47 @@
       </div>
     </div>
   </div>
+
+  <div id="dailyPickerModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dailyPickerTitle">
+    <div class="modal-card calendar-picker-modal">
+      <div class="modal-head">
+        <div>
+          <strong id="dailyPickerTitle">Selecionar dias da tarefa diária</strong>
+          <div class="help">Cada dia selecionado gera uma nova tarefa com início e prazo no próprio dia.</div>
+        </div>
+        <button id="closeDailyPickerBtn" class="secondary" type="button">Fechar</button>
+      </div>
+      <div class="modal-body">
+        <div class="date-picker-shell">
+          <div class="date-picker-top">
+            <div>
+              <div class="date-picker-month" id="dailyPickerMonthLabel">Mês</div>
+              <div class="help">Clique nos dias desejados para montar a série diária.</div>
+            </div>
+            <div class="date-picker-nav">
+              <button id="dailyPickerPrevBtn" class="ghost" type="button">← Mês anterior</button>
+              <button id="dailyPickerTodayBtn" class="secondary" type="button">Mês atual</button>
+              <button id="dailyPickerNextBtn" class="ghost" type="button">Próximo mês →</button>
+            </div>
+          </div>
+          <div class="date-picker-weekdays" id="dailyPickerWeekdays"></div>
+          <div class="date-picker-grid" id="dailyPickerGrid"></div>
+          <div class="picker-summary">
+            <strong id="dailyPickerSummaryTitle">Nenhum dia selecionado</strong>
+            <div id="dailyPickerSummaryBody" class="help">Sem dias selecionados, a tarefa será criada normalmente.</div>
+          </div>
+          <div class="picker-actions">
+            <div class="picker-actions-left">
+              <button id="dailyPickerClearBtn" class="ghost" type="button">Limpar dias</button>
+            </div>
+            <div class="picker-actions-right">
+              <button id="dailyPickerApplyBtn" type="button">Concluir seleção</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -679,6 +768,8 @@ const state = {
   historyItems: [],
   commentEditingId: null,
   commentEditingTaskId: null,
+  dailyPickerMonth: new Date(),
+  selectedDailyDates: [],
 };
 
 const STATUS_LABELS = {
@@ -858,6 +949,144 @@ function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
 function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
 function monthTitle(d){ return d.toLocaleDateString('pt-BR', { month:'long', year:'numeric' }); }
 function weekTitle(start, end){ return `${start.toLocaleDateString('pt-BR')} — ${end.toLocaleDateString('pt-BR')}`; }
+
+function normalizeDateKey(value){
+  if(!value) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+  try{ return dateKey(new Date(value)); }catch{ return ''; }
+}
+function sortDateKeys(values){
+  return Array.from(new Set((values || []).map(normalizeDateKey).filter(Boolean))).sort((a,b) => a.localeCompare(b));
+}
+function formatDateChip(key){
+  if(!key) return '';
+  try{ return parseDateKey(key).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' }); }catch{ return key; }
+}
+function dailyDatesSelected(){
+  return sortDateKeys(state.selectedDailyDates);
+}
+function clearDailySelection(){
+  state.selectedDailyDates = [];
+  renderDailySelectionSummary();
+  syncDailyModeUi();
+}
+function setDailySelection(values){
+  state.selectedDailyDates = sortDateKeys(values);
+  renderDailySelectionSummary();
+  syncDailyModeUi();
+}
+function toggleDailyDate(key){
+  const current = new Set(dailyDatesSelected());
+  if(current.has(key)) current.delete(key); else current.add(key);
+  state.selectedDailyDates = Array.from(current).sort((a,b) => a.localeCompare(b));
+  renderDailyPicker();
+  renderDailySelectionSummary();
+  syncDailyModeUi();
+}
+function syncDailyModeUi(){
+  const hasDates = dailyDatesSelected().length > 0;
+  const startInput = document.getElementById('startDate');
+  const dueInput = document.getElementById('dueDate');
+  const hint = document.getElementById('dateFieldsHint');
+  if(startInput) startInput.disabled = hasDates;
+  if(dueInput) dueInput.disabled = hasDates;
+  if(hint){
+    hint.textContent = hasDates
+      ? 'Modo tarefa diária ativo: o início e o prazo de cada cópia serão preenchidos automaticamente com o próprio dia selecionado.'
+      : 'O calendário usa as datas de início e prazo quando disponíveis. Sem datas, a tarefa aparece pelo dia de criação.';
+    hint.classList.toggle('field-hint-active', hasDates);
+  }
+  const clearBtn = document.getElementById('clearDailyDatesBtn');
+  if(clearBtn) clearBtn.classList.toggle('hidden', !hasDates);
+}
+function renderDailySelectionSummary(){
+  const summary = document.getElementById('dailySelectionSummary');
+  if(!summary) return;
+  const dates = dailyDatesSelected();
+  if(!dates.length){
+    summary.innerHTML = `
+      <div class="daily-selection-empty">Nenhum dia selecionado. Sem selecionar dias, a tarefa será criada normalmente.</div>
+    `;
+    const openBtn = document.getElementById('openDailyPickerBtn');
+    if(openBtn) openBtn.textContent = 'Selecionar dias';
+    return;
+  }
+  const preview = dates.slice(0, 8);
+  const more = dates.length - preview.length;
+  summary.innerHTML = `
+    <div class="selected-date-count">${dates.length} ${dates.length === 1 ? 'dia selecionado' : 'dias selecionados'}</div>
+    <div class="selected-date-list">
+      ${preview.map(key => `<span class="selected-date-chip">${esc(formatDateChip(key))}</span>`).join('')}
+      ${more > 0 ? `<span class="selected-date-chip">+${more} ${more === 1 ? 'dia' : 'dias'}</span>` : ''}
+    </div>
+    <div class="daily-selection-note">Ao salvar, o sistema criará uma nova tarefa para cada dia selecionado, copiando os demais dados da tarefa.</div>
+  `;
+  const openBtn = document.getElementById('openDailyPickerBtn');
+  if(openBtn) openBtn.textContent = 'Editar dias selecionados';
+}
+function getDailyPickerAnchor(){
+  const startValue = normalizeDateKey(document.getElementById('startDate')?.value || '');
+  const dueValue = normalizeDateKey(document.getElementById('dueDate')?.value || '');
+  const firstSelected = dailyDatesSelected()[0] || startValue || dueValue || dateKey(new Date());
+  return parseDateKey(firstSelected);
+}
+function openDailyPicker(){
+  state.dailyPickerMonth = startOfMonth(getDailyPickerAnchor());
+  renderDailyPicker();
+  document.getElementById('dailyPickerModal').classList.add('open');
+}
+function closeDailyPicker(){
+  document.getElementById('dailyPickerModal').classList.remove('open');
+}
+function moveDailyPickerMonth(step){
+  state.dailyPickerMonth = new Date(state.dailyPickerMonth.getFullYear(), state.dailyPickerMonth.getMonth() + step, 1);
+  renderDailyPicker();
+}
+function renderDailyPicker(){
+  const weekdays = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const weekdaysMount = document.getElementById('dailyPickerWeekdays');
+  const grid = document.getElementById('dailyPickerGrid');
+  const monthLabel = document.getElementById('dailyPickerMonthLabel');
+  const summaryTitle = document.getElementById('dailyPickerSummaryTitle');
+  const summaryBody = document.getElementById('dailyPickerSummaryBody');
+  if(weekdaysMount) weekdaysMount.innerHTML = weekdays.map(name => `<div class="date-picker-weekday">${name}</div>`).join('');
+  if(monthLabel) monthLabel.textContent = monthTitle(state.dailyPickerMonth);
+
+  const monthStart = startOfMonth(state.dailyPickerMonth);
+  const monthEnd = endOfMonth(state.dailyPickerMonth);
+  const gridStart = startOfWeek(monthStart);
+  const gridEnd = addDays(startOfWeek(addDays(monthEnd, 6)), 6);
+  const selected = new Set(dailyDatesSelected());
+
+  const cells = [];
+  for(let d = cloneDate(gridStart); d <= gridEnd; d = addDays(d, 1)){
+    const key = dateKey(d);
+    const isOutside = !sameMonth(d, state.dailyPickerMonth);
+    const isSelected = selected.has(key);
+    const isToday = key === todayKey();
+    cells.push(`
+      <button type="button" class="date-cell ${isOutside ? 'is-outside' : ''} ${isSelected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''}" data-daily-date="${key}" aria-pressed="${isSelected ? 'true' : 'false'}">
+        <span class="day-number">${d.getDate()}</span>
+        <span class="day-meta">${isToday ? 'Hoje' : d.toLocaleDateString('pt-BR', { weekday:'short' })}</span>
+      </button>
+    `);
+  }
+  if(grid) grid.innerHTML = cells.join('');
+  grid?.querySelectorAll('[data-daily-date]').forEach(btn => {
+    btn.onclick = () => toggleDailyDate(btn.getAttribute('data-daily-date'));
+  });
+
+  const dates = dailyDatesSelected();
+  if(!dates.length){
+    if(summaryTitle) summaryTitle.textContent = 'Nenhum dia selecionado';
+    if(summaryBody) summaryBody.textContent = 'Sem dias selecionados, a tarefa será criada normalmente.';
+  }else{
+    if(summaryTitle) summaryTitle.textContent = `${dates.length} ${dates.length === 1 ? 'dia selecionado' : 'dias selecionados'}`;
+    const preview = dates.slice(0, 10).map(formatDateChip);
+    const extra = dates.length - preview.length;
+    if(summaryBody) summaryBody.innerHTML = `${preview.map(v => `<span class="selected-date-chip">${esc(v)}</span>`).join(' ')}${extra > 0 ? ` <span class="selected-date-chip">+${extra}</span>` : ''}`;
+  }
+}
 function sameMonth(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth(); }
 
 async function api(path, opts = {}){
@@ -1006,6 +1235,7 @@ function syncFormMode(mode, item=null){
   const saveBtn = document.getElementById('saveBtn');
   const cancelBtn = document.getElementById('cancelEditBtn');
   const backBtn = document.getElementById('backToDetailBtn');
+  const dailySchedulerBox = document.getElementById('dailySchedulerBox');
 
   if(mode === 'edit' && item){
     box.classList.add('editing');
@@ -1015,14 +1245,17 @@ function syncFormMode(mode, item=null){
     saveBtn.textContent = 'Salvar alterações';
     cancelBtn.textContent = 'Cancelar edição';
     backBtn.classList.remove('hidden');
+    dailySchedulerBox.classList.add('hidden');
     return;
   }
+
+  dailySchedulerBox.classList.remove('hidden');
 
   if(mode === 'copy' && item){
     box.classList.remove('editing');
     badge.textContent = 'Copiando';
     title.textContent = `Você está criando uma nova tarefa a partir de: ${item.title}`;
-    text.textContent = 'Os campos foram preenchidos com base na tarefa selecionada. Ajuste o que for necessário e clique em "Criar cópia".';
+    text.textContent = 'Os campos foram preenchidos com base na tarefa selecionada. Ajuste o que for necessário e clique em "Criar cópia". Você também pode marcar a opção de tarefa diária para gerar cópias em vários dias.';
     saveBtn.textContent = 'Criar cópia';
     cancelBtn.textContent = 'Limpar formulário';
     backBtn.classList.add('hidden');
@@ -1032,7 +1265,7 @@ function syncFormMode(mode, item=null){
   box.classList.remove('editing');
   badge.textContent = 'Criando';
   title.textContent = 'Você está criando uma nova tarefa.';
-  text.textContent = 'Preencha os campos abaixo e clique em “Criar tarefa”. Para editar uma tarefa existente, abra uma tarefa na lista e use “Editar”.';
+  text.textContent = 'Preencha os campos abaixo e clique em “Criar tarefa”. Para tarefas diárias, marque a opção específica e selecione os dias desejados.';
   saveBtn.textContent = 'Criar tarefa';
   cancelBtn.textContent = 'Limpar formulário';
   backBtn.classList.add('hidden');
@@ -1444,6 +1677,7 @@ function resetForm(){
   document.getElementById('priority').value = 'media';
   setAssigneeValue(defaultAssigneeUserId());
   document.getElementById('assignedRoleName').value = '';
+  clearDailySelection();
   syncFormMode('create');
   resetCommentComposer();
 }
@@ -1457,6 +1691,7 @@ function fillForm(item){
   document.getElementById('assignedRoleName').value = item.assignedRoleName || '';
   document.getElementById('startDate').value = item.startDate || '';
   document.getElementById('dueDate').value = item.dueDate || '';
+  clearDailySelection();
   document.getElementById('formTitle').textContent = 'Editar tarefa';
   syncFormMode('edit', item);
 }
@@ -1470,6 +1705,7 @@ function fillFormForCopy(item){
   document.getElementById('assignedRoleName').value = item.assignedRoleName || '';
   document.getElementById('startDate').value = item.startDate || '';
   document.getElementById('dueDate').value = item.dueDate || '';
+  clearDailySelection();
   document.getElementById('formTitle').textContent = 'Copiar tarefa';
   syncFormMode('copy', item);
 }
@@ -1807,6 +2043,8 @@ async function onSubmit(ev){
     return;
   }
 
+  const selectedDates = dailyDatesSelected();
+
   const payload = {
     title: document.getElementById('title').value.trim(),
     description: document.getElementById('description').value.trim(),
@@ -1816,20 +2054,28 @@ async function onSubmit(ev){
     assignedToUserId: assignedHidden || null,
     assignedRoleName: document.getElementById('assignedRoleName').value || null,
   };
+  if(selectedDates.length){
+    payload.dailyTask = true;
+    payload.scheduledDates = selectedDates;
+  }
   const taskId = document.getElementById('taskId').value;
+  let result;
   if(taskId){
-    await api('/api/automations/tasks/tasks/' + encodeURIComponent(taskId), {
+    result = await api('/api/automations/tasks/tasks/' + encodeURIComponent(taskId), {
       method:'PUT',
       body: JSON.stringify(payload),
     });
   } else {
-    await api('/api/automations/tasks/tasks', {
+    result = await api('/api/automations/tasks/tasks', {
       method:'POST',
       body: JSON.stringify({ ...payload, status: 'a_fazer' }),
     });
   }
   resetForm();
   await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+  if(result?.createdCount > 1){
+    alert(`${result.createdCount} tarefas foram criadas com base nos dias selecionados.`);
+  }
 }
 
 function moveCalendar(step){
@@ -1892,9 +2138,25 @@ async function boot(){
   document.getElementById('historyModal').addEventListener('click', (ev) => {
     if(ev.target.id === 'historyModal') closeHistoryModal();
   });
-  window.addEventListener('keydown', (ev) => {
-    if(ev.key === 'Escape') closeHistoryModal();
+  document.getElementById('openDailyPickerBtn').onclick = openDailyPicker;
+  document.getElementById('clearDailyDatesBtn').onclick = () => clearDailySelection();
+  document.getElementById('closeDailyPickerBtn').onclick = closeDailyPicker;
+  document.getElementById('dailyPickerPrevBtn').onclick = () => moveDailyPickerMonth(-1);
+  document.getElementById('dailyPickerNextBtn').onclick = () => moveDailyPickerMonth(1);
+  document.getElementById('dailyPickerTodayBtn').onclick = () => { state.dailyPickerMonth = startOfMonth(new Date()); renderDailyPicker(); };
+  document.getElementById('dailyPickerClearBtn').onclick = () => { clearDailySelection(); renderDailyPicker(); };
+  document.getElementById('dailyPickerApplyBtn').onclick = closeDailyPicker;
+  document.getElementById('dailyPickerModal').addEventListener('click', (ev) => {
+    if(ev.target.id === 'dailyPickerModal') closeDailyPicker();
   });
+  window.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Escape'){
+      closeHistoryModal();
+      closeDailyPicker();
+    }
+  });
+  renderDailySelectionSummary();
+  syncDailyModeUi();
   document.getElementById('taskForm').addEventListener('submit', onSubmit);
 }
 boot().catch(err => {
