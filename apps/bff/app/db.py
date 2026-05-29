@@ -333,11 +333,20 @@ def init_db() -> None:
       task_id        UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
       actor_user_id  UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
       body           TEXT NOT NULL,
-      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE INDEX IF NOT EXISTS ix_task_comments_task_created_at
       ON task_comments (task_id, created_at ASC);
+
+        ALTER TABLE IF EXISTS task_comments
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+        DROP TRIGGER IF EXISTS trg_task_comments_touch ON task_comments;
+        CREATE TRIGGER trg_task_comments_touch
+        BEFORE UPDATE ON task_comments
+        FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
     """
     with _pg() as conn, conn.cursor() as cur:

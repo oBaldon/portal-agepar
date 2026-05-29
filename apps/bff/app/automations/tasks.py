@@ -86,6 +86,9 @@ _EVENT_CATALOG: Dict[str, Dict[str, str]] = {
     "task_deleted": {"label": "Tarefa excluída logicamente", "category": "lifecycle", "severity": "danger"},
     "task_restored": {"label": "Tarefa restaurada", "category": "lifecycle", "severity": "success"},
     "task_comment_added": {"label": "Comentário adicionado", "category": "collaboration", "severity": "info"},
+    "task_comment_edited": {"label": "Comentário editado", "category": "collaboration", "severity": "info"},
+    "task_comment_deleted": {"label": "Comentário excluído", "category": "collaboration", "severity": "warning"},
+    "task_comment_updated": {"label": "Comentário editado", "category": "collaboration", "severity": "info"},
     "task_due_date_changed": {"label": "Prazo alterado", "category": "change", "severity": "warning"},
 }
 
@@ -138,6 +141,13 @@ _TASK_NOTIFICATION_RULES: Dict[str, Dict[str, Any]] = {
         "notifyAssignedRole": False,
         "notifyCreator": False,
         "title": "Novo comentário em tarefa",
+    },
+    "task_comment_updated": {
+        "enabled": False,
+        "notifyAssignee": False,
+        "notifyAssignedRole": False,
+        "notifyCreator": False,
+        "title": "Comentário editado em tarefa",
     },
 }
 
@@ -410,6 +420,44 @@ def _task_snapshot(task: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _comment_to_out(comment: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
+    actor_user_id = str(comment["actor_user_id"]) if comment.get("actor_user_id") else None
+    me = str(_user_id_from_session(user))
+    created_at = comment.get("created_at")
+    updated_at = comment.get("updated_at")
+    return {
+        "id": int(comment["id"]),
+        "body": comment["body"],
+        "createdAt": _iso_dt(created_at),
+        "updatedAt": _iso_dt(updated_at),
+        "isEdited": bool(updated_at and created_at and updated_at > created_at),
+        "actorUserId": actor_user_id,
+        "actorName": comment.get("actor_name"),
+        "canEdit": bool(actor_user_id and actor_user_id == me),
+        "canDelete": bool(actor_user_id and actor_user_id == me),
+    }
+
+
+def _load_comment_row(task_id: uuid.UUID, comment_id: int) -> Optional[Dict[str, Any]]:
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT c.id, c.task_id, c.body, c.created_at, c.updated_at, c.actor_user_id, u.name AS actor_name
+            FROM task_comments c
+            LEFT JOIN users u ON u.id = c.actor_user_id
+            WHERE c.task_id = %s AND c.id = %s
+            """,
+            (task_id, comment_id),
+        )
+        return cur.fetchone()
+
+
+def _ensure_can_edit_comment(comment: Dict[str, Any], user: Dict[str, Any]) -> None:
+    actor_id = _user_id_from_session(user)
+    if comment.get("actor_user_id") != actor_id:
+        raise HTTPException(status_code=403, detail="comment cannot be edited by this user")
+
+
 def _event_descriptor(event_type: str) -> Dict[str, str]:
     base = _EVENT_CATALOG.get(event_type)
     if base:
@@ -449,6 +497,28 @@ def _event_summary(
         if body:
             return body[:180]
         return "Comentário registrado na tarefa."
+    if event_type == "task_comment_updated":
+        body = str(
+            metadata.get("comment_preview")
+            or metadata.get("commentPreview")
+            or new_value.get("body")
+            or ""
+        ).strip()
+        if body:
+            return f"Comentário editado: {body[:160]}"
+        return "Comentário editado na tarefa."
+    if event_type == "task_comment_edited":
+        body = str(
+            metadata.get("comment_preview")
+            or metadata.get("commentPreview")
+            or new_value.get("body")
+            or ""
+        ).strip()
+        if body:
+            return "Comentário atualizado: " + body[:160]
+        return "Comentário atualizado na tarefa."
+    if event_type == "task_comment_deleted":
+        return "Comentário removido da tarefa."
     if event_type == "task_deleted":
         return "Tarefa removida das visualizações ativas."
     if event_type == "task_restored":
@@ -928,6 +998,17 @@ class TaskCommentIn(BaseModel):
         if not value:
             raise ValueError("required")
         return value
+
+
+class TaskCommentUpdateIn(BaseModel):
+    body: str = ""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def _normalize_body(cls, value: Any) -> str:
+        return str(value or "").strip()
 
 
 @router.get("/ui", response_class=HTMLResponse)
@@ -1585,7 +1666,7 @@ def get_task(task_id: str, user: Dict[str, Any] = Depends(require_password_chang
     with _pg() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT c.id, c.body, c.created_at, c.actor_user_id, u.name AS actor_name
+            SELECT c.id, c.body, c.created_at, c.updated_at, c.actor_user_id, u.name AS actor_name
             FROM task_comments c
             LEFT JOIN users u ON u.id = c.actor_user_id
             WHERE c.task_id = %s
@@ -1597,16 +1678,7 @@ def get_task(task_id: str, user: Dict[str, Any] = Depends(require_password_chang
 
     return {
         "item": _task_to_out(task, user),
-        "comments": [
-            {
-                "id": int(c["id"]),
-                "body": c["body"],
-                "createdAt": _iso_dt(c["created_at"]),
-                "actorUserId": str(c["actor_user_id"]) if c.get("actor_user_id") else None,
-                "actorName": c.get("actor_name"),
-            }
-            for c in comments
-        ],
+        "comments": [_comment_to_out(c, user) for c in comments],
     }
 
 
@@ -1897,7 +1969,7 @@ def add_comment(task_id: str, payload: TaskCommentIn, user: Dict[str, Any] = Dep
             """
             INSERT INTO task_comments (task_id, actor_user_id, body)
             VALUES (%s, %s, %s)
-            RETURNING id, body, created_at, actor_user_id
+            RETURNING id, body, created_at, updated_at, actor_user_id
             """,
             (task_uuid, actor_id, payload.body),
         )
@@ -1926,16 +1998,162 @@ def add_comment(task_id: str, payload: TaskCommentIn, user: Dict[str, Any] = Dep
     add_audit(KIND, "comment", user, {"task_id": str(task_uuid), "comment_id": int(comment["id"])})
     logger.info("[TASKS] Comentário adicionado | task=%s | actor=%s", task_uuid, actor_id)
 
-    actor_name = user.get("nome") or user.get("name")
-    return {
-        "item": {
-            "id": int(comment["id"]),
-            "body": comment["body"],
-            "createdAt": _iso_dt(comment["created_at"]),
-            "actorUserId": str(comment["actor_user_id"]) if comment.get("actor_user_id") else None,
-            "actorName": actor_name,
-        }
-    }
+    comment_row = _load_comment_row(task_uuid, int(comment["id"])) or comment
+    return {"item": _comment_to_out(comment_row, user)}
+
+
+@router.put("/tasks/{task_id}/comments/{comment_id}")
+def update_comment(
+    task_id: str,
+    comment_id: int,
+    payload: TaskCommentUpdateIn,
+    user: Dict[str, Any] = Depends(require_password_changed),
+) -> Dict[str, Any]:
+    task_uuid = _parse_uuid(task_id, "task id")
+    actor_id = _user_id_from_session(user)
+
+    task = _load_task_row(task_uuid)
+    if not task:
+        raise HTTPException(status_code=404, detail="task not found")
+
+    _ensure_visible(task, user)
+    _ensure_not_deleted(task)
+
+    comment = _load_comment_row(task_uuid, int(comment_id))
+    if not comment:
+        raise HTTPException(status_code=404, detail="comment not found")
+
+    _ensure_can_edit_comment(comment, user)
+
+    new_body = str(payload.body or "").strip()
+    old_body = str(comment.get("body") or "")
+
+    if not new_body:
+        with _pg() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM task_comments
+                WHERE task_id = %s
+                  AND id = %s
+                """,
+                (task_uuid, int(comment_id)),
+            )
+            cur.execute(
+                """
+                UPDATE tasks
+                SET last_updated_by_user_id = %s
+                WHERE id = %s
+                """,
+                (actor_id, task_uuid),
+            )
+
+        _record_task_event(
+            task_id=task_uuid,
+            actor_user_id=actor_id,
+            event_type="task_comment_deleted",
+            old_value={"commentId": int(comment["id"]), "body": old_body},
+        )
+
+        add_audit(KIND, "comment_delete", user, {"task_id": str(task_uuid), "comment_id": int(comment["id"])})
+        logger.info(
+            "[TASKS] Comentário excluído via edição vazia | task=%s | comment=%s | actor=%s",
+            task_uuid,
+            comment_id,
+            actor_id,
+        )
+        return {"deleted": True, "commentId": int(comment["id"])}
+
+    if new_body == old_body:
+        return {"item": _comment_to_out(comment, user)}
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE task_comments
+            SET body = %s,
+                updated_at = now()
+            WHERE task_id = %s AND id = %s
+            RETURNING id, body, created_at, updated_at, actor_user_id
+            """,
+            (new_body, task_uuid, int(comment_id)),
+        )
+        updated_comment = cur.fetchone()
+
+        cur.execute(
+            """
+            UPDATE tasks
+            SET last_updated_by_user_id = %s
+            WHERE id = %s
+            """,
+            (actor_id, task_uuid),
+        )
+
+    _record_task_event(
+        task_id=task_uuid,
+        actor_user_id=actor_id,
+        event_type="task_comment_edited",
+        old_value={"commentId": int(comment_id), "body": old_body},
+        new_value={"commentId": int(comment_id), "body": new_body},
+        metadata={"commentPreview": new_body[:180]},
+    )
+
+    add_audit(KIND, "comment_edit", user, {"task_id": str(task_uuid), "comment_id": int(comment_id)})
+    logger.info("[TASKS] Comentário editado | task=%s | actor=%s | comment_id=%s", task_uuid, actor_id, int(comment_id))
+
+    updated_row = _load_comment_row(task_uuid, int(comment_id)) or updated_comment
+    return {"item": _comment_to_out(updated_row, user)}
+
+
+@router.delete("/tasks/{task_id}/comments/{comment_id}")
+def delete_comment(
+    task_id: str,
+    comment_id: int,
+    user: Dict[str, Any] = Depends(require_password_changed),
+) -> Dict[str, Any]:
+    task_uuid = _parse_uuid(task_id, "task id")
+    actor_id = _user_id_from_session(user)
+
+    task = _load_task_row(task_uuid)
+    if not task:
+        raise HTTPException(status_code=404, detail="task not found")
+
+    _ensure_visible(task, user)
+    _ensure_not_deleted(task)
+
+    comment = _load_comment_row(task_uuid, int(comment_id))
+    if not comment:
+        raise HTTPException(status_code=404, detail="comment not found")
+
+    _ensure_can_edit_comment(comment, user)
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM task_comments
+            WHERE task_id = %s
+              AND id = %s
+            """,
+            (task_uuid, int(comment_id)),
+        )
+        cur.execute(
+            """
+            UPDATE tasks
+            SET last_updated_by_user_id = %s
+            WHERE id = %s
+            """,
+            (actor_id, task_uuid),
+        )
+
+    _record_task_event(
+        task_id=task_uuid,
+        actor_user_id=actor_id,
+        event_type="task_comment_deleted",
+        old_value={"commentId": int(comment["id"]), "body": str(comment.get("body") or "")},
+    )
+
+    add_audit(KIND, "comment_delete", user, {"task_id": str(task_uuid), "comment_id": int(comment["id"])})
+    logger.info("[TASKS] Comentário excluído | task=%s | comment=%s | actor=%s", task_uuid, comment_id, actor_id)
+    return {"deleted": True, "commentId": int(comment["id"])}
 
 
 @router.get("/tasks/{task_id}/history")

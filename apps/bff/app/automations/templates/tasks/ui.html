@@ -252,6 +252,21 @@
   .next-btn{background:var(--pri);color:#fff;border-color:transparent}
   .comment,.history-item{padding:12px 0;border-bottom:1px solid #eef2f7}
   .comment:last-child,.history-item:last-child{border-bottom:none}
+  .comment-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .comment-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .comment-actions{display:flex;gap:6px;align-items:center}
+  .icon-btn{
+    width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:10px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;
+    font-size:14px;line-height:1;
+  }
+  .icon-btn:hover{background:#f8fafc}
+  .icon-btn.danger{color:#991b1b;border-color:#fecaca;background:#fff5f5}
+  .comment-body{margin-top:8px;white-space:pre-wrap;word-break:break-word}
+  .comment-edit-banner{
+    margin-top:8px;padding:10px 12px;border:1px dashed #bfdbfe;border-radius:12px;
+    background:#eff6ff;color:#1e3a8a;font-size:12px;
+  }
   .history-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:6px}
   .history-summary{font-size:12px;color:#334155;margin-top:4px}
   .hidden{display:none !important}
@@ -467,7 +482,11 @@
             <label>Comentários</label>
             <div id="commentsWrap"></div>
             <textarea id="commentBody" placeholder="Adicionar comentário"></textarea>
-            <div style="margin-top:8px"><button id="addCommentBtn" class="secondary" type="button">Comentar</button></div>
+            <div id="commentEditBanner" class="comment-edit-banner hidden"></div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+              <button id="addCommentBtn" class="secondary" type="button">Comentar</button>
+              <button id="cancelCommentEditBtn" class="ghost hidden" type="button">Cancelar edição</button>
+            </div>
           </div>
 
           <div style="margin-top:16px">
@@ -658,6 +677,8 @@ const state = {
   insights: null,
   management: null,
   historyItems: [],
+  commentEditingId: null,
+  commentEditingTaskId: null,
 };
 
 const STATUS_LABELS = {
@@ -692,6 +713,9 @@ const HISTORY_LABELS = {
   task_deleted: 'Tarefa excluída logicamente',
   task_restored: 'Tarefa restaurada',
   task_comment_added: 'Comentário adicionado',
+  task_comment_edited: 'Comentário editado',
+  task_comment_deleted: 'Comentário excluído',
+  task_comment_updated: 'Comentário editado',
 };
 
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m])); }
@@ -947,6 +971,31 @@ function openHistoryModal(){
 
 function closeHistoryModal(){
   document.getElementById('historyModal').classList.remove('open');
+}
+
+function resetCommentComposer(options={}){
+  const keepBody = Boolean(options.keepBody);
+  state.commentEditingId = null;
+  state.commentEditingTaskId = null;
+  document.getElementById('commentEditBanner').textContent = '';
+  document.getElementById('commentEditBanner').classList.add('hidden');
+  document.getElementById('addCommentBtn').textContent = 'Comentar';
+  document.getElementById('cancelCommentEditBtn').classList.add('hidden');
+  if(!keepBody){
+    document.getElementById('commentBody').value = '';
+  }
+}
+
+function startCommentEdit(taskId, comment){
+  if(!comment || !comment.canEdit) return;
+  state.commentEditingId = Number(comment.id);
+  state.commentEditingTaskId = String(taskId);
+  document.getElementById('commentBody').value = comment.body || '';
+  document.getElementById('commentEditBanner').textContent = 'Você está editando um comentário seu. Clique em "Comentar" para salvar ou em "Cancelar edição" para desistir.';
+  document.getElementById('commentEditBanner').classList.remove('hidden');
+  document.getElementById('addCommentBtn').textContent = 'Salvar comentário';
+  document.getElementById('cancelCommentEditBtn').classList.remove('hidden');
+  document.getElementById('commentBody').focus();
 }
 
 function syncFormMode(mode, item=null){
@@ -1396,6 +1445,7 @@ function resetForm(){
   setAssigneeValue(defaultAssigneeUserId());
   document.getElementById('assignedRoleName').value = '';
   syncFormMode('create');
+  resetCommentComposer();
 }
 
 function fillForm(item){
@@ -1582,6 +1632,7 @@ async function selectTaskContext(id){
 }
 
 async function openTask(id){
+  resetCommentComposer();
   await selectTaskContext(id);
   switchTab(true);
 }
@@ -1618,9 +1669,54 @@ function renderDetail(item, comments){
     };
   });
 
+  resetCommentComposer();
   document.getElementById('commentsWrap').innerHTML = comments.length ? comments.map(c => `
-    <div class="comment"><strong>${esc(c.actorName || 'Usuário')}</strong><br><span class="muted">${esc(dt(c.createdAt))}</span><div>${esc(c.body)}</div></div>
+    <div class="comment" data-comment-id="${esc(c.id)}">
+      <div class="comment-head">
+        <div>
+          <strong>${esc(c.actorName || 'Usuário')}</strong>
+          <div class="comment-meta">
+            <span class="muted">${esc(dt(c.createdAt))}</span>
+            ${c.isEdited ? '<span class="badge ghost">editado</span>' : ''}
+          </div>
+        </div>
+        <div class="comment-actions">
+          ${c.canEdit ? `<button class="icon-btn" type="button" data-comment-edit="${esc(c.id)}" title="Editar comentário" aria-label="Editar comentário">✎</button>` : ''}
+          ${c.canDelete ? `<button class="icon-btn danger" type="button" data-comment-delete="${esc(c.id)}" title="Excluir comentário" aria-label="Excluir comentário">✕</button>` : ''}
+        </div>
+      </div>
+      <div class="comment-body">${esc(c.body)}</div>
+    </div>
   `).join('') : '<div class="empty">Sem comentários ainda.</div>';
+
+  document.getElementById('commentsWrap').querySelectorAll('[data-comment-edit]').forEach(btn => {
+    btn.onclick = () => {
+      const commentId = Number(btn.getAttribute('data-comment-edit'));
+      const found = comments.find(entry => Number(entry.id) === commentId);
+      if(found){
+        startCommentEdit(item.id, found);
+      }
+    };
+  });
+
+  document.getElementById('commentsWrap').querySelectorAll('[data-comment-delete]').forEach(btn => {
+    btn.onclick = async () => {
+      const commentId = Number(btn.getAttribute('data-comment-delete'));
+      if(!confirm('Deseja excluir este comentário?')) return;
+      await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/comments/' + encodeURIComponent(commentId), {
+        method:'DELETE',
+      });
+      if(state.commentEditingId === commentId){
+        resetCommentComposer();
+      }
+      await openTask(item.id);
+      await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+    };
+  });
+
+  document.getElementById('cancelCommentEditBtn').onclick = () => {
+    resetCommentComposer();
+  };
 
   document.getElementById('editCurrentBtn').disabled = !item.canEdit;
   document.getElementById('deleteCurrentBtn').disabled = !item.canDelete;
@@ -1653,7 +1749,7 @@ function renderDetail(item, comments){
     state.current = null;
     state.historyItems = [];
     document.getElementById('commentsWrap').innerHTML = '';
-    document.getElementById('commentBody').value = '';
+    resetCommentComposer();
     resetForm();
     switchTab(false);
     await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
@@ -1661,12 +1757,33 @@ function renderDetail(item, comments){
 
   document.getElementById('addCommentBtn').onclick = async () => {
     const body = document.getElementById('commentBody').value.trim();
+
+    if(state.commentEditingId && state.commentEditingTaskId === String(item.id)){
+      if(body){
+        await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/comments/' + encodeURIComponent(state.commentEditingId), {
+          method:'PUT',
+          body: JSON.stringify({ body }),
+        });
+      }else{
+        await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/comments/' + encodeURIComponent(state.commentEditingId), {
+          method:'DELETE',
+        });
+      }
+      resetCommentComposer();
+      await openTask(item.id);
+      await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
+      return;
+    }
+
     if(!body) return;
-    await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/comments', {
-      method:'POST',
-      body: JSON.stringify({ body }),
-    });
-    document.getElementById('commentBody').value = '';
+    {
+      await api('/api/automations/tasks/tasks/' + encodeURIComponent(item.id) + '/comments', {
+        method:'POST',
+        body: JSON.stringify({ body }),
+      });
+    }
+
+    resetCommentComposer();
     await openTask(item.id);
     await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
   };
