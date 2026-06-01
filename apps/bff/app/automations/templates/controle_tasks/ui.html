@@ -636,69 +636,14 @@
         <div class="lane-list" id="activeAssignmentsList"><div class="note">Carregando…</div></div>
       </div>
     </div>
-    <br/>
-    <div class="dashboard-grid">
-      <div class="stack">
-        <div class="card panel-body">
-          <div class="section-head">
-            <h3>Resumo por responsável</h3>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Responsável</th>
-                  <th>Abertas</th>
-                  <th>Atrasadas</th>
-                  <th>Concluídas</th>
-                  <th>Lead médio</th>
-                </tr>
-              </thead>
-              <tbody id="byUserBody"><tr><td colspan="5"><small>Carregando…</small></td></tr></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card panel-body">
-          <div class="section-head">
-            <h3>Série diária (criação x conclusão)</h3>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Data</th><th>Criadas</th><th>Concluídas</th></tr>
-              </thead>
-              <tbody id="dailySeriesBody"><tr><td colspan="3"><small>Carregando…</small></td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="stack">
-        <div class="card panel-body">
-          <div class="section-head"><h3>Por status</h3></div>
-          <div class="list" id="byStatusList"><div class="note">Carregando…</div></div>
-        </div>
-
-        <div class="card panel-body">
-          <div class="section-head"><h3>Por prioridade</h3></div>
-          <div class="list" id="byPriorityList"><div class="note">Carregando…</div></div>
-        </div>
-
-        <div class="card panel-body">
-          <div class="section-head"><h3>Concluídas recentes</h3></div>
-          <div class="list" id="recentCompletedList"><div class="note">Carregando…</div></div>
-        </div>
-      </div>
-    </div>
   </section>
 
   <section class="master-detail panel">
     <div class="card panel-body">
       <div class="section-head">
         <div>
-          <h2>Drill-down de tarefas</h2>
-          <div class="note">Clique na linha da tarefa para abrir o detalhe contextual e o histórico.</div>
+          <h2>Tarefas do período</h2>
+          <div class="note">Lista resumida para abrir rapidamente o que cada servidor está executando, concluindo ou deixando pendente.</div>
         </div>
         <span class="status" id="tasksCount">0 item(ns)</span>
       </div>
@@ -723,13 +668,77 @@
       <div class="card panel-body">
         <div class="section-head">
           <div>
-            <h2>Tarefa selecionada</h2>
+            <h2>Resumo da tarefa</h2>
             <div class="note" id="historyTaskLabel">Nenhuma tarefa selecionada.</div>
           </div>
         </div>
 
         <div id="selectedTaskBox" class="detail-box">
-          <div class="detail-empty">Clique em uma tarefa no mapa detalhado para ver o resumo executivo e o histórico completo.</div>
+          <div class="detail-empty">Clique em uma tarefa da lista para ver um resumo simples, o prazo e o histórico completo.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card panel panel-body">
+    <div class="section-head">
+      <div>
+        <h2>Indicadores complementares</h2>
+        <div class="note">Blocos auxiliares para leitura do período. Ficam abaixo do painel principal para não competir com a visão por servidor.</div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="stack">
+        <div class="card panel-body">
+          <div class="section-head">
+            <h3>Resumo por responsável</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Responsável</th>
+                  <th>Abertas</th>
+                  <th>Atrasadas</th>
+                  <th>Concluídas</th>
+                  <th>Lead médio</th>
+                </tr>
+              </thead>
+              <tbody id="byUserBody"><tr><td colspan="5"><small>Carregando…</small></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card panel-body">
+          <div class="section-head"><h3>Concluídas recentes</h3></div>
+          <div class="list" id="recentCompletedList"><div class="note">Carregando…</div></div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card panel-body">
+          <div class="section-head"><h3>Por status</h3></div>
+          <div class="list" id="byStatusList"><div class="note">Carregando…</div></div>
+        </div>
+
+        <div class="card panel-body">
+          <div class="section-head"><h3>Por prioridade</h3></div>
+          <div class="list" id="byPriorityList"><div class="note">Carregando…</div></div>
+        </div>
+
+        <div class="card panel-body">
+          <div class="section-head">
+            <h3>Série diária (criação x conclusão)</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Data</th><th>Criadas</th><th>Concluídas</th></tr>
+              </thead>
+              <tbody id="dailySeriesBody"><tr><td colspan="3"><small>Carregando…</small></td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
