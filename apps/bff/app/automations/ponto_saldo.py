@@ -27,21 +27,25 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import HTMLResponse, StreamingResponse
 
 from app.db import add_audit, get_submission, insert_submission, list_submissions, update_submission
+from app.auth.rbac import require_password_changed, require_roles_any
 
 logger = logging.getLogger(__name__)
 
 KIND = "ponto_saldo"
 PONTO_SALDO_VERSION = "0.1.0"
 
+_PONTO_SALDO_ALLOWED_ROLES = ("ca", "rh", "cof")
+
 router = APIRouter(
     prefix="/api/automations/ponto_saldo",
     tags=["automations", "ponto_saldo"],
+    dependencies=[Depends(require_password_changed), Depends(require_roles_any(*_PONTO_SALDO_ALLOWED_ROLES))],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))

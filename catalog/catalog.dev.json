@@ -572,6 +572,7 @@
         "horas",
         "pdf"
       ],
+      "requiredRoles": ["ca", "rh", "cof"],
       "order": 6
     },
     {
