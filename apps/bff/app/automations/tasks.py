@@ -57,6 +57,13 @@ _PRIORITY_VALUES = {"baixa", "media", "alta", "urgente"}
 _DIRECTORATE_ROLE_OPTIONS = ("daf", "dp", "dfq", "dnr", "dre")
 _DIRECTORATE_ROLE_SET = set(_DIRECTORATE_ROLE_OPTIONS)
 
+# Regras de pré-seleção do "Cargo a notificar" na criação de novas tarefas.
+# Formato: (cargo_a_notificar, (roles_que_recebem_esse_pre_set, ...))
+# Ex.: usuários com role "ca", "rh" ou "cof" terão DAF pré-selecionado.
+_PRESET_ASSIGNED_ROLE_RULES = (
+    ("daf", ("ca", "rh", "cof")),
+)
+
 # Compatibilidade com nomes antigos usados em patches/containers anteriores.
 _TASK_TRACKING_ROLE_OPTIONS = _DIRECTORATE_ROLE_OPTIONS
 _TASK_TRACKING_ROLE_SET = _DIRECTORATE_ROLE_SET
@@ -173,6 +180,16 @@ def _user_id_from_session(user: Dict[str, Any]) -> uuid.UUID:
 def _norm_roles(user: Dict[str, Any]) -> set[str]:
     roles = user.get("roles") or []
     return {str(r).strip().lower() for r in roles if str(r).strip()}
+
+
+def _default_assigned_role_name_for_user(user: Dict[str, Any]) -> Optional[str]:
+    roles = _norm_roles(user)
+    for assigned_role_name, source_roles in _PRESET_ASSIGNED_ROLE_RULES:
+        if assigned_role_name not in _DIRECTORATE_ROLE_SET:
+            continue
+        if roles.intersection({str(role).strip().lower() for role in source_roles}):
+            return assigned_role_name
+    return None
 
 
 def _is_elevated(user: Dict[str, Any]) -> bool:
@@ -1149,6 +1166,7 @@ def get_config(user: Dict[str, Any] = Depends(require_password_changed)) -> Dict
             "name": user.get("nome") or user.get("name"),
             "roles": sorted(_norm_roles(user)),
             "elevated": _is_elevated(user),
+            "defaultAssignedRoleName": _default_assigned_role_name_for_user(user),
         },
         "users": _load_users_for_picker(user),
         "roleOptions": _load_role_options(),

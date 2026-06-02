@@ -850,6 +850,9 @@ function userById(id){ return usersList().find(u => String(u.id) === String(id))
 function defaultAssigneeUserId(){
   return state.config?.me?.id || '';
 }
+function defaultAssignedRoleName(){
+  return state.config?.me?.defaultAssignedRoleName || '';
+}
 function setAssigneeValue(userId){
   const hidden = document.getElementById('assignedTo');
   const input = document.getElementById('assignedToSearch');
@@ -1686,7 +1689,7 @@ function resetForm(){
   document.getElementById('formTitle').textContent = 'Nova tarefa';
   document.getElementById('priority').value = 'media';
   setAssigneeValue(defaultAssigneeUserId());
-  document.getElementById('assignedRoleName').value = '';
+  document.getElementById('assignedRoleName').value = defaultAssignedRoleName();
   clearDailySelection();
   syncFormMode('create');
   resetCommentComposer();
@@ -1765,7 +1768,7 @@ async function loadConfig(){
 
   wireAssigneePicker();
   setAssigneeValue(defaultAssigneeUserId());
-  document.getElementById('assignedRoleName').value = '';
+  document.getElementById('assignedRoleName').value = defaultAssignedRoleName();
 
   renderInsights();
   renderManagement();
