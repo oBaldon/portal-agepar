@@ -30,7 +30,7 @@
  * - RBAC: userCanSeeBlock.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Link,
   NavLink,
@@ -100,6 +100,14 @@ export default function App() {
   const { user, loading, logout: doLogout } = useAuth();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const [headerHeight, setHeaderHeight] = useState<number>(56);
+  const [navOnSecondRow, setNavOnSecondRow] = useState<boolean>(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const headerContentRef = useRef<HTMLDivElement | null>(null);
+  const headerRowRef = useRef<HTMLDivElement | null>(null);
+  const brandRef = useRef<HTMLAnchorElement | null>(null);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
+  const navMeasureRef = useRef<HTMLElement | null>(null);
   const NOTIF_EVENT = "portal:notifications:unread";
 
   const nav = useNavigate();
@@ -216,8 +224,10 @@ export default function App() {
 
   const activeCls = ({ isActive }: { isActive: boolean }) =>
     [
-      "px-3 py-1.5 rounded-md text-sm transition",
-      isActive ? "bg-sky-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100",
+      "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition",
+      isActive
+        ? "bg-sky-600 text-white shadow-sm"
+        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
     ].join(" ");
 
   const initials =
@@ -250,96 +260,238 @@ export default function App() {
     });
   }, [catalog, user]);
 
-  return (
-    <div className="min-h-full">
-      <header
-        className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur"
-        style={{ ["--header-h" as any]: "56px" }}
-      >
-        <div className="mx-auto max-w-6xl px-4 h-[var(--header-h)] flex items-center gap-4">
-          <Link to={user ? "/inicio" : "/"} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-sky-600 text-white grid place-items-center font-semibold">
-              A
-            </div>
-            <div className="font-semibold tracking-tight">
-              Plataforma <span className="text-sky-700">AGEPAR</span>
-            </div>
-          </Link>
+  useLayoutEffect(() => {
+    const headerContentEl = headerContentRef.current;
+    if (!headerContentEl) return;
 
+    const syncHeaderHeight = () => {
+      const nextHeight = Math.ceil(
+        headerContentEl.scrollHeight || headerContentEl.offsetHeight || 56,
+      );
+      setHeaderHeight((prev) => (prev !== nextHeight ? nextHeight : prev));
+    };
+
+    syncHeaderHeight();
+    const rafId = window.requestAnimationFrame(syncHeaderHeight);
+
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncHeaderHeight) : null;
+
+    observer?.observe(headerContentEl);
+    window.addEventListener("resize", syncHeaderHeight);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      observer?.disconnect();
+      window.removeEventListener("resize", syncHeaderHeight);
+    };
+  }, [user, visibleCategories, navOnSecondRow]);
+
+  useLayoutEffect(() => {
+    if (!user) {
+      setNavOnSecondRow(false);
+      return;
+    }
+
+    const syncNavLayout = () => {
+      const rowEl = headerRowRef.current;
+      const brandEl = brandRef.current;
+      const actionsEl = actionsRef.current;
+      const navEl = navMeasureRef.current;
+
+      if (!rowEl || !brandEl || !actionsEl || !navEl) {
+        setNavOnSecondRow(false);
+        return;
+      }
+
+      const available = rowEl.getBoundingClientRect().width;
+      const required =
+        brandEl.getBoundingClientRect().width +
+        actionsEl.getBoundingClientRect().width +
+        navEl.getBoundingClientRect().width +
+        48;
+
+      setNavOnSecondRow(required > available);
+    };
+
+    syncNavLayout();
+
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncNavLayout) : null;
+
+    if (headerRowRef.current) observer?.observe(headerRowRef.current);
+    if (brandRef.current) observer?.observe(brandRef.current);
+    if (actionsRef.current) observer?.observe(actionsRef.current);
+    if (navMeasureRef.current) observer?.observe(navMeasureRef.current);
+
+    window.addEventListener("resize", syncNavLayout);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", syncNavLayout);
+    };
+  }, [user, visibleCategories]);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.debug("[host] header layout", { headerHeight, navOnSecondRow });
+    }
+  }, [headerHeight, navOnSecondRow]);
+
+  return (
+    <div
+      className="min-h-full"
+      style={{
+        ["--header-h" as any]: `${headerHeight}px`,
+      }}
+    >
+      <header
+        ref={headerRef}
+        className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-white shadow-sm"
+      >
+        <div ref={headerContentRef} className="mx-auto max-w-6xl px-4 py-3">
           {user && (
-            <>
-              <NavLink to="/inicio" className={activeCls}>
-                Início
-              </NavLink>
-              {visibleCategories.map((cat) => (
-                <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
-                  {cat.label}
-                </NavLink>
-              ))}
-            </>
+            <div className="pointer-events-none absolute -left-[9999px] top-0 invisible">
+              <nav ref={navMeasureRef} className="flex items-center gap-2" aria-hidden="true">
+                <span className="inline-flex shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium">
+                  Início
+                </span>
+                {visibleCategories.map((cat) => (
+                  <span
+                    key={cat.id}
+                    className="inline-flex shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium"
+                  >
+                    {cat.label}
+                  </span>
+                ))}
+              </nav>
+            </div>
           )}
 
-          <div className="ml-auto flex items-center gap-3">
-            {user ? (
-              <>
-                <Link
-                  to="/conta/perfil"
-                  className="flex items-center gap-3 group"
-                  title="Editar meu perfil"
+          <div className="flex flex-col gap-3">
+            <div
+              ref={headerRowRef}
+              className={[
+                "flex items-center gap-3",
+                navOnSecondRow ? "justify-between" : "flex-wrap",
+              ].join(" ")}
+            >
+              <Link
+                ref={brandRef}
+                to={user ? "/inicio" : "/"}
+                className="flex min-w-0 shrink-0 items-center gap-2"
+              >
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-sky-600 font-semibold text-white">
+                  A
+                </div>
+                <div className="truncate font-semibold tracking-tight">
+                  Plataforma <span className="text-sky-700">AGEPAR</span>
+                </div>
+              </Link>
+
+              {user && !navOnSecondRow && (
+                <nav
+                  className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+                  aria-label="Categorias do portal"
                 >
-                  <span className="hidden sm:inline text-sm text-slate-600 group-hover:text-slate-900">
-                    Olá, {user.nome}
-                  </span>
-                  <div
-                    className="h-8 w-8 rounded-full bg-slate-200 grid place-items-center text-xs font-semibold text-slate-700
-                               group-hover:ring-2 group-hover:ring-sky-200"
-                  >
-                    {initials}
-                  </div>
-                </Link>
-                <Link
-                  to="/notificacoes"
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-slate-50"
-                  title="Notificações"
-                  aria-label="Notificações"
-                >
-                  <Bell
-                    className={[
-                      "h-5 w-5",
-                      unreadNotifications > 0 ? "text-rose-600" : "text-slate-700",
-                    ].join(" ")}
-                  />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full border border-white bg-rose-600 text-white text-[10px] font-semibold grid place-items-center">
-                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
-                    </span>
-                  )}
-                </Link>
-                <button
-                  onClick={onLogout}
-                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
-                >
-                  Sair
-                </button>
-              </>
-            ) : (
-              <>
-                <NavLink to="/login" className={activeCls}>
-                  Entrar
-                </NavLink>
-                {ENABLE_SELF_REGISTER && (
-                  <Link
-                    to="/registrar"
-                    className="text-sm border rounded-md px-3 py-1.5 hover:bg-slate-50"
-                  >
-                    Criar conta
-                  </Link>
+                  <NavLink to="/inicio" className={activeCls}>
+                    Início
+                  </NavLink>
+                  {visibleCategories.map((cat) => (
+                    <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
+                      {cat.label}
+                    </NavLink>
+                  ))}
+                </nav>
+              )}
+
+              <div
+                ref={actionsRef}
+                className={[
+                  "flex shrink-0 items-center gap-3",
+                  navOnSecondRow ? "" : "ml-auto",
+                ].join(" ")}
+              >
+                {user ? (
+                  <>
+                    <Link
+                      to="/conta/perfil"
+                      className="group flex items-center gap-3"
+                      title="Editar meu perfil"
+                    >
+                      <span className="hidden max-w-[220px] truncate text-sm text-slate-600 group-hover:text-slate-900 sm:inline">
+                        Olá, {user.nome}
+                      </span>
+                      <div
+                        className="grid h-8 w-8 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700
+                                   group-hover:ring-2 group-hover:ring-sky-200"
+                      >
+                        {initials}
+                      </div>
+                    </Link>
+                    <Link
+                      to="/notificacoes"
+                      className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-slate-50"
+                      title="Notificações"
+                      aria-label="Notificações"
+                    >
+                      <Bell
+                        className={[
+                          "h-5 w-5",
+                          unreadNotifications > 0 ? "text-rose-600" : "text-slate-700",
+                        ].join(" ")}
+                      />
+                      {unreadNotifications > 0 && (
+                        <span className="absolute -top-1 -right-1 grid h-[18px] min-w-[18px] place-items-center rounded-full border border-white bg-rose-600 px-1 text-[10px] font-semibold text-white">
+                          {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                        </span>
+                      )}
+                    </Link>
+                    <button
+                      onClick={onLogout}
+                      className="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50"
+                    >
+                      Sair
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <NavLink to="/login" className={activeCls}>
+                      Entrar
+                    </NavLink>
+                    {ENABLE_SELF_REGISTER && (
+                      <Link
+                        to="/registrar"
+                        className="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50"
+                      >
+                        Criar conta
+                      </Link>
+                    )}
+                  </>
                 )}
-              </>
+            </div>
+            </div>
+
+            {user && navOnSecondRow && (
+              <nav
+                className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 pt-2"
+                aria-label="Categorias do portal"
+              >
+                <NavLink to="/inicio" className={activeCls}>
+                  Início
+                </NavLink>
+                {visibleCategories.map((cat) => (
+                  <NavLink key={cat.id} to={`/categoria/${cat.id}`} className={activeCls}>
+                    {cat.label}
+                  </NavLink>
+                ))}
+              </nav>
             )}
           </div>
         </div>
       </header>
+
+      <div aria-hidden="true" style={{ height: `${headerHeight}px` }} />
 
       <GlobalAlertCenter enabled={canUsePrivilegedPolling} pathname={loc.pathname} />
 

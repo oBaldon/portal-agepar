@@ -6,9 +6,38 @@
   },
   "categories": [
     {
-      "id": "cat1",
+      "id": "compras",
       "label": "Compras",
       "icon": "ShoppingCart"
+    },
+    {
+      "id": "pessoas",
+      "label": "Gestão de Pessoas",
+      "icon": "Users"
+    },
+    {
+      "id": "produtividade",
+      "label": "Produtividade",
+      "icon": "Briefcase"
+    },
+    {
+      "id": "suporte",
+      "label": "Suporte",
+      "icon": "LifeBuoy"
+    },
+    {
+      "id": "governanca",
+      "label": "Governança & Administração",
+      "icon": "Shield",
+      "requiredRoles": [
+        "admin",
+        "coordenador",
+        "daf",
+        "dfq",
+        "dre",
+        "dnr",
+        "dp"
+      ]
     },
     {
       "id": "cat2",
@@ -27,30 +56,6 @@
       "label": "Testes & Lab",
       "icon": "FlaskConical",
       "hidden": true
-    },
-    {
-      "id": "ferias",
-      "label": "Férias",
-      "icon": "CalendarDays"
-    },
-    {
-      "id": "util",
-      "label": "Utilidades",
-      "icon": "Upload"
-    },
-    {
-      "id": "governanca",
-      "label": "Governança & Controle",
-      "icon": "Shield",
-      "requiredRoles": [
-        "admin",
-        "coordenador",
-        "daf",
-        "dfq",
-        "dre",
-        "dnr",
-        "dp"
-      ]
     }
   ],
   "blocks": [
@@ -85,7 +90,7 @@
       "name": "dfd",
       "displayName": "DFD — Documento de Formalização da Demanda",
       "version": "1.0.0",
-      "categoryId": "cat1",
+      "categoryId": "compras",
       "description": "Gerar o Documento de Formalização da Demanda, em PDF, com rastreabilidade.",
       "ui": {
         "type": "iframe",
@@ -117,7 +122,7 @@
       "name": "etp",
       "displayName": "ETP — Estudo Técnico Preliminar",
       "version": "1.0.0",
-      "categoryId": "cat1",
+      "categoryId": "compras",
       "description": "Gerar o Estudo Técnico Preliminar a partir de formulário estruturado, com documento final em DOCX/PDF conforme template institucional.",
       "ui": {
         "type": "iframe",
@@ -150,7 +155,7 @@
       "name": "pca",
       "displayName": "Plano de Contratações Anual",
       "version": "0.0.0",
-      "categoryId": "cat1",
+      "categoryId": "compras",
       "ui": {
         "type": "iframe",
         "url": "/api/demo?view=pca"
@@ -225,7 +230,7 @@
       "name": "form2json",
       "displayName": "Formulário para JSON",
       "version": "1.0.0",
-      "categoryId": "cat1",
+      "categoryId": "compras",
       "ui": {
         "type": "iframe",
         "url": "/api/automations/form2json/ui"
@@ -372,7 +377,7 @@
       "name": "usuarios",
       "displayName": "Usuários (RH)",
       "version": "0.1.0",
-      "categoryId": "governanca",
+      "categoryId": "pessoas",
       "ui": {
         "type": "iframe",
         "url": "/api/automations/usuarios/ui"
@@ -425,7 +430,7 @@
       "name": "ferias",
       "displayName": "Férias — Requerimento e Substituição",
       "version": "0.1.0",
-      "categoryId": "ferias",
+      "categoryId": "pessoas",
       "description": "Requerimento + Substituição em um único fluxo (gera dois PDFs).",
       "ui": {
         "type": "iframe",
@@ -457,7 +462,7 @@
       "name": "tasks",
       "displayName": "Gestão de Tarefas",
       "version": "0.1.0",
-      "categoryId": "util",
+      "categoryId": "produtividade",
       "description": "Organize tarefas pessoais e de equipe com visualização em lista e kanban. Calendário e automações entram nas próximas etapas.",
       "ui": {
         "type": "iframe",
@@ -487,7 +492,7 @@
       "name": "support",
       "displayName": "Suporte & Feedback",
       "version": "1.0.0",
-      "categoryId": "util",
+      "categoryId": "suporte",
       "description": "Relate bugs e melhorias (módulo impactado, gravidade, passos, anexos).",
       "ui": {
         "type": "iframe",
@@ -517,7 +522,7 @@
       "name": "fileshare",
       "displayName": "Uploader temporário",
       "version": "0.1.0",
-      "categoryId": "util",
+      "categoryId": "produtividade",
       "description": "Área comunitária para envio/compartilhamento temporário de arquivos (TTL 1 dia/semana/mês, opção de chave secreta).",
       "ui": {
         "type": "iframe",
@@ -547,7 +552,7 @@
       "name": "ponto_saldo",
       "displayName": "Saldo de Horas (PDF)",
       "version": "0.1.0",
-      "categoryId": "util",
+      "categoryId": "pessoas",
       "description": "Lê o espelho de ponto em PDF, calcula horas faltantes/sobrando e sugere distribuição nos dias úteis restantes do mês (considerando feriados/ponto facultativo conforme o PDF).",
       "ui": {
         "type": "iframe",
