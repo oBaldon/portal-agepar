@@ -192,6 +192,13 @@ def _default_assigned_role_name_for_user(user: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _can_use_multi_assignee(user: Dict[str, Any]) -> bool:
+    if user.get("is_superuser") is True:
+        return True
+    roles = _norm_roles(user)
+    return bool({"admin", "coordenador"} & roles)
+
+
 def _is_elevated(user: Dict[str, Any]) -> bool:
     if user.get("is_superuser") is True:
         return True
@@ -944,6 +951,7 @@ class TaskCreateIn(BaseModel):
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     assigned_to_user_id: Optional[str] = None
+    additional_assigned_to_user_ids: List[str] = Field(default_factory=list)
     source_kind: Optional[str] = None
     source_id: Optional[str] = None
     assigned_role_name: Optional[str] = None
@@ -962,6 +970,8 @@ class TaskCreateIn(BaseModel):
             "startDate": "start_date",
             "dueDate": "due_date",
             "assignedToUserId": "assigned_to_user_id",
+            "assignedToUserIds": "additional_assigned_to_user_ids",
+            "additionalAssignedToUserIds": "additional_assigned_to_user_ids",
             "sourceKind": "source_kind",
             "sourceId": "source_id",
             "assignedRoleName": "assigned_role_name",
@@ -980,6 +990,22 @@ class TaskCreateIn(BaseModel):
             return None
         value = str(value).strip()
         return value or None
+
+    @field_validator("additional_assigned_to_user_ids")
+    @classmethod
+    def _normalize_additional_assigned_to_user_ids(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
+        items = value if isinstance(value, list) else [value]
+        out: List[str] = []
+        seen: set[str] = set()
+        for raw in items:
+            item = str(raw or "").strip()
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            out.append(item)
+        return out
 
     @field_validator("title")
     @classmethod
@@ -1154,6 +1180,8 @@ def get_schema() -> Dict[str, Any]:
             "creatorCanDelete": True,
             "assigneeCanChangeStatus": True,
             "elevatedRoles": ["admin"],
+            "multiAssigneeRoles": ["admin", "coordenador", "superuser"],
+            "multiAssigneeMode": "task-copies-per-assignee",
         },
     }
 
@@ -1166,6 +1194,8 @@ def get_config(user: Dict[str, Any] = Depends(require_password_changed)) -> Dict
             "name": user.get("nome") or user.get("name"),
             "roles": sorted(_norm_roles(user)),
             "elevated": _is_elevated(user),
+            "canUseMultiAssignee": _can_use_multi_assignee(user),
+            "canAssignMultiple": _can_use_multi_assignee(user),
             "defaultAssignedRoleName": _default_assigned_role_name_for_user(user),
         },
         "users": _load_users_for_picker(user),
@@ -1709,10 +1739,28 @@ def list_tasks(
 def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_password_changed)) -> Dict[str, Any]:
     actor_id = _user_id_from_session(user)
 
+    # parse primary assignee (optional)
     if "assigned_to_user_id" in payload.model_fields_set:
         assigned_to_uuid = _parse_uuid(payload.assigned_to_user_id, "assignedToUserId") if payload.assigned_to_user_id else None
     else:
         assigned_to_uuid = actor_id
+
+    additional_assigned_to_uuids: List[uuid.UUID] = []
+    if payload.additional_assigned_to_user_ids:
+        if not _can_use_multi_assignee(user):
+            raise HTTPException(status_code=403, detail="multi-assignee not allowed for this role")
+        if assigned_to_uuid is None:
+            raise HTTPException(status_code=422, detail={"assignedToUserId": "required when using multiple assignees"})
+        seen_targets: set[uuid.UUID] = set()
+        for raw_user_id in payload.additional_assigned_to_user_ids:
+            target_uuid = _parse_uuid(raw_user_id, "additionalAssignedToUserIds")
+            if target_uuid == assigned_to_uuid or target_uuid in seen_targets:
+                continue
+            seen_targets.add(target_uuid)
+            additional_assigned_to_uuids.append(target_uuid)
+
+    assignee_uuids: List[Optional[uuid.UUID]] = [assigned_to_uuid]
+    assignee_uuids.extend(additional_assigned_to_uuids)
 
     scheduled_dates = sorted(set(payload.scheduled_dates or []))
     is_daily_batch = bool(payload.daily_task or scheduled_dates)
@@ -1727,22 +1775,28 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
     if is_daily_batch:
         for scheduled_date in scheduled_dates:
             completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
-            created_specs.append(
-                {
-                    "start_date": scheduled_date,
-                    "due_date": scheduled_date,
-                    "completed_at": completed_at,
-                }
-            )
+            for assignee in assignee_uuids:
+                created_specs.append(
+                    {
+                        "start_date": scheduled_date,
+                        "due_date": scheduled_date,
+                        "completed_at": completed_at,
+                        "assigned_to_user_id": assignee,
+                    }
+                )
     else:
         completed_at = datetime.now(timezone.utc) if payload.status == "concluida" else None
-        created_specs.append(
-            {
-                "start_date": payload.start_date,
-                "due_date": payload.due_date,
-                "completed_at": completed_at,
-            }
-        )
+        for assignee in assignee_uuids:
+            created_specs.append(
+                {
+                    "start_date": payload.start_date,
+                    "due_date": payload.due_date,
+                    "completed_at": completed_at,
+                    "assigned_to_user_id": assignee,
+                }
+            )
+
+    is_multi_assignee = bool(additional_assigned_to_uuids)
 
     created_ids: List[uuid.UUID] = []
     audit_meta = {
@@ -1750,10 +1804,13 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
         "created_count": len(created_specs),
         "status": payload.status,
         "assigned_to_user_id": str(assigned_to_uuid) if assigned_to_uuid else None,
+        "additional_assigned_to_user_ids": [str(v) for v in additional_assigned_to_uuids],
         "source_kind": payload.source_kind,
         "source_id": payload.source_id,
         "assigned_role_name": payload.assigned_role_name,
         "daily_task": is_daily_batch,
+        "multi_assignee": is_multi_assignee,
+        "assignee_target_count": len(assignee_uuids),
         "scheduled_dates": [d.isoformat() for d in scheduled_dates],
     }
 
@@ -1761,6 +1818,7 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
         try:
             with conn.cursor() as cur:
                 for spec in created_specs:
+                    spec_assigned_to = spec.get("assigned_to_user_id")
                     task_id = _insert_task_row(
                         cur,
                         title=payload.title.strip(),
@@ -1771,7 +1829,7 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
                         due_date_value=spec["due_date"],
                         completed_at_value=spec["completed_at"],
                         created_by_user_id=actor_id,
-                        assigned_to_user_id=assigned_to_uuid,
+                        assigned_to_user_id=spec_assigned_to,
                         last_updated_by_user_id=actor_id,
                         source_kind=payload.source_kind,
                         source_id=payload.source_id,
@@ -1786,7 +1844,7 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
                         "startDate": _iso_date(spec["start_date"]),
                         "dueDate": _iso_date(spec["due_date"]),
                         "completedAt": _iso_dt(spec["completed_at"]),
-                        "assignedToUserId": str(assigned_to_uuid) if assigned_to_uuid else None,
+                        "assignedToUserId": str(spec_assigned_to) if spec_assigned_to else None,
                         "assignedRoleName": payload.assigned_role_name,
                         "sourceKind": payload.source_kind,
                         "sourceId": payload.source_id,
@@ -1823,11 +1881,13 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
         created_tasks.append(task)
         _dispatch_task_notification(event_type="task_created", task=task, actor=user)
     logger.info(
-        "[TASKS] Tarefa%s criada%s | count=%s | actor=%s",
+        "[TASKS] Tarefa%s criada%s | count=%s | assignees=%s | actor=%s | multi_assignee=%s",
         "s" if len(created_ids) != 1 else "",
-        " em lote" if is_daily_batch else "",
+        " em lote" if (is_daily_batch or is_multi_assignee) else "",
         len(created_ids),
+        len(assignee_uuids),
         actor_id,
+        is_multi_assignee,
     )
 
     out_items = [_task_to_out(task, user) for task in created_tasks]
@@ -1836,6 +1896,8 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
         "items": out_items,
         "createdCount": len(out_items),
         "dailyTask": is_daily_batch,
+        "multiAssignee": is_multi_assignee,
+        "assigneeTargetCount": len(assignee_uuids),
     }
 
 

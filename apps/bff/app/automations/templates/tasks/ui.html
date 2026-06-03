@@ -139,6 +139,38 @@
   .assignee-empty{padding:10px 12px;color:var(--muted);font-size:12px}
   .assignee-note{font-size:12px;color:var(--muted)}
 
+  .modal-card.assignee-picker-modal{width:min(760px,96vw);overflow:hidden}
+  .modal-head.rounded{border-radius:18px 18px 0 0;background:#fff}
+  .multi-assignee-row{display:grid;gap:10px;margin-top:12px;width:100%}
+  .multi-assignee-launch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;align-items:stretch}
+  .multi-assignee-launch .secondary{width:100%;height:46px;min-height:46px;max-height:46px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:0 14px;font-size:14px}
+  .multi-assignee-tip{height:46px;min-height:46px;max-height:46px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;color:var(--muted);font-size:11px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25}
+  .multi-assignee-summary{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}
+  .multi-assignee-summary.empty{background:#f8fafc;color:var(--muted);font-size:12px}
+  .multi-assignee-summary-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .multi-assignee-summary-head strong{font-size:13px}
+  .multi-assignee-summary-clear{background:#fff;color:#334155;border-color:#cbd5e1;padding:6px 10px;border-radius:10px;font-size:12px}
+  .multi-assignee-note{font-size:12px;color:var(--muted)}
+  .multi-chip-list{display:flex;flex-wrap:wrap;gap:8px}
+  .multi-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:600}
+  .multi-chip button{all:unset;cursor:pointer;font-weight:800;line-height:1}
+  .assignee-modal-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.9fr);gap:12px;align-items:start}
+  .assignee-modal-search{display:grid;gap:6px}
+  .assignee-modal-search label{margin:0}
+  .assignee-modal-meta{margin-top:12px;font-size:12px;color:#334155;font-weight:600}
+  .assignee-modal-list-shell{margin-top:12px;border:1px solid var(--line);border-radius:16px;background:#f8fafc;padding:10px}
+  .assignee-modal-list{display:grid;gap:8px;max-height:320px;overflow:auto;padding-right:4px}
+  .assignee-choice{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff;cursor:pointer;transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease}
+  .assignee-choice:hover{border-color:#93c5fd;background:#f8fbff}
+  .assignee-choice.is-selected{border-color:#93c5fd;background:#eff6ff;box-shadow:0 0 0 1px rgba(37,99,235,.06)}
+  .assignee-choice input{width:18px;height:18px;margin-top:2px;flex:0 0 auto;accent-color:#2563eb}
+  .assignee-choice-main{display:grid;gap:2px}
+  .assignee-choice-main strong{font-size:14px}
+  .assignee-choice-main .sub{font-size:12px;color:var(--muted)}
+  .assignee-modal-empty{padding:18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);text-align:center;background:#fff}
+  .field-lock-note{font-size:12px;color:#1d4ed8}
+  @media (max-width:760px){.multi-assignee-launch,.assignee-modal-top{grid-template-columns:1fr}}
+
   .role-select{width:100%}
   .role-note{font-size:12px;color:var(--muted)}
   .row-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -485,6 +517,14 @@
                 </div>
               </div>
             </div>
+            <div id="multiAssigneeBox" class="multi-assignee-row hidden">
+              <div class="multi-assignee-launch">
+                <button type="button" id="openMultiAssigneeBtn" class="secondary">Mais pessoas</button>
+                <div class="multi-assignee-tip">Cria cópias da mesma tarefa para outras pessoas.</div>
+              </div>
+              <div id="multiAssigneeLockNote" class="field-lock-note hidden">Responsável principal travado enquanto houver responsáveis adicionais selecionados.</div>
+              <div id="multiAssigneeSummary" class="multi-assignee-summary empty">Nenhuma pessoa adicional selecionada.</div>
+            </div>
             <div style="margin-top:10px">
               <label for="assignedRoleName">Cargo a notificar</label>
               <select id="assignedRoleName" class="role-select"></select>
@@ -709,7 +749,7 @@
 
   <div id="historyModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
     <div class="modal-card">
-      <div class="modal-head">
+      <div class="modal-head rounded">
         <div>
           <strong id="historyModalTitle">Histórico da tarefa</strong>
           <div id="historyModalSubtitle" class="help">Carregando…</div>
@@ -724,7 +764,7 @@
 
   <div id="dailyPickerModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dailyPickerTitle">
     <div class="modal-card calendar-picker-modal">
-      <div class="modal-head">
+      <div class="modal-head rounded">
         <div>
           <strong id="dailyPickerTitle">Selecionar dias da tarefa diária</strong>
           <div class="help">Cada dia selecionado gera uma nova tarefa com início e prazo no próprio dia.</div>
@@ -762,6 +802,40 @@
       </div>
     </div>
   </div>
+
+  <div id="multiAssigneeModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="multiAssigneeTitle">
+    <div class="modal-card assignee-picker-modal">
+      <div class="modal-head">
+        <div>
+          <strong id="multiAssigneeTitle">Escolher mais responsáveis</strong>
+          <div class="help">Selecione as pessoas adicionais que devem receber uma cópia desta mesma tarefa.</div>
+        </div>
+        <button id="closeMultiAssigneeBtn" class="secondary" type="button">Fechar</button>
+      </div>
+      <div class="modal-body">
+        <div class="assignee-modal-top">
+          <div id="multiAssigneePrimaryInfo" class="picker-summary"></div>
+          <div class="assignee-modal-search">
+            <label for="multiAssigneeSearch">Buscar pessoas</label>
+            <input id="multiAssigneeSearch" type="text" placeholder="Digite nome ou e-mail"/>
+          </div>
+        </div>
+        <div id="multiAssigneeMeta" class="assignee-modal-meta"></div>
+        <div class="assignee-modal-list-shell">
+          <div id="multiAssigneeList" class="assignee-modal-list"></div>
+        </div>
+        <div class="picker-actions" style="margin-top:16px">
+          <div class="picker-actions-left">
+            <button id="clearMultiAssigneeModalBtn" class="ghost" type="button">Limpar adicionais</button>
+          </div>
+          <div class="picker-actions-right">
+            <button type="button" id="applyMultiAssigneeBtn">Concluir seleção</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -780,6 +854,9 @@ const state = {
   commentEditingTaskId: null,
   dailyPickerMonth: new Date(),
   selectedDailyDates: [],
+  multiAssigneeModalOpen: false,
+  multiAssigneeSearch: '',
+  selectedAdditionalAssigneeIds: [],
 };
 
 const STATUS_LABELS = {
@@ -848,16 +925,171 @@ function assigneeDisplay(userId){
 function usersList(){ return state.config?.users || []; }
 function userById(id){ return usersList().find(u => String(u.id) === String(id)) || null; }
 function defaultAssigneeUserId(){
-  return state.config?.me?.id || '';
+  return canUseMultiAssignee() ? '' : (state.config?.me?.id || '');
 }
 function defaultAssignedRoleName(){
   return state.config?.me?.defaultAssignedRoleName || '';
+}
+function canUseMultiAssignee(){
+  return Boolean(state.config?.me?.canUseMultiAssignee ?? state.config?.me?.canAssignMultiple);
+}
+function additionalAssigneeIds(){
+  return Array.from(new Set((state.selectedAdditionalAssigneeIds || []).map(v => String(v || '').trim()).filter(Boolean)));
+}
+function multiAssigneeTotalCount(){
+  const extraCount = additionalAssigneeIds().length;
+  const dayCount = dailyDatesSelected().length || 1;
+  return (1 + extraCount) * dayCount;
+}
+function clearAdditionalAssignees(){
+  state.selectedAdditionalAssigneeIds = [];
+  state.multiAssigneeSearch = '';
+  syncMultiAssigneeUi();
+}
+function removeAdditionalAssignee(userId){
+  state.selectedAdditionalAssigneeIds = additionalAssigneeIds().filter(id => id !== String(userId));
+  syncMultiAssigneeUi();
+  renderMultiAssigneeModal();
+}
+function syncPrimaryAssigneeLock(){
+  const input = document.getElementById('assignedToSearch');
+  const hasExtras = additionalAssigneeIds().length > 0;
+  const shouldLock = hasExtras || state.multiAssigneeModalOpen;
+  input.disabled = shouldLock;
+  document.getElementById('multiAssigneeLockNote').classList.toggle('hidden', !hasExtras);
+}
+function renderMultiAssigneeSummary(){
+  const box = document.getElementById('multiAssigneeBox');
+  const summary = document.getElementById('multiAssigneeSummary');
+  if(!box || !summary) return;
+  if(!canUseMultiAssignee()){
+    box.classList.add('hidden');
+    return;
+  }
+  const taskId = document.getElementById('taskId').value;
+  const visible = !taskId;
+  box.classList.toggle('hidden', !visible);
+  if(!visible) return;
+  const extras = additionalAssigneeIds().map(userById).filter(Boolean);
+  if(!extras.length){
+    summary.className = 'multi-assignee-summary empty';
+    summary.innerHTML = 'Nenhuma pessoa adicional selecionada.';
+    return;
+  }
+  const totalCount = multiAssigneeTotalCount();
+  const dayCount = dailyDatesSelected().length || 1;
+  summary.className = 'multi-assignee-summary';
+  summary.innerHTML = `
+    <div class="multi-assignee-summary-head">
+      <strong>${extras.length} ${extras.length === 1 ? 'pessoa adicional selecionada' : 'pessoas adicionais selecionadas'}</strong>
+      <button type="button" class="multi-assignee-summary-clear" id="clearMultiAssigneeBtn">Limpar</button>
+    </div>
+    <div class="multi-chip-list">
+      ${extras.map(user => `<span class="multi-chip">${esc(user.name || user.email || 'Usuário')} <button type="button" data-remove-additional="${esc(user.id)}" aria-label="Remover ${esc(user.name || user.email || 'usuário')}">×</button></span>`).join('')}
+    </div>
+    <div class="multi-assignee-note">Ao salvar, o sistema criará <strong>${totalCount}</strong> ${totalCount === 1 ? 'tarefa' : 'tarefas'} (${1 + extras.length} ${1 + extras.length === 1 ? 'responsável' : 'responsáveis'} × ${dayCount} ${dayCount === 1 ? 'data' : 'datas'}).</div>
+  `;
+  summary.querySelector('#clearMultiAssigneeBtn')?.addEventListener('click', clearAdditionalAssignees);
+  summary.querySelectorAll('[data-remove-additional]').forEach(btn => {
+    btn.onclick = () => removeAdditionalAssignee(btn.getAttribute('data-remove-additional'));
+  });
+}
+function syncMultiAssigneeUi(){
+  renderMultiAssigneeSummary();
+  syncPrimaryAssigneeLock();
+}
+function availableAdditionalUsers(term=''){
+  const normalized = String(term || '').trim().toLowerCase();
+  const primaryId = String(document.getElementById('assignedTo').value || '');
+  const selected = new Set(additionalAssigneeIds());
+  return usersList()
+    .filter(user => {
+      const id = String(user?.id || '');
+      if(!id || id === primaryId) return false;
+      if(!normalized) return true;
+      const name = String(user?.name || '').toLowerCase();
+      const email = String(user?.email || '').toLowerCase();
+      return name.includes(normalized) || email.includes(normalized);
+    })
+    .sort((a,b) => String(a?.name || a?.email || '').localeCompare(String(b?.name || b?.email || ''), 'pt-BR'))
+    .map(user => ({ ...user, checked: selected.has(String(user.id)) }));
+}
+function renderMultiAssigneeModal(){
+  const list = document.getElementById('multiAssigneeList');
+  const searchInput = document.getElementById('multiAssigneeSearch');
+  const primaryInfo = document.getElementById('multiAssigneePrimaryInfo');
+  const meta = document.getElementById('multiAssigneeMeta');
+  if(!list || !searchInput || !primaryInfo || !meta) return;
+  searchInput.value = state.multiAssigneeSearch || '';
+  const primaryUser = userById(document.getElementById('assignedTo').value || '');
+  primaryInfo.innerHTML = primaryUser
+    ? `<strong>Responsável principal</strong><div class="help">${esc(primaryUser.name || '')}${primaryUser.email ? ` — ${esc(primaryUser.email)}` : ''}</div>`
+    : `<strong>Selecione primeiro o responsável principal</strong><div class="help">A lista adicional será habilitada depois que o campo “Responsável” estiver preenchido.</div>`;
+  if(!primaryUser){
+    meta.textContent = '';
+    list.innerHTML = '<div class="assignee-modal-empty">Escolha primeiro o responsável principal para selecionar pessoas adicionais.</div>';
+    return;
+  }
+  const users = availableAdditionalUsers(state.multiAssigneeSearch || '');
+  const selectedCount = additionalAssigneeIds().length;
+  meta.textContent = users.length
+    ? `${users.length} ${users.length === 1 ? 'pessoa disponível' : 'pessoas disponíveis'}${selectedCount ? ` • ${selectedCount} selecionada(s)` : ''}`
+    : 'Nenhuma pessoa disponível para este filtro.';
+  if(!users.length){
+    list.innerHTML = '<div class="assignee-modal-empty">Nenhum usuário encontrado para este filtro.</div>';
+    return;
+  }
+  list.innerHTML = users.map(user => `
+    <label class="assignee-choice ${user.checked ? 'is-selected' : ''}">
+      <input type="checkbox" data-multi-assignee="${esc(user.id)}" ${user.checked ? 'checked' : ''}/>
+      <div class="assignee-choice-main">
+        <strong>${esc(user.name || 'Usuário')}</strong>
+        <span class="sub">${esc(user.email || 'Sem e-mail cadastrado')}</span>
+      </div>
+    </label>
+  `).join('');
+  list.querySelectorAll('[data-multi-assignee]').forEach(input => {
+    input.onchange = () => {
+      const id = input.getAttribute('data-multi-assignee');
+      const current = new Set(additionalAssigneeIds());
+      if(input.checked) current.add(id); else current.delete(id);
+      state.selectedAdditionalAssigneeIds = Array.from(current);
+      renderMultiAssigneeModal();
+      syncMultiAssigneeUi();
+    };
+  });
+}
+function openMultiAssigneeModal(){
+  if(!canUseMultiAssignee()) return;
+  syncAssigneeHiddenFromInput();
+  const primaryId = String(document.getElementById('assignedTo').value || '');
+  if(!primaryId){
+    alert('Selecione primeiro o responsável principal.');
+    document.getElementById('assignedToSearch').focus();
+    return;
+  }
+  state.multiAssigneeModalOpen = true;
+  state.multiAssigneeSearch = '';
+  renderMultiAssigneeModal();
+  syncPrimaryAssigneeLock();
+  document.getElementById('multiAssigneeModal').classList.add('open');
+  document.getElementById('multiAssigneeSearch').focus();
+}
+function closeMultiAssigneeModal(){
+  state.multiAssigneeModalOpen = false;
+  document.getElementById('multiAssigneeModal').classList.remove('open');
+  syncPrimaryAssigneeLock();
 }
 function setAssigneeValue(userId){
   const hidden = document.getElementById('assignedTo');
   const input = document.getElementById('assignedToSearch');
   hidden.value = userId || '';
   input.value = assigneeDisplay(userId || '');
+  if(userId){
+    state.selectedAdditionalAssigneeIds = additionalAssigneeIds().filter(id => id !== String(userId));
+  }
+  syncMultiAssigneeUi();
+  renderMultiAssigneeModal();
 }
 function assigneeMatches(user, term){
   if(!term) return true;
@@ -1691,6 +1923,7 @@ function resetForm(){
   setAssigneeValue(defaultAssigneeUserId());
   document.getElementById('assignedRoleName').value = defaultAssignedRoleName();
   clearDailySelection();
+  clearAdditionalAssignees();
   syncFormMode('create');
   resetCommentComposer();
 }
@@ -1705,6 +1938,7 @@ function fillForm(item){
   document.getElementById('startDate').value = item.startDate || '';
   document.getElementById('dueDate').value = item.dueDate || '';
   clearDailySelection();
+  clearAdditionalAssignees();
   document.getElementById('formTitle').textContent = 'Editar tarefa';
   syncFormMode('edit', item);
 }
@@ -1719,6 +1953,7 @@ function fillFormForCopy(item){
   document.getElementById('startDate').value = item.startDate || '';
   document.getElementById('dueDate').value = item.dueDate || '';
   clearDailySelection();
+  clearAdditionalAssignees();
   document.getElementById('formTitle').textContent = 'Copiar tarefa';
   syncFormMode('copy', item);
 }
@@ -1769,6 +2004,7 @@ async function loadConfig(){
   wireAssigneePicker();
   setAssigneeValue(defaultAssigneeUserId());
   document.getElementById('assignedRoleName').value = defaultAssignedRoleName();
+  syncMultiAssigneeUi();
 
   renderInsights();
   renderManagement();
@@ -2071,6 +2307,10 @@ async function onSubmit(ev){
     payload.dailyTask = true;
     payload.scheduledDates = selectedDates;
   }
+  const additionalAssigneeIdsPayload = additionalAssigneeIds();
+  if(additionalAssigneeIdsPayload.length && !document.getElementById('taskId').value){
+    payload.additionalAssignedToUserIds = additionalAssigneeIdsPayload;
+  }
   const taskId = document.getElementById('taskId').value;
   let result;
   if(taskId){
@@ -2087,7 +2327,15 @@ async function onSubmit(ev){
   resetForm();
   await Promise.all([loadTasks(), loadSummary(), loadInsights(), loadManagement(), loadActivity()]);
   if(result?.createdCount > 1){
-    alert(`${result.createdCount} tarefas foram criadas com base nos dias selecionados.`);
+    if(result?.multiAssignee && result?.dailyTask){
+      alert(`${result.createdCount} tarefas foram criadas com base nos responsáveis e nos dias selecionados.`);
+    }else if(result?.multiAssignee){
+      alert(`${result.createdCount} tarefas foram criadas, uma para cada responsável selecionado.`);
+    }else if(result?.dailyTask){
+      alert(`${result.createdCount} tarefas foram criadas com base nos dias selecionados.`);
+    }else{
+      alert(`${result.createdCount} tarefas foram criadas.`);
+    }
   }
 }
 
@@ -2153,6 +2401,20 @@ async function boot(){
   });
   document.getElementById('openDailyPickerBtn').onclick = openDailyPicker;
   document.getElementById('clearDailyDatesBtn').onclick = () => clearDailySelection();
+  document.getElementById('openMultiAssigneeBtn').onclick = openMultiAssigneeModal;
+  document.getElementById('closeMultiAssigneeBtn').onclick = closeMultiAssigneeModal;
+  document.getElementById('clearMultiAssigneeModalBtn').onclick = () => {
+    clearAdditionalAssignees();
+    renderMultiAssigneeModal();
+  };
+  document.getElementById('applyMultiAssigneeBtn').onclick = closeMultiAssigneeModal;
+  document.getElementById('multiAssigneeSearch').addEventListener('input', (ev) => {
+    state.multiAssigneeSearch = ev.target.value || '';
+    renderMultiAssigneeModal();
+  });
+  document.getElementById('multiAssigneeModal').addEventListener('click', (ev) => {
+    if(ev.target.id === 'multiAssigneeModal') closeMultiAssigneeModal();
+  });
   document.getElementById('closeDailyPickerBtn').onclick = closeDailyPicker;
   document.getElementById('dailyPickerPrevBtn').onclick = () => moveDailyPickerMonth(-1);
   document.getElementById('dailyPickerNextBtn').onclick = () => moveDailyPickerMonth(1);
@@ -2166,10 +2428,12 @@ async function boot(){
     if(ev.key === 'Escape'){
       closeHistoryModal();
       closeDailyPicker();
+      closeMultiAssigneeModal();
     }
   });
   renderDailySelectionSummary();
   syncDailyModeUi();
+  syncMultiAssigneeUi();
   document.getElementById('taskForm').addEventListener('submit', onSubmit);
 }
 boot().catch(err => {
