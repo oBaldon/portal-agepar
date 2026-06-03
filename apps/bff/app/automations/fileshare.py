@@ -10,7 +10,7 @@ paginada de itens e limpeza de itens expirados.
 
 Segurança/RBAC
 --------------
-- Router protegido por `require_roles_any("user", "coordenador", "admin")`.
+- Router protegido por `require_roles_any("user", "admin")`.
 - Todas as rotas exigem autenticação, exceto o download por token público.
 - Download autenticado respeita proteção por senha, exceto para superusuário.
 - Links públicos:
@@ -69,7 +69,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/automations/fileshare",
     tags=["automations", "fileshare"],
-    dependencies=[Depends(require_roles_any("user", "coordenador", "admin"))],
+    dependencies=[Depends(require_roles_any("user", "admin"))],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))

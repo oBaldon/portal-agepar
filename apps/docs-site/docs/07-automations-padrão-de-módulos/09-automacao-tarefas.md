@@ -51,7 +51,7 @@ Tabelas introduzidas:
 
 - usuários autenticados acessam o módulo
 - usuários comuns veem tarefas que criaram ou que lhes foram atribuídas
-- admin/coordenador possuem visão ampliada
+- admin possui visão ampliada
 - somente o criador pode excluir sua tarefa na operação normal
 - a restauração de tarefa excluída segue a mesma lógica do criador, com visão ampliada para perfis elevados
 
@@ -85,7 +85,7 @@ As notificações usam o mecanismo central do Portal, portanto podem chegar tant
 
 ## Visão gerencial preparatória
 
-Perfis elevados (`admin` / `coordenador`) passam a ter um primeiro bloco gerencial ainda dentro do próprio módulo de tarefas, com:
+Perfis elevados (`admin`) passam a ter um primeiro bloco gerencial ainda dentro do próprio módulo de tarefas, com:
 
 - resumo global de abertas / concluídas / atrasadas / em revisão
 - distribuição por status

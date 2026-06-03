@@ -482,7 +482,7 @@ Se você não tem certeza se algo merece auditoria, pergunte:
 ### 6.1. cURL — buscando auditoria pelo painel de controle
 
 ```bash title="Listando auditoria de DFD pelo painel de controle" showLineNumbers
-# Exige papel coordenador/admin ou superuser
+# Exige papel admin ou superuser
 curl -X GET \
   -H "Cookie: session=<cookie-válido>" \
   "http://localhost:8000/api/automations/controle/audits?kind=dfd&action=download&limit=20"

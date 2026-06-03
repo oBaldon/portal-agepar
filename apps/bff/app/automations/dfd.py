@@ -11,7 +11,7 @@ Visão geral
 - Expõe endpoints para schema, listagem/consulta de submissões do autor,
   download de resultados e páginas de UI.
 - Aplica RBAC: criação/listagem exigem o papel "compras"; downloads permitem
-  também "coordenador" e "admin".
+    também "admin".
 
 Integrações
 -----------
@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 KIND = "dfd"
 DFD_VERSION = "2.6.0"
 REQUIRED_ROLES = ("compras",)
-ELEVATED_ROLES = ("admin", "coordenador")
+ELEVATED_ROLES = ("admin",)
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "dfd"
 ENV_REAJUSTE_PCA_ACTIVE = "DFD_REAJUSTE_PCA_ACTIVE"
@@ -351,7 +351,7 @@ def _can_access_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
     Regras
     ------
     - Dono da submissão sempre pode acessar.
-    - Papéis elevados (`admin` ou `coordenador`) podem acessar independentemente do autor.
+    - Papéis elevados (`admin`) podem acessar independentemente do autor.
     """
     if _owns_submission(row, user):
         return True
@@ -1608,7 +1608,7 @@ async def submit_dfd(
 async def download_result(
     sid: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("compras", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("compras", "admin")),
 ):
     """
     Download primário do resultado: retorna PDF quando disponível; caso contrário, DOCX.
@@ -1616,7 +1616,7 @@ async def download_result(
     Permissões
     ----------
     - Dono da submissão, ou
-    - Papéis elevados (`admin`/`coordenador`), ou
+    - Papéis elevados (`admin`), ou
     - Papel específico da automação (`compras`).
     """
     try:
@@ -1683,7 +1683,7 @@ async def download_result_fmt(
     sid: str,
     fmt: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("compras", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("compras", "admin")),
 ):
     """
     Download explícito por formato.

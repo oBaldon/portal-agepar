@@ -16,7 +16,7 @@ Escopo da Fase 1B
 Observações
 -----------
 - O módulo foi desenhado para usuários autenticados.
-- Admin/coordenador possuem visão ampliada; demais usuários veem tarefas que
+- Admin possuem visão ampliada; demais usuários veem tarefas que
   criaram ou que lhes foram atribuídas.
 - A base foi preparada para evoluir no futuro com calendário, métricas e
   gatilhos de notificação.
@@ -196,7 +196,7 @@ def _is_elevated(user: Dict[str, Any]) -> bool:
     if user.get("is_superuser") is True:
         return True
     roles = _norm_roles(user)
-    return bool({"admin", "coordenador"} & roles)
+    return bool({"admin"} & roles)
 
 
 def _ensure_elevated(user: Dict[str, Any]) -> None:
@@ -1153,7 +1153,7 @@ def get_schema() -> Dict[str, Any]:
             "creatorCanEdit": True,
             "creatorCanDelete": True,
             "assigneeCanChangeStatus": True,
-            "elevatedRoles": ["admin", "coordenador"],
+            "elevatedRoles": ["admin"],
         },
     }
 

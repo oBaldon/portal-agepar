@@ -203,7 +203,7 @@ flowchart LR
 RBAC (hoje, em `dfd.py`):
 
 * Criação/listagem: **papel `compras`** (mínimo);
-* Downloads: `compras`, `coordenador`, `admin` (papeis elevados).
+* Downloads: `compras`, `admin`.
 
 ---
 

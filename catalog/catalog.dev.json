@@ -31,7 +31,6 @@
       "icon": "Shield",
       "requiredRoles": [
         "admin",
-        "coordenador",
         "daf",
         "dfq",
         "dre",
@@ -177,7 +176,6 @@
         "utilitário"
       ],
       "requiredRoles": [
-        "coordenador",
         "admin"
       ]
     },
@@ -216,7 +214,6 @@
         "auditoria"
       ],
       "requiredRoles": [
-        "coordenador",
         "admin",
         "daf",
         "dfq",
@@ -577,7 +574,11 @@
         "horas",
         "pdf"
       ],
-      "requiredRoles": ["ca", "rh", "cof"],
+      "requiredRoles": [
+        "ca",
+        "rh",
+        "cof"
+      ],
       "order": 6
     },
     {

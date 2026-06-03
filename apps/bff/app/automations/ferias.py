@@ -12,7 +12,7 @@ substituição. Os arquivos resultantes são disponibilizados para download
 Segurança/RBAC
 --------------
 - Submeter e consultar submissões próprias exige o papel "ferias".
-- Downloads aceitam também papéis elevados "coordenador" e "admin".
+- Downloads aceitam também o papel elevado "admin".
 - Listagem de auditoria administrativa exige "admin".
 
 Efeitos colaterais
@@ -233,7 +233,7 @@ logger = logging.getLogger(__name__)
 KIND = "ferias"
 FERIAS_VERSION = "0.2.2"
 REQUIRED_ROLES = ("ferias",)
-ELEVATED_ROLES = ("admin", "coordenador")
+ELEVATED_ROLES = ("admin",)
 FERIAS_DEBUG_LOG = os.getenv("FERIAS_DEBUG_LOG", "0").lower() in ("1", "true", "yes")
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "ferias"
 
@@ -422,7 +422,7 @@ def _can_access_submission(row: Dict[str, Any], user: Dict[str, Any]) -> bool:
     Regras
     ------
     - Dono pode acessar.
-    - Papéis elevados (admin/coordenador) também podem.
+    - Papéis elevados (admin) também podem.
 
     Retorna
     -------
@@ -1241,7 +1241,7 @@ async def submit_ferias(
 async def download_zip(
     sid: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("ferias", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("ferias", "admin")),
 ):
     """
     Baixa um arquivo ZIP contendo ambos os PDFs gerados.
@@ -1312,7 +1312,7 @@ async def download_one(
     sid: str,
     fmt: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("ferias", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("ferias", "admin")),
 ):
     """
     Baixa especificamente um dos PDFs: "requerimento" ou "substituicao".

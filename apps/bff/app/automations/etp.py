@@ -20,7 +20,7 @@ Estratégia de geração DOCX
 Segurança/RBAC
 --------------
 - Submeter e listar exige o papel "compras".
-- Downloads aceitam também "coordenador" e "admin".
+- Downloads aceitam também "admin".
 - Auditoria administrativa exige "admin".
 
 Persistência
@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 KIND = "etp"
 ETP_VERSION = "1.0.0"
 REQUIRED_ROLES = ("compras",)
-ELEVATED_ROLES = ("admin", "coordenador")
+ELEVATED_ROLES = ("admin",)
 
 TEMPLATE_PATH = pathlib.Path(os.environ.get("ETP_TEMPLATE_PATH", "/app/templates/etp/model.docx"))
 OUTPUT_DIR = pathlib.Path(os.environ.get("ETP_OUTPUT_DIR", "/app/data/files/etp"))
@@ -1054,7 +1054,7 @@ async def submit_etp(
 async def download_result(
     sid: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("compras", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("compras", "admin")),
 ):
     """
     Download primário: retorna PDF quando disponível; caso contrário, DOCX.
@@ -1122,7 +1122,7 @@ async def download_result_fmt(
     sid: str,
     fmt: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_roles_any("compras", "coordenador", "admin")),
+    user: Dict[str, Any] = Depends(require_roles_any("compras", "admin")),
 ):
     """
     Download explícito por formato: `pdf` ou `docx`.

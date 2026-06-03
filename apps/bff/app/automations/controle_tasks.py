@@ -42,7 +42,6 @@ logger = logging.getLogger(__name__)
 
 _CONTROL_TASKS_ALLOWED_ROLES = {
     "admin",
-    "coordenador",
     *{str(role).strip().lower() for role in tasks_automation._load_role_options()},
 }
 

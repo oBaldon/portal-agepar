@@ -822,7 +822,7 @@ def delete_notification(notification_id: str, request: Request, user: Dict[str, 
 @router.post(
     "/send",
     response_model=SendNotificationOut,
-    dependencies=[Depends(require_roles_any("admin", "coordenador"))],
+    dependencies=[Depends(require_roles_any("admin"))],
 )
 def send_notification_http(payload: SendNotificationIn, request: Request, user: Dict[str, Any] = Depends(require_auth)):
     try:

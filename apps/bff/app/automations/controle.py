@@ -11,7 +11,7 @@ Fornece uma UI simples e endpoints para consulta e exportação de:
 Segurança
 ---------
 - Todos os endpoints são protegidos por RBAC e exigem **qualquer um** dos seguintes:
-  `coordenador`, `admin`, cargos diretivos elegíveis (`daf`, `dfq`, `dre`, `dnr`, `dp`)
+    `admin`, cargos diretivos elegíveis (`daf`, `dfq`, `dre`, `dnr`, `dp`)
   **ou** usuário com `is_superuser == true`.
 
 Compatibilidade
@@ -65,7 +65,6 @@ logger = logging.getLogger(__name__)
 
 _CONTROL_ALLOWED_ROLES = {
     "admin",
-    "coordenador",
     *{str(role).strip().lower() for role in tasks_automation._load_role_options()},
 }
 

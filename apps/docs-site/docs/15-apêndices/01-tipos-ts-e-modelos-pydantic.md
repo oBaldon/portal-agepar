@@ -90,7 +90,7 @@ Exemplo de JSON compatível:
   "cpf": "12345678901",
   "nome": "Servidor(a) Exemplo",
   "email": "exemplo@agepar.pr.gov.br",
-  "roles": ["compras", "coordenador"],
+  "roles": ["compras"],
   "unidades": ["AGEPAR"],
   "auth_mode": "local",
   "is_superuser": false,

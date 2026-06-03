@@ -14,7 +14,7 @@ Normaliza submissões do tipo "ferias" em eventos padronizados e expõe:
 Segurança
 ---------
 Todos os endpoints são protegidos por RBAC e exigem pelo menos um dos papéis:
-`"coordenador"`, `"admin"`, `"rh"` ou um dos cargos diretivos (`"daf"`, `"dfq"`, `"dre"`, `"dnr"`, `"dp"`).
+`"admin"`, `"rh"` ou um dos cargos diretivos (`"daf"`, `"dfq"`, `"dre"`, `"dnr"`, `"dp"`).
 
 Detalhes de implementação
 -------------------------
@@ -45,6 +45,7 @@ from app import db as db
 logger = logging.getLogger(__name__)
 
 _CONTROL_FERIAS_ALLOWED_ROLES = ("coordenador", "admin", "rh", "daf", "dfq", "dre", "dnr", "dp")
+_CONTROL_FERIAS_ALLOWED_ROLES = ("admin", "rh", "daf", "dfq", "dre", "dnr", "dp")
 
 router = APIRouter(
     prefix="/api/automations/controle/ferias",
@@ -432,7 +433,7 @@ def list_events(
     Regras adicionais
     -----------------
     - Submissões marcadas como soft delete (via automação `ferias`) são ignoradas
-      completamente e não geram eventos, mesmo para admin/coordenador.
+            completamente e não geram eventos, mesmo para admin.
 
     Retorna
     -------

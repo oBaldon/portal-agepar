@@ -107,7 +107,7 @@ Trecho simplificado do catálogo:
       "categoryId": "cat1",
       "ui": { "type": "iframe", "url": "/api/demo?view=pca" },
       "routes": [{ "path": "/pca", "kind": "iframe" }],
-      "requiredRoles": ["coordenador", "admin"]
+      "requiredRoles": ["admin"]
     },
     {
       "name": "form2json",
@@ -140,7 +140,7 @@ Pontos-chave:
   KIND = "dfd"
   DFD_VERSION = "2.4.0"
   REQUIRED_ROLES = ("compras",)
-  ELEVATED_ROLES = ("admin", "coordenador")
+  ELEVATED_ROLES = ("admin",)
   ```
 
   ```python
@@ -208,10 +208,10 @@ Efeitos práticos:
 * O fluxo de compras **depende de RBAC** correto:
 
   * `compras` para uso do DFD,
-  * `coordenador`, `admin` para PCA, controle, etc.
+  * `admin` para PCA, controle, etc.
 * O **Painel de Controle (`controle`)** é o lugar onde:
 
-  * um coordenador consegue ver as submissões `KIND="dfd"`,
+  * um admin consegue ver as submissões `KIND="dfd"`,
   * auditar quem enviou, quando e qual foi o resultado (artefato gerado).
 
 ### 4.2 Suporte, anexos e arquivos temporários

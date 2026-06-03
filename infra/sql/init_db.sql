@@ -287,7 +287,7 @@ CREATE INDEX IF NOT EXISTS ix_app_logs_context ON app_logs USING GIN (context);
 
 -- Seeds mínimos (dev)
 INSERT INTO roles (name, description)
-VALUES ('admin','Acesso administrativo'), ('coordenador','Papel de coordenação')
+VALUES ('admin','Acesso administrativo'), ('coordenador','Papel legado sem atribuições padrão')
 ON CONFLICT (name) DO NOTHING;
 
 WITH existing AS (

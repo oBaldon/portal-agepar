@@ -53,7 +53,7 @@ Resposta:
 
 `POST /api/notifications/read-all` → `204`
 
-### Enviar (admin/coordenador)
+### Enviar (admin)
 
 `POST /api/notifications/send`
 

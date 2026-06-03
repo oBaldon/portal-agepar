@@ -12,7 +12,7 @@ o download do JSON "bonito" e a geração de um documento PDF do relato.
 RBAC / Segurança
 ----------------
 - O `router` exige autenticação e, por padrão, qualquer papel listado em
-  `require_roles_any("user", "compras", "ferias", "coordenador", "admin", "controle", "auditor")`.
+    `require_roles_any("user", "compras", "ferias", "admin", "controle", "auditor")`.
 - Endpoints sensíveis (download de JSON e geração de documento) são
   restritos aos papéis em `ALLOWED_AUDIT_ROLES` e ainda validam via `_has_audit_role`.
 - As consultas de submissões por ID garantem ownership comparando CPF/e-mail.
@@ -90,7 +90,7 @@ def _has_audit_role(user: Optional[Dict[str, Any]]) -> bool:
 router = APIRouter(
     prefix="/api/automations/support",
     tags=["automations", "support"],
-    dependencies=[Depends(require_roles_any("user", "compras", "ferias", "coordenador", "admin", "controle", "auditor"))],
+    dependencies=[Depends(require_roles_any("user", "compras", "ferias", "admin", "controle", "auditor"))],
 )
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
