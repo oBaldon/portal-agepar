@@ -36,7 +36,7 @@ services:
       org.agepar.service: bff
       org.agepar.env: dev
     environment:
-      DATABASE_URL: "postgresql://${PGUSER:-portal}:${PGPASSWORD:-portaldev}@postgres:5432/${PGDATABASE:-portal}"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://portal:portaldev@postgres:5432/portal}
     depends_on:
       postgres:
         condition: service_healthy

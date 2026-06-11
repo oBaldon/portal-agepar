@@ -20,8 +20,8 @@ services:
       AUTH_MODE: mock
       AUTH_DEFAULT_ROLES: "user,compras,ferias"
       EP_MODE: mock
-      SESSION_SECRET: dev-secret
-      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      SESSION_SECRET: ${SESSION_SECRET:-dev-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       CATALOG_FILE: /catalog/catalog.dev.json
       AUTH_RATE_LIMIT_SCOPE: identifier   # ou "off" em dev
       AUTH_RATE_LIMIT_WINDOW_MINUTES: "10"
@@ -29,15 +29,18 @@ services:
       LOG_LEVEL: INFO
       AUTH_ENABLE_SELF_REGISTER: "false"
       ACCOUNTS_CREATE_LEGACY_ENABLED: "false"  # LEGADO: criação de contas desativada (true => habilita compat)
-      EXPRESSO_MAIL_ENABLED: "true"
-      EXPRESSO_API_BASE: "https://api.expresso.pr.gov.br/celepar"
-      EXPRESSO_API_USER: "plataforma.agepar"
-      EXPRESSO_API_PASSWORD: "Agepar2026"
-      EXPRESSO_MAIL_TIMEOUT_SECONDS: "10"
-      EXPRESSO_MAIL_AUTH_CACHE_SECONDS: "600"
-      PORTAL_PUBLIC_BASE_URL: "http://10.59.1.13:5173/"
-      TASK_WEEKLY_EMAIL_SCHEDULER_ENABLED: "true"
-      TASK_WEEKLY_EMAIL_SCHEDULER_POLL_SECONDS: "60"
+      EXPRESSO_MAIL_ENABLED: ${EXPRESSO_MAIL_ENABLED:-true}
+      EXPRESSO_API_BASE: ${EXPRESSO_API_BASE:-https://api.expresso.pr.gov.br/celepar}
+      EXPRESSO_API_USER: ${EXPRESSO_API_USER:-}
+      EXPRESSO_API_PASSWORD: ${EXPRESSO_API_PASSWORD:-}
+      EXPRESSO_MAIL_TIMEOUT_SECONDS: ${EXPRESSO_MAIL_TIMEOUT_SECONDS:-10}
+      EXPRESSO_MAIL_AUTH_CACHE_SECONDS: ${EXPRESSO_MAIL_AUTH_CACHE_SECONDS:-600}
+      PORTAL_PUBLIC_BASE_URL: ${PORTAL_PUBLIC_BASE_URL:-http://10.59.1.13:5173/}
+      TASK_WEEKLY_EMAIL_SCHEDULER_ENABLED: ${TASK_WEEKLY_EMAIL_SCHEDULER_ENABLED:-true}
+      TASK_WEEKLY_EMAIL_SCHEDULER_POLL_SECONDS: ${TASK_WEEKLY_EMAIL_SCHEDULER_POLL_SECONDS:-60}
+      DFD_REAJUSTE_PCA_ACTIVE: ${DFD_REAJUSTE_PCA_ACTIVE:-false}
+      DFD_ACCEPTING: ${DFD_ACCEPTING:-1}
+      FERIAS_DEBUG_LOG: ${FERIAS_DEBUG_LOG:-1}
     volumes:
       - ../apps/bff:/app
       - ../catalog:/catalog:ro
@@ -53,8 +56,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    env_file:
-      - .env
   host:
     image: node:20-alpine
     container_name: portal-agepar-host

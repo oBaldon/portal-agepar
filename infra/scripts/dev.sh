@@ -14,21 +14,21 @@ shopt -s extglob
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ROOT_DIR="$(cd "${INFRA_DIR}/.." && pwd)"
 
 DEV_YML="${INFRA_DIR}/docker-compose.dev.yml"
 PG_YML="${INFRA_DIR}/docker-compose.pg.yml"
-
-# Variáveis de ambiente com defaults para exibição
-PGPORT_MAP="${PGPORT_MAP:-5432}"
-PGDATABASE="${PGDATABASE:-portal}"
-PGUSER="${PGUSER:-portal}"
+ROOT_ENV="${ROOT_DIR}/.env"
 
 # Resolve docker compose vs docker-compose
+# IMPORTANTE:
+# - usa o .env da raiz explicitamente
+# - NÃO usa --project-directory, para não quebrar os paths ../apps/... dos YAMLs
 dc() {
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
+    docker compose --env-file "$ROOT_ENV" "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
+    docker-compose --env-file "$ROOT_ENV" "$@"
   else
     echo "Erro: nem 'docker compose' nem 'docker-compose' encontrados no PATH." >&2
     exit 127
@@ -38,6 +38,23 @@ dc() {
 compose_cmd() {
   dc -f "$DEV_YML" -f "$PG_YML" "$@"
 }
+
+# Carrega .env da raiz apenas para uso local do script
+# (exibição e migrate-init), sem depender disso para o compose funcionar.
+load_root_env() {
+  [[ -f "$ROOT_ENV" ]] || return 0
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROOT_ENV"
+  set +a
+}
+
+load_root_env
+
+# Variáveis de ambiente com defaults para exibição
+PGPORT_MAP="${PGPORT_MAP:-5432}"
+PGDATABASE="${PGDATABASE:-portal}"
+PGUSER="${PGUSER:-portal}"
 
 # Helper: acrescenta EXTRA_COMPOSE_ARGS apenas se houver itens
 compose_with_extra() {
@@ -100,6 +117,7 @@ set -- "${POSITIONAL[@]}"
 validate_files() {
   [[ -f "$DEV_YML" ]] || { echo "❌ Não encontrei ${DEV_YML}"; exit 1; }
   [[ -f "$PG_YML"  ]] || { echo "❌ Não encontrei ${PG_YML}"; exit 1; }
+  [[ -f "$ROOT_ENV" ]] || { echo "❌ Não encontrei ${ROOT_ENV}. Copie .env.example para .env e ajuste os valores."; exit 1; }
 }
 
 print_services() {
@@ -135,7 +153,6 @@ action_up() {
   validate_files
   print_services
   check_postgres
-  # pontos principais: build + pull always + remove-orphans
   compose_with_extra up -d --build --pull always --remove-orphans
   print_urls
   print_images
@@ -145,8 +162,6 @@ action_restart() {
   validate_files
   print_services
   check_postgres
-  # Reinício sem forçar pull always (mantém semântica distinta do "up" original),
-  # mas com build e remove-orphans; ajuste se preferir igual ao up.
   compose_with_extra up -d --build --remove-orphans
   print_urls
 }
