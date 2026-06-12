@@ -199,6 +199,20 @@ def _can_use_multi_assignee(user: Dict[str, Any]) -> bool:
     return bool({"admin", "coordenador"} & roles)
 
 
+def _should_exclude_actor_from_multi_assignee(
+    user: Dict[str, Any],
+    actor_id: uuid.UUID,
+    assigned_to_uuid: Optional[uuid.UUID],
+    additional_assigned_to_uuids: List[uuid.UUID],
+) -> bool:
+    if not additional_assigned_to_uuids:
+        return False
+    roles = _norm_roles(user)
+    if "coordenador" not in roles:
+        return False
+    return assigned_to_uuid == actor_id
+
+
 def _is_elevated(user: Dict[str, Any]) -> bool:
     if user.get("is_superuser") is True:
         return True
@@ -1759,7 +1773,16 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
             seen_targets.add(target_uuid)
             additional_assigned_to_uuids.append(target_uuid)
 
-    assignee_uuids: List[Optional[uuid.UUID]] = [assigned_to_uuid]
+    exclude_actor_default_assignee = _should_exclude_actor_from_multi_assignee(
+        user=user,
+        actor_id=actor_id,
+        assigned_to_uuid=assigned_to_uuid,
+        additional_assigned_to_uuids=additional_assigned_to_uuids,
+    )
+
+    assignee_uuids: List[Optional[uuid.UUID]] = []
+    if not exclude_actor_default_assignee:
+        assignee_uuids.append(assigned_to_uuid)
     assignee_uuids.extend(additional_assigned_to_uuids)
 
     scheduled_dates = sorted(set(payload.scheduled_dates or []))
@@ -1811,6 +1834,7 @@ def create_task(payload: TaskCreateIn, user: Dict[str, Any] = Depends(require_pa
         "daily_task": is_daily_batch,
         "multi_assignee": is_multi_assignee,
         "assignee_target_count": len(assignee_uuids),
+        "exclude_actor_default_assignee": exclude_actor_default_assignee,
         "scheduled_dates": [d.isoformat() for d in scheduled_dates],
     }
 

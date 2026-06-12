@@ -925,7 +925,23 @@ function assigneeDisplay(userId){
 function usersList(){ return state.config?.users || []; }
 function userById(id){ return usersList().find(u => String(u.id) === String(id)) || null; }
 function defaultAssigneeUserId(){
-  return canUseMultiAssignee() ? '' : (state.config?.me?.id || '');
+  return state.config?.me?.id || '';
+}
+function currentUserId(){
+  return String(state.config?.me?.id || '');
+}
+function isCoordinatorUser(){
+  return Boolean((state.config?.me?.roles || []).includes('coordenador'));
+}
+function isCoordinatorUsingOwnDefaultAsPrimary(){
+  if(!isCoordinatorUser()) return false;
+  const primaryId = String(document.getElementById('assignedTo')?.value || '');
+  return Boolean(primaryId && primaryId === currentUserId() && additionalAssigneeIds().length > 0);
+}
+function effectiveAssigneeCount(){
+  const extraCount = additionalAssigneeIds().length;
+  if(isCoordinatorUsingOwnDefaultAsPrimary()) return extraCount;
+  return 1 + extraCount;
 }
 function defaultAssignedRoleName(){
   return state.config?.me?.defaultAssignedRoleName || '';
@@ -937,9 +953,8 @@ function additionalAssigneeIds(){
   return Array.from(new Set((state.selectedAdditionalAssigneeIds || []).map(v => String(v || '').trim()).filter(Boolean)));
 }
 function multiAssigneeTotalCount(){
-  const extraCount = additionalAssigneeIds().length;
   const dayCount = dailyDatesSelected().length || 1;
-  return (1 + extraCount) * dayCount;
+  return effectiveAssigneeCount() * dayCount;
 }
 function clearAdditionalAssignees(){
   state.selectedAdditionalAssigneeIds = [];
@@ -978,6 +993,10 @@ function renderMultiAssigneeSummary(){
   }
   const totalCount = multiAssigneeTotalCount();
   const dayCount = dailyDatesSelected().length || 1;
+  const assigneeCount = effectiveAssigneeCount();
+  const coordinatorOwnDefaultNote = isCoordinatorUsingOwnDefaultAsPrimary()
+    ? '<div class="multi-assignee-note">Como o responsável principal está pré-preenchido com você, a distribuição em lote considerará apenas as pessoas adicionais selecionadas.</div>'
+    : '';
   summary.className = 'multi-assignee-summary';
   summary.innerHTML = `
     <div class="multi-assignee-summary-head">
@@ -987,7 +1006,8 @@ function renderMultiAssigneeSummary(){
     <div class="multi-chip-list">
       ${extras.map(user => `<span class="multi-chip">${esc(user.name || user.email || 'Usuário')} <button type="button" data-remove-additional="${esc(user.id)}" aria-label="Remover ${esc(user.name || user.email || 'usuário')}">×</button></span>`).join('')}
     </div>
-    <div class="multi-assignee-note">Ao salvar, o sistema criará <strong>${totalCount}</strong> ${totalCount === 1 ? 'tarefa' : 'tarefas'} (${1 + extras.length} ${1 + extras.length === 1 ? 'responsável' : 'responsáveis'} × ${dayCount} ${dayCount === 1 ? 'data' : 'datas'}).</div>
+    ${coordinatorOwnDefaultNote}
+    <div class="multi-assignee-note">Ao salvar, o sistema criará <strong>${totalCount}</strong> ${totalCount === 1 ? 'tarefa' : 'tarefas'} (${assigneeCount} ${assigneeCount === 1 ? 'responsável' : 'responsáveis'} × ${dayCount} ${dayCount === 1 ? 'data' : 'datas'}).</div>
   `;
   summary.querySelector('#clearMultiAssigneeBtn')?.addEventListener('click', clearAdditionalAssignees);
   summary.querySelectorAll('[data-remove-additional]').forEach(btn => {
