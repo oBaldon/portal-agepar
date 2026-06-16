@@ -75,6 +75,8 @@ MAX_SHORT = 300
 MAX_MEDIUM = 2000
 MAX_LONG = 12000
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+LEGACY_SOLUCAO_FIELD_RE = re.compile(r"^descricaosolucao(?:\d+)?$", re.IGNORECASE)
+LEGACY_ANALISE_FIELD_RE = re.compile(r"^analisesolucao(?:\d+)?$", re.IGNORECASE)
 
 
 router = APIRouter(prefix=f"/api/automations/{KIND}", tags=[f"automation:{KIND}"])
@@ -135,8 +137,12 @@ def _normalize_text(v: Any) -> str:
 
 def _normalize_string_list(v: Any) -> List[str]:
     """
-    Aceita lista, texto com quebras de linha ou texto único e devolve lista limpa.
-    Também tolera itens em formato dict com chaves comuns de descrição/nome/texto.
+    Aceita lista, texto único ou itens em formato dict e devolve lista limpa.
+
+    Importante:
+    - preserva quebras de linha dentro de cada item textual;
+    - não transforma tópicos/Alt+Enter em novos itens da lista;
+    - mantém compatibilidade com listas e dicionários legados.
     """
     out: List[str] = []
 
@@ -144,8 +150,9 @@ def _normalize_string_list(v: Any) -> List[str]:
         if x is None:
             return
         if isinstance(x, str):
-            parts = [p.strip() for p in x.replace("\r", "\n").split("\n")]
-            out.extend([p for p in parts if p])
+            txt = _normalize_text(x)
+            if txt:
+                out.append(txt)
             return
         if isinstance(x, dict):
             for key in ("texto", "descricao", "nome", "titulo", "label", "value"):
@@ -439,7 +446,7 @@ def _normalize_submit_body(body: Dict[str, Any]) -> Dict[str, Any]:
     )
     if not solucoes_existentes:
         for key in sorted(body.keys()):
-            if key.lower().startswith("descricaosolucao"):
+            if LEGACY_SOLUCAO_FIELD_RE.match(key):
                 txt = _normalize_text(body.get(key))
                 if txt:
                     solucoes_existentes.append(txt)
@@ -452,7 +459,7 @@ def _normalize_submit_body(body: Dict[str, Any]) -> Dict[str, Any]:
     )
     if not analise_solucoes:
         for key in sorted(body.keys()):
-            if key.lower().startswith("analisesolucao"):
+            if LEGACY_ANALISE_FIELD_RE.match(key):
                 txt = _normalize_text(body.get(key))
                 if txt:
                     analise_solucoes.append(txt)
@@ -658,13 +665,25 @@ def _add_section(doc, title: str, text: str) -> None:
 
 def _add_string_list(doc, items: List[str], *, prefix: str) -> None:
     """
-    Adiciona uma sequência enumerada de blocos textuais.
+    Adiciona uma sequência enumerada de blocos textuais preservando
+    quebras de linha dentro de cada item.
     """
     if not items:
         _add_paragraph(doc, "Não informado.")
         return
+
     for idx, item in enumerate(items, start=1):
-        _add_paragraph(doc, f"{prefix} {idx}: {item}")
+        content = _normalize_text(item)
+        if not content:
+            continue
+
+        lines = [line.strip() for line in content.replace("\r", "\n").split("\n") if line.strip()]
+        if not lines:
+            continue
+
+        _add_paragraph(doc, f"{prefix} {idx}: {lines[0]}")
+        for line in lines[1:]:
+            _add_paragraph(doc, line)
 
 
 def _clear_document_body(doc) -> None:
