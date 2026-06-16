@@ -333,7 +333,7 @@ function BlockCard({ block }: { block: CatalogBlock }) {
 
 ## Próximos passos
 
-* **[Proxies do Vite](/docs/03-build-run-deploy/proxies-do-vite-api-catalog-docs)** para garantir roteamento correto em dev.
+* **[Proxies do Vite](../03-build-run-deploy/03-proxies-do-vite-api-catalog-docs)** para garantir roteamento correto em dev.
 * **Testes de navegação** (Vitest/RTL) dos componentes principais.
 * **Hardening de UX**: estados de erro e *skeletons* nas listas de blocos.
 

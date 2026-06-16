@@ -94,3 +94,12 @@ infra/
 - Não há suíte de testes automatizados versionada.
 - Há coexistência de `package-lock.json` e `pnpm-lock.yaml` em `apps/docs-site`.
 - Parte da documentação antiga ainda falava em MkDocs/SQLite; esta revisão corrige isso.
+
+## Onde registrar ajustes de documentação
+
+- mudanças de arquitetura: `01-visão-geral-e-arquitetura/`
+- mudanças de setup/operação: `02-ambiente-dev-setup/` e `03-build-run-deploy/`
+- mudanças de padrão editorial da doc: `13-documentação-docusaurus/06-padrão-editorial-e-template-de-página`
+- inventários atualizados de módulos e tabelas:
+  - `07-automations-padrão-de-módulos/10-inventário-de-automações-e-blocos-do-estado-atual`
+  - `08-banco-de-dados-persistência/06-inventário-de-tabelas-e-domínios-do-estado-atual`

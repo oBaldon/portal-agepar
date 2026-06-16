@@ -240,7 +240,7 @@ def test_empty_name_fails():
 
 ## Próximos passos
 
-* **[Rotas gerais /api e /api/automations/:kind/...](./rotas-gerais-api-e-api-automations-kind)**
+* **[Rotas gerais /api e /api/automations/:kind/...](./03-rotas-gerais-api-e-api-automations-kind)**
 * **Tratamento de erros e logging (padrões do projeto)**
 * **Modelos por automação** (DFD, Férias, etc.) seguindo o mesmo padrão
 

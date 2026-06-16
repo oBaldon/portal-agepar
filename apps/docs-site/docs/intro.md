@@ -79,3 +79,6 @@ O repositório atual, porém, está em:
 - **07 — Automations**: padrão dos módulos e inventário atual
 - **08 — Banco**: Postgres, schema e persistência
 - **12 — Testes**: o que existe e o que ainda falta
+
+- **13 — Documentação**: padrões editoriais e estrutura do Docusaurus
+- **05 da seção 01**: auditoria rápida do estado atual do repositório

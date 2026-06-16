@@ -210,9 +210,9 @@ describe("stableSortByOrder", () => {
 
 ## Próximos passos
 
-* **[Navbar por categorias e leitura do catálogo](./navbar-por-categorias-e-leitura-do-catálogo)**
-* **[RBAC simples (requiredRoles ANY-of)](./rbac-simples-requiredroles-any-of)**
-* **[Renderização de blocos (iframe ui.url)](./renderização-de-blocos-iframe-uiurl)**
+* **[Navbar por categorias e leitura do catálogo](./02-navbar-por-categorias-e-leitura-do-catálogo)**
+* **[RBAC simples (requiredRoles ANY-of)](./04-rbac-simples-requiredroles-any-of)**
+* **[Renderização de blocos (iframe ui.url)](./03-renderização-de-blocos-iframe-uiurl)**
 
 ---
 

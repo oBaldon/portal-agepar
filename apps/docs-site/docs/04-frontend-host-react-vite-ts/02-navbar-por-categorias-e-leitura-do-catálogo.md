@@ -278,8 +278,8 @@ curl -s -i http://localhost:5173/api/me
 
 ## Próximos passos
 
-* **[Estrutura src/, pages/, components/](./estrutura-src-pages-components)**
-* **[Proxies do Vite (/api, /catalog, /docs)](/docs/03-build-run-deploy/proxies-do-vite-api-catalog-docs)**
+* **[Estrutura src/, pages/, components/](./01-estrutura-src-pages-components)**
+* **[Proxies do Vite (/api, /catalog, /devdocs)](../03-build-run-deploy/03-proxies-do-vite-api-catalog-docs)**
 * **Testes de navegação/ACL** (Vitest/RTL) para garantir RBAC e ordem correta.
 
 ---

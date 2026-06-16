@@ -193,9 +193,9 @@ Abra o Host e confirme que o **card** da categoria renderiza a UI no iframe.
 
 ## Próximos passos
 
-* **[Local: apps/bff/app/automations/`{slug}`.py](./local-apps-bff-app-automations-slugpy)**
-* **[GET /schema (opcional), GET /ui](./get-schema-opcional-get-ui)**
-* **[POST /submit (BackgroundTasks)](./post-submit-backgroundtasks)**
+* **[Local: apps/bff/app/automations/`{slug}`.py](./01-local-apps-bff-app-automations-slugpy)**
+* **[GET /schema (opcional), GET /ui](./02-get-schema-opcional-get-ui)**
+* **[POST /submit (BackgroundTasks)](./03-post-submit-backgroundtasks)**
 
 ---
 

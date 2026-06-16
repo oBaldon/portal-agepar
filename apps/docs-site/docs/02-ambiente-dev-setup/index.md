@@ -1,5 +1,5 @@
 ---
-id: index
+id: "ambiente-dev-setup"
 title: "Ambiente Dev — Setup"
 sidebar_position: 0
 ---

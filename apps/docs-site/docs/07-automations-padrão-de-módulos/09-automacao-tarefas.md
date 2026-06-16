@@ -1,4 +1,8 @@
-# Automação de tarefas (`tasks`)
+---
+id: "automacao-tarefas"
+title: "Automação de tarefas (`tasks`)"
+sidebar_position: 10
+---
 
 ## Objetivo
 
@@ -155,3 +159,17 @@ Esta frente está em estágio avançado, com:
 - visão consolidada no Controle
 - primeiros gatilhos automáticos ativos
 - base pronta para scheduler/regras futuras de vencimento e alertas mais sofisticados
+
+
+## Arquivos mapeados
+
+- `apps/bff/app/automations/tasks.py`
+- `apps/bff/app/automations/controle_tasks.py`
+- `apps/bff/app/db.py`
+- `catalog/catalog.dev.json`
+
+## Observação sobre a UI
+
+A UI principal da automação é servida pelo próprio BFF em
+`GET /api/automations/tasks/ui` e o Host apenas a embute via iframe, seguindo
+o padrão geral do portal.

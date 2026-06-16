@@ -221,9 +221,9 @@ curl -s http://localhost:5173/api/me
 
 ## Próximos passos
 
-* **[Esquema de bloco (categoryId, ui, ...)](./esquema-de-bloco)**
-* **[Convenções (icon, order, hidden)](./convencoes-icon-order-hidden)**
-* **[Exemplos e extensão](./exemplos-e-extensao)**
+* **[Esquema de bloco (categoryId, ui, ...)](./02-esquema-de-bloco-categoryid-ui-navigation-routes)**
+* **[Convenções (icon, order, hidden)](./03-convenções-icon-order-hidden)**
+* **[Exemplos e extensão](./04-exemplos-e-práticas-de-extensão)**
 
 ---
 

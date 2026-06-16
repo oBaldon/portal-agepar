@@ -28,7 +28,7 @@ Esta página formaliza o **esquema de um bloco** do catálogo (`/catalog/dev`) e
   "categoryId": "compras",
   "ui": { "type": "iframe", "url": "/api/automations/tr/ui" },
   "description": "Termo de Referência",
-  "navigation": ["/guia/tr", "/docs/automacoes/tr"],
+  "navigation": ["/guia/tr", "/devdocs/docs/07-automations-padrão-de-módulos/06-checklist-para-criar-nova-automação"],
   "routes": ["/compras/tr", "/compras/tr/historico"],
   "requiredRoles": ["editor", "admin"],
   "order": 10,
@@ -252,8 +252,8 @@ Se o serviço externo retornar `X-Frame-Options: DENY` ou `Content-Security-Poli
 
 ## 10) Próximos passos
 
-* **[Convenções (icon, order, hidden)](./convencoes-icon-order-hidden)**
-* **[Exemplos e extensão](./exemplos-e-extensao)**
+* **[Convenções (icon, order, hidden)](./03-convenções-icon-order-hidden)**
+* **[Exemplos e extensão](./04-exemplos-e-práticas-de-extensão)**
 
 ---
 

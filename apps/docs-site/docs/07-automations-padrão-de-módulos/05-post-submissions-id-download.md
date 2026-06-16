@@ -10,7 +10,7 @@ Esta página define o contrato do endpoint de **download de artefatos** gerados 
   Gera **on-demand** (ou recupera) o arquivo associado à submissão e retorna como **download** (PDF/DOCX/ZIP, etc.).
 
 > Referências no repo: `apps/bff/app/automations/*.py`, `apps/bff/app/utils/docx_tools.py`, `apps/bff/app/db.py`  
-> Relacionado: **[POST /submit (BackgroundTasks)](./post-submit-backgroundtasks)**, **[GET /submissions, GET /submissions/`{id}`](./get-submissions-get-submissions-id)**
+> Relacionado: **[POST /submit (BackgroundTasks)](./03-post-submit-backgroundtasks)**, **[GET /submissions, GET /submissions/`{id}`](./04-get-submissions-get-submissions-id)**
 
 ---
 
@@ -170,9 +170,9 @@ curl -s -X POST -OJ http://localhost:5173/api/automations/example/submissions/s_
 
 ## Próximos passos
 
-* **[GET /submissions, GET /submissions/`{id}`](./get-submissions-get-submissions-id)**
-* **[Local: apps/bff/app/automations/`{slug}`.py](./local-apps-bff-app-automations-slugpy)**
-* **[GET /schema (opcional), GET /ui](./get-schema-opcional-get-ui)**
+* **[GET /submissions, GET /submissions/`{id}`](./04-get-submissions-get-submissions-id)**
+* **[Local: apps/bff/app/automations/`{slug}`.py](./01-local-apps-bff-app-automations-slugpy)**
+* **[GET /schema (opcional), GET /ui](./02-get-schema-opcional-get-ui)**
 
 ---
 

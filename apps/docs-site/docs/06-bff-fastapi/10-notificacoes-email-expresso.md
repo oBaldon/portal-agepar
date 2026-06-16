@@ -1,3 +1,9 @@
+---
+id: "notificacoes-email-expresso"
+title: "Notificações com e-mail via Expresso"
+sidebar_position: 10
+---
+
 # Notificações com e-mail via Expresso
 
 ## Objetivo
@@ -67,3 +73,16 @@ PORTAL_PUBLIC_BASE_URL: "http://localhost:5173"
    - inbox do portal;
    - chegada do e-mail;
    - logs do container `bff`.
+
+
+## Arquivos mapeados
+
+- `apps/bff/app/notifications.py`
+- `apps/bff/app/integrations/expresso_mail.py`
+- `infra/docker-compose.dev.yml`
+- `.env.example`
+
+## Observações
+
+- No estado atual do repositório, `.env.example` ainda carrega variáveis sensíveis
+  relacionadas ao Expresso; trate isso como passivo operacional e não como prática desejada.

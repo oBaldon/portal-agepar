@@ -1,5 +1,5 @@
 ---
-id: index
+id: "catalogo-catalog-dev"
 title: "Catálogo (/catalog/dev)"
 sidebar_position: 0
 ---

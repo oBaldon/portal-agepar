@@ -1,5 +1,5 @@
 ---
-id: index
+id: "frontend-host-react-vite-ts"
 title: "Frontend (Host – React/Vite/TS)"
 sidebar_position: 0
 ---

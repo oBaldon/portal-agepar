@@ -1,5 +1,5 @@
 ---
-id: index
+id: "observabilidade"
 title: "Observabilidade"
 sidebar_position: 0
 ---

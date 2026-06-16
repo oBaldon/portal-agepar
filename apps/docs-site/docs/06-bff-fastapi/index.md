@@ -1,5 +1,5 @@
 ---
-id: index
+id: "bff-fastapi"
 title: "BFF (FastAPI)"
 sidebar_position: 0
 ---

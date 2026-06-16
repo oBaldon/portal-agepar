@@ -1,5 +1,5 @@
 ---
-id: index
+id: "documentacao-docusaurus"
 title: "Documentação (Docusaurus)"
 sidebar_position: 0
 ---

@@ -1,5 +1,5 @@
 ---
-id: index
+id: "padroes-de-erro-dx"
 title: "Padrões de Erro & DX"
 sidebar_position: 0
 ---

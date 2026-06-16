@@ -1,5 +1,5 @@
 ---
-id: index
+id: "automations-padrao-de-modulos"
 title: "Automations – Padrão de Módulos"
 sidebar_position: 0
 ---

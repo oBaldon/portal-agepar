@@ -210,8 +210,8 @@ curl -s http://localhost:5173/api/automations/example/submissions/s_abcdef1234 |
 
 ## 12) Próximos passos
 
-* **[GET /submissions e detalhes](./get-submissions-get-submissions-id)**
-* **[POST /submissions/`{id}`/download](./post-submissions-id-download)**
+* **[GET /submissions e detalhes](./04-get-submissions-get-submissions-id)**
+* **[POST /submissions/`{id}`/download](./05-post-submissions-id-download)**
 * **Observabilidade**: métricas de fila/tempo de processamento
 
 ---

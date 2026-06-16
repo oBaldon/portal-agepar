@@ -189,8 +189,8 @@ Se estiver usando a variante **ordenada**, valide que:
 
 ## Próximos passos
 
-* **[Esquema de bloco (categoryId, ui, navigation, routes, ...)](./esquema-de-bloco-categoryid-ui-navigation-routes)**
-* **[Exemplos e extensão](./exemplos-e-extensao)**
+* **[Esquema de bloco (categoryId, ui, navigation, routes, ...)](./02-esquema-de-bloco-categoryid-ui-navigation-routes)**
+* **[Exemplos e extensão](./04-exemplos-e-práticas-de-extensão)**
 
 ---
 

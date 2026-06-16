@@ -65,7 +65,7 @@ flowchart LR
     direction TB
     UI[Navbar + Catálogo + Iframes]
     UI -->|/api| BFF
-    UI -->|/docs| DOCS
+    UI -->|/devdocs| DOCS
   end
 
   BFF(FastAPI)

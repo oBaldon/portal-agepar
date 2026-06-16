@@ -1,6 +1,7 @@
 ---
-id: estilo-de-codigo
-title: Guia de Estilo — Exemplos de Código
+id: "estilo-de-codigo"
+title: "Guia de estilo — exemplos de código"
+sidebar_position: 1
 ---
 
 import Tabs from '@theme/Tabs';
@@ -17,6 +18,14 @@ Este guia define **como escrever exemplos de código** neste portal de docs
 > **executados exatamente como estão** (comando real, arquivo real, endpoint real).
 
 ---
+
+
+## 0) Convenções editoriais
+
+- Preferir **frontmatter completo** em toda página: `id`, `title` e, quando a página participa da ordem da seção, `sidebar_position`.
+- Preferir **links relativos** entre documentos (`./` e `../`) em vez de hardcode de rotas `/docs/...`, porque o site roda com `baseUrl: "/devdocs/"`.
+- Quando o **nome do arquivo for histórico**, explicitar isso logo no início da página com uma nota curta em bloco de citação.
+- Sempre documentar **estado real**, inclusive passivos e desvios conhecidos, em vez de estado desejado.
 
 ## Padrões gerais
 
@@ -38,8 +47,8 @@ Use o `title="..."` para deixar claro **o que é** aquele snippet.
 - Arquivo → caminho relativo no monorepo.
 - Comando → descrição curta do que o comando faz.
 
-```bash title="Subindo ambiente de desenvolvimento com Docker Compose"
-docker compose -f infra/docker-compose.dev.yml up --build
+```bash title="Subindo ambiente de desenvolvimento com o helper oficial"
+./infra/scripts/dev.sh up
 ```
 
 **Boas práticas**:

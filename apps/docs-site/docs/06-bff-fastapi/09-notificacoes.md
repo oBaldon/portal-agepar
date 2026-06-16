@@ -1,5 +1,7 @@
 ---
+id: "notificacoes-inbox"
 title: "Notificações (Inbox)"
+sidebar_position: 9
 ---
 
 ## Objetivo
@@ -14,6 +16,15 @@ Você pode enviar uma notificação para:
 > A “role efetiva” considera: roles do BD + `AUTH_DEFAULT_ROLES` + superuser ⇒ `admin`.
 
 ---
+
+
+## Estado atual implementado
+
+- router em `apps/bff/app/notifications.py`, com prefixo `/api/notifications`;
+- persistência em Postgres;
+- envio para `userIds` e `roleNames`;
+- contagem de não lidas no Host via `getUnreadNotificationCount()`;
+- integração opcional de e-mail via Expresso descrita na página seguinte.
 
 ## Modelo de dados (Postgres)
 

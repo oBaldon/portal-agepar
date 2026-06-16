@@ -48,3 +48,9 @@ apps/docs-site/
   divergência operacional conhecida e a documentação principal já registra o tema.
 - O site assume `baseUrl: "/devdocs/"`, então qualquer proxy ou publicação deve
   respeitar esse prefixo ou ajustar o config antes do build.
+
+## Padrão editorial da documentação
+
+A convenção editorial adotada nesta revisão está documentada em:
+
+- `apps/docs-site/docs/13-documentação-docusaurus/06-padrão-editorial-e-template-de-página.md`

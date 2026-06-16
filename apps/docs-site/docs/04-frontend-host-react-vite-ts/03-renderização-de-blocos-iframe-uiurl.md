@@ -273,7 +273,7 @@ Se a página retornar **`X-Frame-Options: DENY`**, o embutimento não será poss
 
 ## Próximos passos
 
-* **[Navbar por categorias e leitura do catálogo](./navbar-por-categorias-e-leitura-do-catálogo)**
+* **[Navbar por categorias e leitura do catálogo](./02-navbar-por-categorias-e-leitura-do-catálogo)**
 * **Testes de integração** do fluxo catálogo → renderização → comunicação com automations.
 
 ---

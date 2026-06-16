@@ -217,8 +217,8 @@ describe("anyRoleAllowed", () => {
 
 ## Próximos passos
 
-* **[Navbar por categorias e leitura do catálogo](./navbar-por-categorias-e-leitura-do-catálogo)**
-* **[Renderização de blocos (iframe ui.url)](./renderização-de-blocos-iframe-uiurl)**
+* **[Navbar por categorias e leitura do catálogo](./02-navbar-por-categorias-e-leitura-do-catálogo)**
+* **[Renderização de blocos (iframe ui.url)](./03-renderização-de-blocos-iframe-uiurl)**
 
 ---
 

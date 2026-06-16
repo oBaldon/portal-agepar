@@ -1,5 +1,5 @@
 ---
-id: index
+id: "seguranca"
 title: "Segurança"
 sidebar_position: 0
 ---

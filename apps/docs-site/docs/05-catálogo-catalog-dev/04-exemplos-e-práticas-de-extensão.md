@@ -196,7 +196,7 @@ Use `navigation` para links úteis (docs, tutoriais) e `routes` para **deep link
 {
   "categoryId": "contratos",
   "ui": { "type": "iframe", "url": "/api/automations/contrato/ui" },
-  "navigation": ["/docs/automacoes/contrato", "/guia/contratos"],
+  "navigation": ["/devdocs/docs/07-automations-padrão-de-módulos/06-checklist-para-criar-nova-automação", "/guia/contratos"],
   "routes": ["/contratos/novo", "/contratos/lista"]
 }
 ```
@@ -277,9 +277,9 @@ curl -I http://localhost:8000/api/automations/dfd/ui
 
 ## Próximos passos
 
-* **[Estrutura JSON (categories, blocks)](./estrutura-json-categories-blocks)**
-* **[Esquema de bloco (categoryId, ui, navigation, routes, ...)](./esquema-de-bloco-categoryid-ui-navigation-routes)**
-* **[Convenções (icon, order, hidden)](./convenções-icon-order-hidden)**
+* **[Estrutura JSON (categories, blocks)](./01-estrutura-json-categories-blocks)**
+* **[Esquema de bloco (categoryId, ui, navigation, routes, ...)](./02-esquema-de-bloco-categoryid-ui-navigation-routes)**
+* **[Convenções (icon, order, hidden)](./03-convenções-icon-order-hidden)**
 
 ---
 

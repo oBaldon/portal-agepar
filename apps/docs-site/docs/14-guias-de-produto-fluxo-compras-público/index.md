@@ -1,5 +1,5 @@
 ---
-id: index
+id: "guias-de-produto-fluxo-compras-publico"
 title: "Guias de Produto (Fluxo Compras Público)"
 sidebar_position: 0
 ---

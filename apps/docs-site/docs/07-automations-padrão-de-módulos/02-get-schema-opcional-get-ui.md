@@ -227,9 +227,9 @@ No navegador, abra o Host e confirme que o card **abre o iframe** corretamente.
 
 ## 9) Próximos passos
 
-* **[POST /submit (BackgroundTasks)](./post-submit-backgroundtasks)**
-* **[GET /submissions e detalhes](./get-submissions-get-submissions-id)**
-* **[POST /submissions/`{id}`/download](./post-submissions-id-download)**
+* **[POST /submit (BackgroundTasks)](./03-post-submit-backgroundtasks)**
+* **[GET /submissions e detalhes](./04-get-submissions-get-submissions-id)**
+* **[POST /submissions/`{id}`/download](./05-post-submissions-id-download)**
 
 ---
 

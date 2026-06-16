@@ -1,5 +1,7 @@
 ---
+id: "automacao-ponto-saldo-pdf"
 title: "Automação — Saldo de Horas (PDF)"
+sidebar_position: 8
 ---
 
 ## Visão geral
@@ -82,3 +84,13 @@ Base: `/api/automations/ponto_saldo`
 - PDFs “escaneados” (sem texto extraível) podem falhar ou retornar alertas indicando necessidade de OCR.
 - Como o **PDF é o universo**, feriados não marcados no documento não serão inferidos.
 - Caso o PDF tenha layout muito diferente, a extração pode não conseguir identificar linhas no padrão `dd/mm - ...`.
+
+## Arquivos mapeados
+
+- `apps/bff/app/automations/ponto_saldo.py`
+- `catalog/catalog.dev.json`
+
+## Observações
+
+- O bloco está no catálogo da categoria `pessoas`.
+- O acesso é restringido a papéis como `ca`, `rh` e `cof`.

@@ -9,7 +9,7 @@ Esta página documenta as rotas de **consulta de submissões** de uma automaçã
 - **`GET /api/automations/{slug}/submissions/{id}`** (detalhe de uma submissão)
 
 > Referências no repo: `apps/bff/app/automations/*.py`, `apps/bff/app/db.py`  
-> Relacionado: **[POST /submit (BackgroundTasks)](./post-submit-backgroundtasks)**
+> Relacionado: **[POST /submit (BackgroundTasks)](./03-post-submit-backgroundtasks)**
 
 ---
 
@@ -165,8 +165,8 @@ curl -s "http://localhost:8000/api/automations/example/submissions/s_abcd1234" |
 
 ## Próximos passos
 
-* **[POST /submit (BackgroundTasks)](./post-submit-backgroundtasks)**
-* **[POST /submissions/`{id}`/download](./post-submissions-id-download)**
+* **[POST /submit (BackgroundTasks)](./03-post-submit-backgroundtasks)**
+* **[POST /submissions/`{id}`/download](./05-post-submissions-id-download)**
 
 ---
 

@@ -1,9 +1,8 @@
 ---
-title: Avisos globais rastreáveis
+id: "avisos-globais-rastreaveis"
+title: "Avisos globais rastreáveis"
 sidebar_position: 9
 ---
-
-# Avisos globais rastreáveis
 
 A automação `avisos` permite que um administrador publique um comunicado global
 para todos os usuários com sessão ativa no momento do disparo.
@@ -73,3 +72,11 @@ Elas guardam:
 O host adiciona um `GlobalAlertCenter` acima das rotas. Ele faz polling leve e
 também sincroniza múltiplas abas via `localStorage` e `BroadcastChannel` para remover o popup quando
 o usuário responde em outra aba. Dismiss temporário é persistido por aba em `sessionStorage`.
+
+
+## Arquivos mapeados
+
+- `apps/bff/app/automations/avisos.py`
+- `apps/bff/app/notifications.py`
+- `apps/host/src/components/GlobalAlertCenter.tsx`
+- `catalog/catalog.dev.json`
