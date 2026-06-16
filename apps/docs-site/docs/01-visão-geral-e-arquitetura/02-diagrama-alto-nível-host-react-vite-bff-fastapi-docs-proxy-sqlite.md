@@ -1,76 +1,60 @@
 ---
 id: diagrama-alto-nível-host-react-vite-bff-fastapi-docs-proxy-sqlite
-title: "Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite)"
+title: "Diagrama alto nível (Host, BFF, Docusaurus e Postgres)"
 sidebar_position: 2
 ---
 
-Esta página apresenta o **diagrama alto nível** da Plataforma AGEPAR e como os componentes se conectam em **dev** e **produção**.
+> O nome do arquivo é histórico. O conteúdo abaixo foi atualizado para o estado
+> atual do monorepo: **Docusaurus + PostgreSQL + `/devdocs/`**.
 
-## Diagrama (alto nível)
+## Diagrama alto nível
 
 ```mermaid
 flowchart LR
-  subgraph Host
-    direction TB
-    UI[Navbar + Catálogo + Iframes]
-    UI -->|/api| BFF
-    UI -->|/docs| DOCS
+  Browser[(Browser)]
+  subgraph Front["Camada Web"]
+    Host["Host React/Vite :5173"]
+    Docs["Docs Docusaurus :8000"]
   end
+  BFF["FastAPI BFF :8000"]
+  PG[(PostgreSQL :5432)]
 
-  BFF(FastAPI)
-  DOCS(MkDocs/Material)
-  DB[(SQLite)]
-  AUTO[Automations]
-
-  BFF --> DB
-  BFF -->|/catalog/dev| UI
-  BFF -->|/api/automations/:kind| AUTO
+  Browser --> Host
+  Host -->|/api| BFF
+  Host -->|/catalog| BFF
+  Host -->|/devdocs| Docs
+  BFF --> PG
 ```
 
-**Portas e _proxies_ (dev):**
-- **host**: 5173 (Vite) → _proxy_ para `/api`, `/catalog` e `/docs`
-- **bff**: 8000 (FastAPI)
-- **docs**: servido via host em `/docs` (backend MkDocs)
+## Leitura do diagrama
 
-> Em produção, os componentes permanecem os mesmos, com _build_ otimizado do Host, CORS/cookies endurecidos no BFF e logs/auditoria ativos.
+### Host
+- monta a SPA;
+- carrega o catálogo;
+- protege navegação;
+- filtra categorias e blocos por RBAC;
+- embute módulos por iframe.
 
-## Responsabilidades por componente
+### BFF
+- autentica usuários;
+- mantém sessão em banco;
+- expõe `/api`, `/catalog/dev` e as automações;
+- inicializa schema no startup;
+- registra auditoria e resultados.
 
-- **Host (Vite/React/TS)**: navegação por categorias; renderização de blocos via `ui` (ex.: `iframe` aponta para `/api/automations/:kind/ui`); RBAC **ANY-of** com `requiredRoles`.
-- **BFF (FastAPI)**: login mock (`POST /api/auth/login`), identidade (`GET /api/me`), catálogo (`/catalog/dev`), rotas de automations (`/schema`, `/ui`, `/submit`, etc.) e persistência (`submissions`, `audits`).
-- **Docs (MkDocs/Material)**: conteúdo para não-devs servido via Host em `/docs`.
-- **SQLite**: base local inicializada no _startup_, usada para submissões e auditorias.
-- **Automations**: módulos isolados (BFF + UI no-build), expostos sob `/api/automations/:kind/...` e carregados no Host por _iframe_.
+### Docs
+- projeto Docusaurus v3 em `apps/docs-site`;
+- servido em dev via proxy do Host em **`/devdocs/`**;
+- pode ser acessado diretamente em `:9000/devdocs/`.
 
-## Exemplos (cURL)
+### Banco
+- PostgreSQL;
+- `DATABASE_URL` obrigatória;
+- compose dividido entre arquivo base + override de Postgres.
 
-```bash
-# Health (se disponível)
-curl -i http://localhost:8000/api/health
+## Pontos que mudaram em relação ao desenho antigo
 
-# Catálogo (usado pelo Host para montar navbar/cards)
-curl -s http://localhost:8000/catalog/dev | jq .
-
-# Sessão mock
-curl -i -X POST http://localhost:8000/api/auth/login   -H "Content-Type: application/json"   -d '{"username":"dev","password":"dev"}'
-
-# UI de uma automação (iframe)
-curl -s http://localhost:8000/api/automations/dfd/ui
-```
-
-## Evidências no repositório
-
-- Compose: `—`
-- Vite config: `apps/host/vite.config.ts`
-- Pistas FastAPI (exemplo): `apps/bff/app/main.py`
-- Catálogo JSON (exemplo): `catalog/catalog.dev.json`
-
-## Notas de operação
-
-- **Erros**: padronizados (`400/401/403/404/409/422`) com mensagens claras.
-- **Validação**: Pydantic v2 (`populate_by_name=True`, `extra="ignore"`) e normalização para evitar `422` triviais.
-- **Logs**: `INFO` no caminho feliz; `ERROR` com contexto (request_id, user, automation, submission_id).
-
----
-
-> _Criado em 2025-10-27_
+- `/docs` → `/devdocs`
+- MkDocs → Docusaurus
+- SQLite → PostgreSQL
+- “mock como fluxo principal” → auth local + mock legado opcional

@@ -1,150 +1,81 @@
 ---
 id: intro
-title: "Plataforma AGEPAR — Doc Técnica"
+title: "Plataforma AGEPAR — doc técnica alinhada ao repositório"
 sidebar_position: 0
 ---
 
-_Criado em 2025-10-27_
+Esta documentação foi revisada para refletir o **estado atual** do monorepo.
 
-Este site documenta arquitetura, DevOps, BFF (FastAPI), Host (React/Vite/TS), Catálogo e Automations do Plataforma AGEPAR.
+## O que existe hoje
 
-> Gerado automaticamente a partir de dois JSONs: **timeline** e **outline mapeado**.
+- **BFF** em `apps/bff` com FastAPI, auth local, sessão persistida em banco,
+  catálogo, notificações, auditoria e automações.
+- **Host** em `apps/host` com React/Vite/TS, rotas protegidas, RBAC de vitrine,
+  páginas SPA e renderização de módulos via iframe.
+- **Docs** em `apps/docs-site` com Docusaurus v3.
+- **PostgreSQL** como banco do ambiente dev.
+- **Infra dev** em `infra/docker-compose.dev.yml` + `infra/docker-compose.pg.yml`.
 
-## Visão Geral
-
-A **Plataforma AGEPAR** organiza um monorepo com três serviços principais executados via Docker Compose:
-
-- **bff** (FastAPI) — porta **8000** no host
-- **host** (Vite + React/TS) — porta **5173**, com *proxy* para `/api`, `/catalog`, `/docs`
-- **docs** (servidor interno MkDocs/Material em `http://docs:8000`), exposto via **host** em `/docs`
-
-### Fluxo alto nível
+## Desenho de alto nível
 
 ```mermaid
 flowchart LR
-  subgraph Frontend
-    direction TB
-    UI[Navbar + Catálogo + Iframes]
-    UI -->|/api| BFF
-    UI -->|/docs| DOCS
-  end
+  Browser[(Navegador)]
+  Host[Host React/Vite :5173]
+  BFF[BFF FastAPI :8000]
+  Docs[Docusaurus :8000]
+  PG[(PostgreSQL :5432)]
 
-  BFF(FastAPI)
-  DOCS(MkDocs/Material)
-  DB[(SQLite)]
-  AUTO[Automations]
-
-  BFF --> DB
-  BFF -->|/catalog/dev| UI
-  BFF -->|/api/automations/:kind| AUTO
-
-  classDef svc fill:#eee,stroke:#999,rx:6,ry:6
-  class BFF,DOCS svc
+  Browser --> Host
+  Browser --> BFF
+  Host -->|/api,/catalog| BFF
+  Host -->|/devdocs| Docs
+  BFF --> PG
 ```
 
-## Padrões e Decisões de Arquitetura
+## Diferenças em relação à documentação antiga
 
-**BFF (FastAPI)**  
-- Sessões mock: `POST /api/auth/login` e `GET /api/me`  
-- Catálogo servido em: `/catalog/dev`  
-- Automations: `/api/automations/{kind}/...` (ex.: `form2json`)  
-- Banco: SQLite inicializado no *startup* (`init_db`) com tabelas `submissions` e `audits`  
-- Validação: **Pydantic v2** `ConfigDict(populate_by_name=True, extra="ignore")` e normalização de campos para evitar `422` triviais  
-- Persistência: `submissions` (payload, status, result, error) e auditoria em `audits`  
-- Erros claros: `400/401/403/404/409/422` com mensagens úteis  
-- Segurança: sem segredos no repo; CORS restrito; cookies de sessão  
-- Logs: `INFO` no caminho feliz; `ERROR` com contexto
+A documentação anterior ainda carregava referências históricas a:
+- **MkDocs**
+- **SQLite**
+- docs publicadas em **`/docs`**
+- quickstart com `docker compose up` incompleto
+- foco excessivo em “sessões mock” como se fossem o fluxo principal
 
-**Host (Vite + React/TS)**  
-- Lê o **catálogo** e monta navbar por categorias; cards por categoria  
-- Blocos do catálogo são renderizados conforme `ui` (ex. `iframe` via `<iframe src={block.ui.url} />`)  
-- RBAC simples via `requiredRoles` (*ANY-of*)  
-- Ordem: preservar ordem de escrita do catálogo (categorias e blocos)  
-- Proxies Vite: `/api` e `/catalog` → `bff:8000`; `/docs` (inclui livereload) → `docs:8000`
+O repositório atual, porém, está em:
+- **Docusaurus**
+- **PostgreSQL**
+- docs em **`/devdocs/`**
+- auth local com sessão persistida em banco
+- script operacional preferencial em `infra/scripts/dev.sh`
 
-**Docs (MkDocs/Material)**  
-- Servidas pelo **host** em `/docs`  
-- Conteúdo voltado a não-devs; tema Material com Mermaid e Glightbox  
-- Páginas em `docs/` + `mkdocs.yml`
+## Estado atual resumido
 
-**Catálogo (`/catalog/dev`)**  
-Estrutura base:
-```json
-{
-  "categories": [{ "id": "compras", "label": "Compras", "icon": "ShoppingCart" }],
-  "blocks": [{ "categoryId": "compras", "ui": { "type": "iframe", "url": "/some/ui" }, "navigation": [], "routes": [] }]
-}
-```
+### Serviços
+- `host` → `5173`
+- `bff` → `8000`
+- `docs` → `8000` interno, `9000:8000` exposto diretamente
+- `postgres` → `5432`
 
-## Estrutura do Repositório (alto nível)
+### Proxies do Host
+- `/api`
+- `/catalog`
+- `/devdocs`
 
-```text
-portal-agepar/
-  apps/
-    bff/                 # FastAPI + automations
-  host/                  # Vite/React/TS
-  docs/                  # MkDocs Material (servido em /docs)
-  docs-site/             # Docusaurus (estas páginas)
-  docker-compose*.yml    # Orquestração local
-  README.md
-```
+### Rotas do BFF mais relevantes
+- `/health`
+- `/version`
+- `/api/auth/*`
+- `/api/me`
+- `/catalog/dev`
+- `/api/automations/*`
 
-> Arquivos de composição detectados: ['portal-agepar-main/infra/docker-compose.dev.yml', 'portal-agepar-main/infra/docker-compose.pg.yml']
-> Pistas FastAPI: ['portal-agepar-main/apps/bff/app/main.py', 'portal-agepar-main/apps/bff/app/auth/middleware.py', 'portal-agepar-main/apps/bff/app/auth/rbac.py']
-> Pastas de catálogo: ['portal-agepar-main/catalog']
+## Como navegar nesta doc
 
-## Convenções
-
-- **Linters/formatters**: seguir configs do repo (`prettier`, `eslint`, `ruff/black` se presentes)  
-- **Commits**: Conventional Commits (ex.: `feat(bff): rota /api/automations/form2json`)  
-- **Versionamento**: *semver* no app, *rolling* no monorepo  
-- **Logs**: `request_id`, `user`, `automation`, `submission_id` quando aplicável
-
-## Como rodar (dev)
-
-```bash
-# 1) subir serviços
-docker compose up --build
-
-# 2) acessar
-# Host (frontend)
-http://localhost:5173
-
-# BFF (API)
-http://localhost:8000
-
-# Docs (via host)
-http://localhost:5173/docs
-```
-
-## Healthchecks rápidos
-
-- `GET /api/health` (BFF) deve retornar `200`  
-- `GET /catalog/dev` deve trazer `categories[]` e `blocks[]`  
-- `GET /docs/` deve responder o site de documentos internos
-
-## Próximos passos neste site
-
-A documentação técnica da Plataforma AGEPAR está organizada por **seções numeradas** dentro de `docs/`, cada uma com seu próprio `index.md`:
-
-1. **Visão Geral & Arquitetura** — `01-visão-geral-e-arquitetura/`  
-2. **Ambiente Dev (Setup)** — `02-ambiente-dev-setup/`  
-3. **Build, Run & Deploy** — `03-build-run-deploy/`  
-4. **Frontend / Host (React/Vite/TS)** — `04-frontend-host-react-vite-ts/`  
-5. **Catálogo (`/catalog/dev`)** — `05-catálogo-catalog-dev/`  
-6. **BFF (FastAPI)** — `06-bff-fastapi/`  
-7. **Automations (Padrão de Módulos)** — `07-automations-padrão-de-módulos/`  
-8. **Banco de Dados & Persistência** — `08-banco-de-dados-persistência/`  
-9. **Segurança** — `09-segurança/`  
-10. **Observabilidade** — `10-observabilidade/`  
-11. **Padrões de Erro & DX** — `11-padrões-de-erro-dx/`  
-12. **Testes** — `12-testes/`  
-13. **Documentação (Docusaurus)** — `13-documentação-docusaurus/`  
-14. **Guias de Produto (Compras Públicas)** — `14-guias-de-produto-fluxo-compras-público/`  
-15. **Apêndices** — `15-apêndices/`
-
-> Cada seção possui um `index.md` e páginas específicas (ex.: `01-visão-geral-e-arquitetura/index.md`). A navegação é controlada pela sidebar do Docusaurus.
-
----
-
-_Criado em 2025-10-27_
+- **01 — Visão Geral e Arquitetura**: contrato atual do monorepo
+- **02 — Ambiente & Dev Setup**: compose, `.env`, scripts e operação local
+- **03 — Build, Run & Deploy**: execução direta, proxy e artefatos
+- **06 — BFF**: auth, rotas, padrões e erros
+- **07 — Automations**: padrão dos módulos e inventário atual
+- **08 — Banco**: Postgres, schema e persistência
+- **12 — Testes**: o que existe e o que ainda falta

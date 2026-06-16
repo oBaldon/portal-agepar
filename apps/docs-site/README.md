@@ -1,25 +1,50 @@
-# Plataforma AGEPAR — Docusaurus Skeleton
+# Plataforma AGEPAR — documentação de desenvolvimento
 
-Este esqueleto foi gerado automaticamente a partir de:
-- `docusaurus-timeline.json`
-- `docusaurus-outline-mapeado.json`
+Projeto Docusaurus da documentação técnica do Portal AGEPAR.
 
-## Como usar
+## Estado atual
+
+- **Framework:** Docusaurus v3
+- **Base URL em dev:** `/devdocs/`
+- **Proxy do Host:** `http://localhost:5173/devdocs/`
+- **Acesso direto opcional:** `http://localhost:9000/devdocs/`
+- **Entrada principal:** `docusaurus.config.ts`
+- **Navegação:** `sidebars.ts`
+
+## Como rodar no monorepo
+
+### Via Docker Compose
+O jeito mais fiel ao repositório é subir a stack pela raiz:
 
 ```bash
-# 1) Instale dependências
-npm i
+./infra/scripts/dev.sh up
+```
 
-# 2) Rodar em dev
-npm start
+### Diretamente
+Dentro de `apps/docs-site`:
 
-# 3) Build estático
-npm run build
-npm run serve
+```bash
+npm install
+npm run start -- --host 0.0.0.0 --port 8000
 ```
 
 ## Estrutura
-- `docs/` — Conteúdo em seções (00–..), com `index.md`, tópicos e `99-referencias.mdx`
-- `sidebars.ts` — Sidebar mapeando seções
-- `docusaurus.config.ts` — Configuração do site
-- `src/` — CSS e páginas extras
+
+```text
+apps/docs-site/
+  docs/                 # conteúdo em Markdown/MDX
+  blog/                 # posts técnicos
+  src/                  # páginas e CSS customizado
+  static/               # assets
+  sidebars.ts           # sidebar principal
+  docusaurus.config.ts  # baseUrl, navbar, footer, temas
+  package.json          # scripts do Docusaurus
+```
+
+## Observações importantes
+
+- O container de docs do compose usa **npm**.
+- O diretório ainda possui `package-lock.json` e `pnpm-lock.yaml`; isso é uma
+  divergência operacional conhecida e a documentação principal já registra o tema.
+- O site assume `baseUrl: "/devdocs/"`, então qualquer proxy ou publicação deve
+  respeitar esse prefixo ou ajustar o config antes do build.

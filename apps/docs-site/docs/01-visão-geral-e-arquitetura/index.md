@@ -4,56 +4,49 @@ title: "Visão Geral e Arquitetura"
 sidebar_position: 0
 ---
 
-## Objetivos
-- Descrever: Objetivo da Plataforma AGEPAR, escopo e público, Diagrama alto nível (Host React/Vite, BFF FastAPI, Docs proxy, SQLite), Monorepo: estrutura de pastas, Fluxo dev local vs. produção
+Esta seção documenta o **contrato real** do portal no estado atual do repositório.
 
-## Sumário Rápido
-- Estrutura e conceitos
-- Padrões adotados
-- Exemplos e referências aos arquivos do repositório
+## Resumo executivo
 
-## Visão da Arquitetura (alto nível)
+- monorepo em `apps/`
+- BFF FastAPI
+- Host React/Vite/TS
+- Docs em Docusaurus
+- Postgres no ambiente dev
+- catálogo em `catalog/catalog.dev.json`
+- docs publicadas em **`/devdocs/`** em dev
+
+## Diagrama
 
 ```mermaid
 flowchart LR
-  subgraph Host 
-    direction TB
-    UI[Navbar + Catálogo + Iframes]
-    UI -->|/api| BFF
-    UI -->|/docs| DOCS
-  end
+  Browser[(Browser)]
+  Host[Host :5173]
+  BFF[BFF :8000]
+  Docs[Docs :8000]
+  PG[(Postgres :5432)]
 
-  BFF(FastAPI)
-  DOCS(MkDocs Material)
-  DB[(SQLite)]
-  AUTO[Automations]
-
-  BFF --> DB
-  BFF -->|/catalog/dev| UI
-  BFF -->|/api/automations/:kind| AUTO
+  Browser --> Host
+  Host -->|/api,/catalog| BFF
+  Host -->|/devdocs| Docs
+  BFF --> PG
 ```
 
-**Portas e rotas (dev):**
-- **host**: 5173 (Vite), com _proxies_ para `/api`, `/catalog` e `/docs`
-- **bff**: 8000 (FastAPI)
-- **docs**: servido via host em `/docs` (backend MkDocs interno)
+## Temas cobertos aqui
 
-## Monorepo — Estrutura de Pastas (alto nível)
+- objetivo e escopo do portal
+- diagrama alto nível
+- estrutura de pastas
+- fluxo dev local x produção
 
-```text
-(Preencher com a árvore do repositório: apps/, docker-compose*, etc.)
-```
+## Observação importante
 
-## Fluxo: Dev local vs. Produção
+Esta revisão substitui referências históricas a:
+- `/docs`
+- MkDocs
+- SQLite
 
-- **Dev local**: `docker compose up --build` sobe host (frontend), bff (API) e docs. O host faz _proxy_ para o BFF e para as docs. Banco local **SQLite** inicializado no _startup_.
-- **Produção**: mesmos componentes, com build otimizado do host, _hardening_ de CORS/cookies no BFF, logs/auditoria ativos e catálogo versionado.
-
-## Padrões adotados (resumo)
-
-- **BFF / FastAPI**: sessões mock (`POST /api/auth/login`, `GET /api/me`); automations em `/api/automations/:kind/...`; validação Pydantic v2 (`populate_by_name`, `extra="ignore"`); _error codes_ padronizados `400/401/403/404/409/422`.
-- **Host / Vite React TS**: navbar por categorias; cards por categoria; renderização de blocos conforme `ui` (iframe); RBAC **ANY-of** por `requiredRoles`; preserva ordem de escrita no catálogo.
-- **Docs / MkDocs**: servidas via `/docs` pelo host; conteúdo para não-devs; tema Material com Mermaid/Glightbox.
-- **Catálogo**: servido em `/catalog/dev` com `categories[]` e `blocks[]`; blocos com `ui.type="iframe"`.
-
-> _Criado em 2025-10-27_
+pelo comportamento realmente implementado no código:
+- `/devdocs`
+- Docusaurus
+- PostgreSQL

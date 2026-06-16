@@ -4,94 +4,85 @@ title: "Monorepo: estrutura de pastas"
 sidebar_position: 3
 ---
 
-Esta página descreve a **estrutura do monorepo** do Portal AGEPAR, destacando as pastas principais e arquivos‑chave que suportam Host, BFF, Docs e Catálogo.
-
-## Árvore (2 níveis)
+## Árvore de alto nível
 
 ```text
-/
-  README.md
-  docusaurus-outline-mapeado.json
-  docusaurus-timeline.json
-  requirements.txt
 apps/
-apps/bff/
-      Dockerfile.dev
-      requirements.txt
-      run_dev.sh
-apps/docs-site/
-      README.md
-      docusaurus.config.ts
-      package-lock.json
-      package.json
-      pnpm-lock.yaml
-      sidebars.ts
-      tsconfig.json
-      typedoc.json
-apps/host/
-      index.html
-      package-lock.json
-      package.json
-      postcss.config.js
-      tsconfig.json
-      vite.config.ts
+  bff/
+    app/
+      auth/
+      automations/
+      games/
+      utils/
+      main.py
+      db.py
+    Dockerfile.dev
+    run_dev.sh
+
+  host/
+    src/
+      auth/
+      components/
+      lib/
+      pages/
+      App.tsx
+      types.ts
+    vite.config.ts
+
+  docs-site/
+    docs/
+    blog/
+    src/
+    static/
+    docusaurus.config.ts
+    sidebars.ts
+
 catalog/
-    catalog.dev.json
+  catalog.dev.json
+
 infra/
-    docker-compose.dev.yml
-    docker-compose.pg.yml
-infra/scripts/
-      db_smoke.sh
-      dev_down.sh
-      dev_fresh.sh
-      dev_logs.sh
-      dev_logs_purge.sh
-      dev_up.sh
-infra/sql/
-      001_init_auth_logs.sql
-      002_seed_auth_dev.sql
-      099_test_auth_logs.sql
+  docker-compose.dev.yml
+  docker-compose.pg.yml
+  scripts/dev.sh
+  sql/init_db.sql
 ```
 
-> A árvore acima é intencionalmente curta (até **2 níveis**) para manter a leitura objetiva.
+## Papel de cada raiz
 
-## Pastas principais (função)
+### `apps/bff`
+Backend de fronteira:
+- auth
+- catálogo
+- automações
+- auditoria
+- notificações
+- tarefas
+- integração de sessão com Postgres
 
-- **apps/bff/** — API **FastAPI** e módulos de **Automations**. Espera‑se `app/`, `routers/`, `automations/`, `init_db` e requisitos Python.
-- **apps/host/** — **Vite/React/TS** do frontend. Lê o **Catálogo** e renderiza blocos (iframe) + RBAC.
-- **apps/docs/** — **MkDocs/Material** para não‑devs, servido via **host** em `/docs`.
-- **apps/docs-site/** — **Docusaurus** (este site técnico), com `docs/` em seções numeradas e sidebar autogerada.
-- **catalog/** (se presente) — JSONs com `categories[]` e `blocks[]` para o Host.
-- **docker-compose*.yml** — orquestração local (subir host/bff/docs, volumes, portas).
+### `apps/host`
+Frontend principal:
+- login e rotas protegidas
+- dashboard e categorias
+- chamadas ao BFF
+- regras de visibilidade de catálogo
+- renderização iframe
 
-## Arquivos‑chave detectados
+### `apps/docs-site`
+Documentação técnica em Docusaurus:
+- `docs/`
+- `blog/`
+- `sidebars.ts`
+- `docusaurus.config.ts`
 
-- Compose: —
-- Vite config: ['apps/host/vite.config.ts']
-- mkdocs.yml: —
-- pyproject.toml: —
-- package.json: ['apps/docs-site/package.json', 'apps/host/package.json']
+### `catalog`
+Metadados dos blocos visíveis no Host.
 
-## Boas práticas de organização
+### `infra`
+Compose, scripts operacionais e SQL consolidado de bootstrap.
 
-- **Automations como módulos isolados** (BFF + UI no‑build), seguindo a convenção de endpoints (`/schema`, `/ui`, `/submit`, ...).
-- **Catálogo versionado** por ambiente (dev/hml/prod) e **ordem preservada** de categorias/blocos.
-- **Proxies Vite** configurados para `/api`, `/catalog` e `/docs` apontando para os serviços no docker compose.
-- **Logs/Auditoria**: tabelas `submissions` e `audits` + `request_id/user/automation/submission_id` nos logs.
-- **Validação**: **Pydantic v2** (`populate_by_name=True`, `extra="ignore"`) para evitar `422` triviais.
+## Observações arquiteturais úteis
 
-## Exemplos rápidos
-
-**Subir serviços (dev):**
-```bash
-docker compose up --build
-```
-
-**Conferir catálogo:**
-```bash
-curl -s http://localhost:8000/catalog/dev | jq .
-```
-
----
-
-> _Criado em 2025-10-27_
+- o repositório usa **Docusaurus**, não MkDocs;
+- a documentação de dev é publicada em **`/devdocs/`** no estado atual;
+- o banco de dev é **PostgreSQL**, não SQLite;
+- a composição completa depende de dois arquivos YAML.
