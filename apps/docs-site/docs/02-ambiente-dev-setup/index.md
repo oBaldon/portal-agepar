@@ -12,7 +12,7 @@ Esta seção descreve o setup que realmente sobe a stack hoje.
 - o recomendado é usar `infra/scripts/dev.sh`;
 - as docs são servidas em **`/devdocs/`**;
 - o banco é **PostgreSQL**;
-- `.env.example` precisa ser tratado com cautela.
+- `.env.example` está sanitizado, mas continua sendo apenas base de laboratório.
 
 ## Serviços esperados
 

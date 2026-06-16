@@ -6,25 +6,23 @@ sidebar_position: 99
 
 ## Arquivos mapeados do repositório
 
-### DB/ORM/Migrações
+### Bootstrap SQL
+- `infra/sql/init_db.sql`
 
-### Referências a submissions
-- `portal-agepar-main/README.md`
-- `portal-agepar-main/apps/bff/app/automations/accounts.py`
-- `portal-agepar-main/apps/bff/app/automations/controle.py`
-- `portal-agepar-main/apps/bff/app/automations/controle_ferias.py`
-- `portal-agepar-main/apps/bff/app/automations/dfd.py`
-- `portal-agepar-main/apps/bff/app/automations/ferias.py`
-- `portal-agepar-main/apps/bff/app/automations/form2json.py`
-- `portal-agepar-main/apps/bff/app/automations/support.py`
-- `portal-agepar-main/apps/bff/app/db.py`
-- `portal-agepar-main/apps/bff/app/main.py`
+### Camada operacional do BFF
+- `apps/bff/app/db.py`
 
-### Referências a audits
-- `portal-agepar-main/apps/bff/app/automations/controle.py`
-- `portal-agepar-main/apps/bff/app/automations/dfd.py`
-- `portal-agepar-main/apps/bff/app/automations/ferias.py`
-- `portal-agepar-main/apps/bff/app/db.py`
-- `portal-agepar-main/apps/bff/app/main.py`
-- `portal-agepar-main/infra/sql/001_init_auth_logs.sql`
-- `portal-agepar-main/infra/sql/099_test_auth_logs.sql`
+### Domínios que persistem dados
+- `apps/bff/app/auth/routes.py`
+- `apps/bff/app/auth/sessions.py`
+- `apps/bff/app/notifications.py`
+- `apps/bff/app/automations/dfd.py`
+- `apps/bff/app/automations/etp.py`
+- `apps/bff/app/automations/ferias.py`
+- `apps/bff/app/automations/fileshare.py`
+- `apps/bff/app/automations/tasks.py`
+- `apps/bff/app/automations/avisos.py`
+
+### Infra de desenvolvimento
+- `infra/docker-compose.pg.yml`
+- `.env.example`

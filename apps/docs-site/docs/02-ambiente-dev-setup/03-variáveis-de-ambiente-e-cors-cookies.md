@@ -38,8 +38,12 @@ O `SessionMiddleware` hoje está configurado com:
 
 Isso documenta o que o código faz hoje; não é um hardening completo para produção.
 
-## Situação de segurança do `.env.example`
+## Situação do `.env.example`
 
-O arquivo existe para bootstrap, mas no estado atual contém valores sensíveis
-versionados. A documentação registra isso para evitar que o comportamento seja
-interpretado como prática aceitável.
+O arquivo existe para bootstrap e, neste snapshot, já está sanitizado:
+
+- `EXPRESSO_API_USER` e `EXPRESSO_API_PASSWORD` vêm vazios;
+- `SESSION_SECRET=dev-secret` e `PGPASSWORD=portaldev` são defaults de laboratório;
+- cada ambiente continua responsável por injetar seus próprios segredos fora do versionamento.
+
+A regra continua a mesma: **segredos reais não entram no repositório**.

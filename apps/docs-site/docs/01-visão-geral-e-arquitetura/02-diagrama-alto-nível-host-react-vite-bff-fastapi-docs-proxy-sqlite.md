@@ -1,6 +1,6 @@
 ---
 id: diagrama-alto-nível-host-react-vite-bff-fastapi-docs-proxy-sqlite
-title: "Diagrama alto nível (Host, BFF, Docusaurus e Postgres)"
+title: "Diagrama alto nível — Host, BFF, Docs e Postgres"
 sidebar_position: 2
 ---
 

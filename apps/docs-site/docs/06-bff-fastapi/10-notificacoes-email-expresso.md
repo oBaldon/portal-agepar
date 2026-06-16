@@ -84,5 +84,7 @@ PORTAL_PUBLIC_BASE_URL: "http://localhost:5173"
 
 ## Observações
 
-- No estado atual do repositório, `.env.example` ainda carrega variáveis sensíveis
-  relacionadas ao Expresso; trate isso como passivo operacional e não como prática desejada.
+- Neste snapshot, `.env.example` já traz `EXPRESSO_API_USER` e
+  `EXPRESSO_API_PASSWORD` vazios.
+- O comportamento desejado continua sendo preencher credenciais reais apenas via
+  ambiente/secret manager.

@@ -1,60 +1,62 @@
 ---
-id: objetivo-do-portal-agepar-escopo-e-público
+id: objetivo-do-portal-agepar-escopo-e-publico
 title: "Objetivo do Portal AGEPAR, escopo e público"
 sidebar_position: 1
 ---
 
-O Portal AGEPAR é uma plataforma interna modular para centralizar rotinas
-operacionais e automações de negócio, com foco forte em fluxo documental,
-compras públicas, apoio administrativo e produtividade institucional.
+O Portal AGEPAR é um monorepo voltado a **fluxos internos de trabalho**, com
+ênfase em automações institucionais e, em especial, no fluxo de **compras
+públicas**.
+
+## Objetivo do portal
+
+O objetivo do produto é oferecer uma camada única para:
+
+- autenticação e sessão de usuários;
+- navegação por catálogo de módulos;
+- automações com UI simples, embutidas no Host;
+- persistência e trilha de auditoria;
+- documentação técnica para evolução do portal.
+
+No estado atual do repositório, esse objetivo já aparece em módulos como:
+
+- DFD;
+- ETP;
+- Férias;
+- Tasks;
+- Fileshare;
+- Support;
+- Avisos;
+- WhoIsOnline;
+- Painéis de controle e administração.
+
+## Escopo funcional atual
+
+Hoje o portal cobre, ao mesmo tempo:
+
+- **módulos de compras** (`dfd`, `etp`, `pca` em modo demo, `form2json`);
+- **módulos de pessoas** (`usuarios`, `ferias`, `ponto_saldo`);
+- **módulos de produtividade** (`tasks`, `fileshare`);
+- **módulos de governança/administração** (`controle`, `accounts`, `avisos`, `whoisonline`);
+- **blocos de laboratório e demonstração** (`demo`, `snake`, `cat2`, `cat3`).
 
 ## Público principal
 
-- desenvolvimento e sustentação da plataforma
-- áreas administrativas da AGEPAR
-- equipes que operam compras, férias, tarefas, suporte, avisos e gestão de usuários
-- perfis com governança/auditoria
+A plataforma serve principalmente:
 
-## Escopo técnico atual
+- devs que mantêm o monorepo;
+- áreas internas da AGEPAR que usam as automações;
+- times de governança, compras, RH e suporte;
+- gestores que precisam de relatórios, auditoria e visibilidade operacional.
 
-O escopo realmente implementado hoje inclui:
+## O que esta seção substitui da narrativa antiga
 
-- autenticação local com sessão persistida em banco;
-- leitura de catálogo por categorias;
-- SPA com páginas públicas e protegidas;
-- módulos de automação servidos por HTML simples via iframe;
-- geração de documentos e downloads;
-- trilha de auditoria;
-- notificações e avisos globais;
-- gestão de tarefas;
-- gestão de usuários, contas e sessões.
+Esta documentação deixa de tratar como estado atual coisas que hoje são apenas
+histórico do projeto, por exemplo:
 
-## Macrofluxos de produto já representados
-
-### Compras
-- DFD
-- ETP
-- PCA ainda como bloco demonstrativo
-- módulos auxiliares como `form2json`
-
-### Pessoas
-- férias
-- saldo de ponto
-- usuários
-- perfil
-
-### Produtividade e governança
-- tarefas
-- controle / auditoria
-- fileshare
-- avisos
-- whoisonline
-
-## O que não é mais verdade no estado atual
-
-A base já não é mais:
-- um portal com docs MkDocs;
 - um backend apoiado em SQLite;
+- um site de docs em MkDocs/Material;
 - um app centrado apenas em “sessões mock”.
 
-A documentação desta seção foi atualizada justamente para refletir a evolução do projeto.
+O código atual já representa outro estágio: **FastAPI + React/Vite + Docusaurus
++ PostgreSQL**, com autenticação local persistida e mock legado opcional.

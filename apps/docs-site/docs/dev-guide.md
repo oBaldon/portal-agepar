@@ -89,11 +89,13 @@ infra/
 
 ## Passivos que o dev precisa conhecer
 
-- `.env.example` contém credenciais que devem ser sanitizadas.
+- `.env.example` está sanitizado neste snapshot, mas continua sendo apenas um
+  exemplo de laboratório; segredos reais devem entrar por ambiente.
 - O Host usa iframe sem `sandbox`.
 - Não há suíte de testes automatizados versionada.
 - Há coexistência de `package-lock.json` e `pnpm-lock.yaml` em `apps/docs-site`.
 - Parte da documentação antiga ainda falava em MkDocs/SQLite; esta revisão corrige isso.
+- Há nomes históricos de alguns arquivos de doc que ainda não refletem o nome final ideal.
 
 ## Onde registrar ajustes de documentação
 

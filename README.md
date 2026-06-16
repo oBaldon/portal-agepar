@@ -83,9 +83,9 @@ Na raiz do projeto:
 cp .env.example .env
 ```
 
-> **Atenção:** no estado atual do repositório, `.env.example` contém credenciais
-> que não deveriam estar versionadas. Trate isso como passivo de segurança e
-> substitua os valores antes de usar fora de laboratório.
+> **Observação:** o `.env.example` deste snapshot já está sanitizado para uso de
+> laboratório, com placeholders vazios para integrações externas. Ainda assim,
+> cada ambiente deve preencher seus próprios segredos fora do versionamento.
 
 ### 2) Subir a stack completa de dev + Postgres
 
@@ -295,7 +295,7 @@ O repositório já implementa:
 
 Mas também carrega passivos que a documentação agora explicita:
 
-- `.env.example` contém credenciais que devem ser removidas/sanitizadas;
+- `.env.example` está sanitizado neste snapshot, mas continua sendo apenas um exemplo de laboratório;
 - `iframe` do Host ainda é renderizado sem `sandbox`;
 - `SessionMiddleware` está com `https_only=False` no estado atual;
 - não há proteção explícita de CSRF documentada/implementada para o modelo com cookie.

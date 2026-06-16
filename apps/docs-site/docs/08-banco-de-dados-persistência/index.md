@@ -14,3 +14,4 @@ mais compatível com a narrativa antiga de SQLite.
 - tabelas operacionais
 - tabela de sessão e identidade
 - limites e passivos de backup/migração
+- inventário das tabelas realmente observáveis no snapshot atual

@@ -28,22 +28,32 @@ passivos observáveis sem depender de premissas antigas.
 - `init_db()` roda no startup
 - autenticação local com sessão persistida em banco
 - `AUTH_LEGACY_MOCK=1` mantém o atalho legado de mock
+- módulos ativos para DFD, ETP, férias, tarefas, fileshare, suporte, avisos, usuários e outros
 
-### Docs
-- `baseUrl: "/devdocs/"`
-- sidebar principal em `sidebars.ts`
-- mix atual de `package-lock.json` e `pnpm-lock.yaml`
+### Banco
+- `infra/sql/init_db.sql` inicializa o domínio base de auth/RBAC/auditoria/RH
+- `apps/bff/app/db.py` garante tabelas operacionais como `submissions`,
+  `automation_audits`, `notifications`, `tasks` e `fileshare_items`
 
-## Passivos documentados
+## Principais passivos ainda observáveis
 
-- `.env.example` ainda contém variáveis sensíveis que não deveriam estar versionadas;
-- `docker-compose.dev.yml` e `run_dev.sh` comunicam sinais diferentes sobre `AUTH_MODE`;
-- o Host embute iframes sem `sandbox`;
-- o repositório ainda não possui suíte automatizada consolidada para BFF e Host.
+- quickstart alternativo fora de `infra/scripts/dev.sh` ainda é fácil de errar,
+  porque o BFF depende do compose com Postgres;
+- o Host continua embutindo módulos em `iframe` sem `sandbox`;
+- o repositório continua sem suíte de testes automatizados versionada;
+- coexistem `package-lock.json` e `pnpm-lock.yaml` no projeto `apps/docs-site`;
+- ainda existem nomes históricos em alguns arquivos da documentação.
 
-## Como usar esta página
+## O que mudou em relação à revisão anterior
 
-Use esta auditoria como referência rápida quando houver dúvida entre:
-- documentação histórica,
-- comportamento realmente implementado,
-- ou débito técnico explicitamente conhecido.
+- `.env.example` deste snapshot está **sanitizado**, com placeholders vazios para
+  integrações externas;
+- a principal divergência restante na doc não é mais segredo versionado, mas sim
+  trechos históricos e páginas novas que precisavam voltar ao padrão editorial.
+
+## Leitura relacionada
+
+- `../../dev-guide`
+- `../../02-ambiente-dev-setup`
+- `../../08-banco-de-dados-persistência`
+- `../../14-guias-de-produto-fluxo-compras-público`

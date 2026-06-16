@@ -1,6 +1,6 @@
 ---
 id: sem-segredos-no-repo
-title: "Segredos no repositório: regra, desvio atual e ação esperada"
+title: "Segredos no repositório: regra e estado atual"
 sidebar_position: 3
 ---
 
@@ -10,20 +10,23 @@ Nenhum segredo real deveria estar versionado.
 
 ## Estado atual observado
 
-O arquivo `.env.example` do repositório hoje contém valores sensíveis, incluindo
-credenciais relacionadas a integração de e-mail. Isso deve ser tratado como
-**desvio do padrão esperado**, e não como exemplo aceitável.
+Neste snapshot, o `.env.example` já foi sanitizado e usa placeholders vazios para
+integrações externas, como o Expresso.
+
+Isso melhora bastante a situação em relação a revisões anteriores, mas **não**
+transforma `.env.example` em fonte de verdade para produção.
 
 ## Como interpretar corretamente o repo
 
 - `SESSION_SECRET=dev-secret` é um placeholder de laboratório;
 - `PGPASSWORD=portaldev` é um default de dev;
-- credenciais nominais para integrações externas **não devem permanecer** em
-  arquivo versionado, mesmo em `.env.example`.
+- `EXPRESSO_API_USER` e `EXPRESSO_API_PASSWORD` vazios indicam que o segredo deve ser preenchido fora do versionamento;
+- qualquer ambiente real continua precisando de secret manager, variável protegida
+  ou mecanismo equivalente.
 
-## O que a documentação passa a registrar
+## O que a documentação registra
 
 1. o padrão correto continua sendo “segredos via ambiente/secret manager”;
-2. o estado atual do repo ainda tem passivo de saneamento;
-3. qualquer uso externo do `.env.example` deve passar por revisão e substituição
-   imediata dos valores.
+2. o snapshot atual já está sanitizado no que diz respeito ao `.env.example`;
+3. defaults de desenvolvimento não devem ser promovidos automaticamente para
+   ambientes reais.

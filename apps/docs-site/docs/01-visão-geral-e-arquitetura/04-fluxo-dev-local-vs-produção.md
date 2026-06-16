@@ -64,7 +64,7 @@ O repositório não traz uma pipeline CI/CD consolidada, mas o desenho implícit
 ## Diferenças importantes entre dev e produção
 
 - `https_only=False` no cookie é aceitável em dev, não em produção;
-- credenciais de `.env.example` não podem ser reaproveitadas;
+- placeholders de `.env.example` não dispensam o preenchimento de segredos reais por ambiente;
 - docs podem continuar em `/devdocs/` ou migrar para outro path, desde que
   `baseUrl` seja ajustado no Docusaurus;
 - qualquer dependência do modo mock deve ser explicitamente desligada.

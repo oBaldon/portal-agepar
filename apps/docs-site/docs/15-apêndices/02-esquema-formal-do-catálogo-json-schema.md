@@ -21,8 +21,8 @@ Esta página documenta o **esquema formal do catálogo** do Portal AGEPAR em for
 
 O objetivo deste esquema é:
 
-- Servir de **referência única** para o formato de `catalog.dev.json`.
-- Ajudar em **validações automáticas** (lint em CI/CD, testes de contrato).
+- Servir de **referência editorial/técnica** para o formato de `catalog.dev.json`.
+- Ajudar em futuras **validações automáticas** (lint em CI/CD, testes de contrato).
 - Explicitar **campos obrigatórios** e **tipos** do catálogo.
 - Documentar **regras semânticas** que não cabem diretamente no JSON Schema
   (ex.: unicidade de `name` e `id`, relacionamento `categoryId → categories[].id`).
@@ -30,8 +30,9 @@ O objetivo deste esquema é:
 Algumas observações importantes:
 
 - O BFF é tolerante a campos extras em `blocks` e `categories` — eles são **ignorados** em tempo de execução.
-- O JSON Schema abaixo é pensado como **documento de referência**; times podem
-  copiar/adaptar (por exemplo, endurecendo `additionalProperties`).
+- O JSON Schema abaixo é pensado como **documento de referência**.
+- **Não existe**, neste snapshot, um arquivo versionado oficial como `catalog.schema.json`;
+  o conteúdo desta página serve justamente como base caso o time decida formalizar esse artefato.
 
 ---
 
@@ -109,7 +110,7 @@ classDiagram
 
 Abaixo um JSON Schema de referência para o **objeto raiz** do catálogo.
 
-> Sugestão de nome de arquivo: `catalog.schema.json` (por exemplo em `infra/schemas/`).
+> Se o time decidir versionar esse artefato, um nome plausível é `catalog.schema.json` na raiz de `catalog/` ou em pasta dedicada.
 
 ```json title="catalog.schema.json — esquema de alto nível" showLineNumbers
 {
@@ -406,6 +407,7 @@ Exemplo reduzido que valida contra o schema proposto:
 
 ```ts title="Validação com Ajv (exemplo)" showLineNumbers
 import Ajv from "ajv";
+// supondo que o time tenha salvo o schema desta página como catalog.schema.json
 import schema from "./catalog.schema.json";
 import catalog from "../../catalog/catalog.dev.json";
 
@@ -426,6 +428,7 @@ if (!validate(catalog)) {
 import json
 from jsonschema import Draft202012Validator
 
+# supondo que o time tenha salvo o schema desta página como catalog.schema.json
 with open("catalog.schema.json", "r", encoding="utf-8") as f:
     schema = json.load(f)
 

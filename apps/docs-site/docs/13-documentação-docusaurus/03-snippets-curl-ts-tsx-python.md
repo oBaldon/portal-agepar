@@ -16,7 +16,7 @@ Aqui a gente foca **nos três tipos de snippet mais usados**:
 - TypeScript / TSX (Host),
 - Python (BFF / automations),
 
-com exemplos prontos para reaproveitar nas seções 01–12.
+com exemplos prontos para reaproveitar nas seções 01–15.
 
 ---
 
@@ -92,6 +92,7 @@ Esses exemplos aparecem (ou podem aparecer) em:
 * 06 — BFF (FastAPI),
 * 07 — Automations,
 * 12 — Testes.
+* 14 — Guias de Produto (quando o snippet ajuda a ligar produto e implementação).
 
 ---
 

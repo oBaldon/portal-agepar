@@ -22,17 +22,18 @@ Use `ui.type = "iframe"` e caminho relativo para o BFF.
   "description": "DFD — Documento de Formalização da Demanda",
   "requiredRoles": ["editor", "admin"]
 }
-````
+```
 
 **Checklist**
 
-* `categoryId` existe em `categories`.
-* Endpoint responde:
+- `categoryId` existe em `categories`.
+- Endpoint responde:
 
   ```bash
   curl -I http://localhost:8000/api/automations/dfd/ui
   ```
-* Se o alvo bloquear `frame-ancestors`, troque para **link externo** (ver seção 2).
+
+- Se o alvo bloquear `frame-ancestors`, troque para **link externo** (ver seção 2).
 
 ---
 
@@ -42,7 +43,7 @@ Quando o serviço não permite `iframe`, mude para `link`.
 
 ```json
 {
-  "categoryId": "orcamento",
+  "categoryId": "governanca",
   "ui": { "type": "link", "href": "https://transparencia.exemplo.gov.br" },
   "description": "Portal de transparência"
 }
@@ -63,8 +64,8 @@ Exemplo de categoria **Compras** com três blocos. A UI preserva a **ordem do ar
   ],
   "blocks": [
     { "categoryId": "compras", "ui": { "type": "iframe", "url": "/api/automations/dfd/ui" }, "description": "DFD" },
-    { "categoryId": "compras", "ui": { "type": "iframe", "url": "/api/automations/pca/ui" }, "description": "PCA" },
-    { "categoryId": "compras", "ui": { "type": "iframe", "url": "/api/automations/tr/ui"  }, "description": "TR"  }
+    { "categoryId": "compras", "ui": { "type": "iframe", "url": "/api/automations/etp/ui" }, "description": "ETP" },
+    { "categoryId": "compras", "ui": { "type": "iframe", "url": "/api/demo?view=pca" }, "description": "PCA (demo)" }
   ]
 }
 ```
@@ -80,9 +81,14 @@ flowchart LR
 ## 4) Variações por ambiente com overlay JSON
 
 Mantenha um **arquivo base** e aplique **overlays** por ambiente (dev, staging, prod) com `jq`.
+
+> Observação importante: o repositório atual **não versiona** `catalog.base.json`,
+> `catalog.hml.json` ou `catalog.prod.json`. O exemplo abaixo é um **padrão
+> recomendado**, não uma descrição do que já existe no snapshot.
+
 Estrutura sugerida:
 
-```
+```text
 catalog/
   catalog.base.json
   overlays/
@@ -102,7 +108,7 @@ catalog/
         "set":   { "ui": { "type": "link", "href": "https://staging.transparencia.exemplo.gov.br" } }
       },
       {
-        "match": { "ui": { "type": "iframe", "url": "/api/automations/tr/ui" } },
+        "match": { "ui": { "type": "iframe", "url": "/api/demo?view=pca" } },
         "set":   { "hidden": true }
       }
     ]
@@ -110,177 +116,39 @@ catalog/
 }
 ```
 
-**Script simples (Node) para aplicar overlay**:
+---
 
-```ts
-// tools/mergeCatalog.ts
-import fs from "fs";
+## 5) Validação do catálogo
 
-type Block = any;
+O snapshot atual **não inclui** um arquivo versionado como `tools/catalog.schema.json`.
 
-function applyBlocks(base: Block[], rules: any[]): Block[] {
-  return base.map(b => {
-    for (const r of rules) {
-      const m = JSON.stringify(b);
-      const target = JSON.stringify(r.match);
-      if (m.includes(target)) {
-        b = { ...b, ...r.set };
-      }
-    }
-    return b;
-  });
-}
+Ainda assim, há duas estratégias úteis:
 
-const base = JSON.parse(fs.readFileSync("catalog/catalog.base.json", "utf-8"));
-const ov   = JSON.parse(fs.readFileSync(process.argv[2], "utf-8")); // overlays/dev.json
-
-const out = { ...base, blocks: applyBlocks(base.blocks, ov.overrides?.blocks ?? []) };
-fs.writeFileSync("catalog/catalog.dev.json", JSON.stringify(out, null, 2));
-console.log("catalog.dev.json gerado");
-```
-
-Uso:
+### 5.1) Validação leve com `jq`
 
 ```bash
-node tools/mergeCatalog.js catalog/overlays/dev.json
+jq . catalog/catalog.dev.json >/dev/null
 ```
 
-> Em pipelines, rode esse merge antes de publicar o catálogo.
+### 5.2) Validação formal com schema ad hoc
 
----
+Se o time decidir versionar um schema, a página
+`15-apêndices/02-esquema-formal-do-catálogo-json-schema`
+já traz um modelo de referência.
 
-## 5) Feature flags simples com `hidden`
-
-Para liberar gradualmente:
-
-```json
-{
-  "categoryId": "compras",
-  "ui": { "type": "iframe", "url": "/api/automations/novidade/ui" },
-  "hidden": true
-}
-```
-
-Quando estiver pronto, mude para `false` ou remova a chave.
-
----
-
-## 6) RBAC progressivo
-
-Comece público e endureça aos poucos:
-
-```json
-{
-  "categoryId": "compras",
-  "ui": { "type": "iframe", "url": "/api/automations/dfd/ui" }
-}
-```
-
-Depois de validar, restrinja:
-
-```json
-{
-  "categoryId": "compras",
-  "ui": { "type": "iframe", "url": "/api/automations/dfd/ui" },
-  "requiredRoles": ["editor", "admin"]
-}
-```
-
----
-
-## 7) Campos auxiliares de navegação
-
-Use `navigation` para links úteis (docs, tutoriais) e `routes` para **deep links** internos:
-
-```json
-{
-  "categoryId": "contratos",
-  "ui": { "type": "iframe", "url": "/api/automations/contrato/ui" },
-  "navigation": ["/devdocs/docs/07-automations-padrão-de-módulos/06-checklist-para-criar-nova-automação", "/guia/contratos"],
-  "routes": ["/contratos/novo", "/contratos/lista"]
-}
-```
-
-A UI pode transformar isso em **atalhos** no card ou na página.
-
----
-
-## 8) Versionamento do catálogo
-
-* **Commits pequenos** e descritivos (um bloco por PR quando possível).
-* **Validação local**:
-
-  ```bash
-  jq -e . catalog/catalog.dev.json > /dev/null
-  ```
-* **Diffs legíveis**: mantenha **ordem do arquivo** estável para o histórico não “pular”.
-
----
-
-## 9) Validação e lint
-
-Valide o shape com um **schema JSON** (ver página de Esquema de bloco). Exemplo de check local:
+Exemplo de comando, assumindo que você salvou esse schema localmente como
+`catalog.schema.json`:
 
 ```bash
-# usando ajv-cli (npm i -g ajv-cli)
-ajv validate -s tools/catalog.schema.json -d catalog/catalog.dev.json
+ajv validate -s catalog.schema.json -d catalog/catalog.dev.json
 ```
 
 ---
 
-## 10) Diagnóstico rápido
+## 6) Checklist de mudança segura
 
-```bash
-# BFF servindo o catálogo
-curl -s http://localhost:8000/catalog/dev | jq .
-
-# Proxy do Host
-curl -s http://localhost:5173/catalog/dev | jq .
-
-# Teste um iframe
-curl -I http://localhost:8000/api/automations/dfd/ui
-```
-
-**Problemas típicos**
-
-* Bloco não aparece → `hidden: true` ou `requiredRoles` sem correspondência.
-* Iframe em branco → alvo bloqueia embedding; use `link`.
-* Ordem estranha → algum sort aplicado; regra padrão é **não ordenar**.
-
----
-
-## 11) Template para novo bloco (copie e cole)
-
-```json
-{
-  "categoryId": "coloque_aqui",
-  "ui": { "type": "iframe", "url": "/api/automations/slug/ui" },
-  "description": "",
-  "navigation": [],
-  "routes": [],
-  "requiredRoles": [],
-  "hidden": false
-}
-```
-
----
-
-## 12) Fluxo sugerido de PR
-
-1. Crie/edite o bloco no `catalog.dev.json`.
-2. Valide com `jq` e, se disponível, com o schema.
-3. Teste no Host e verifique RBAC/ordem/iframe.
-4. Abra PR com **título claro** e **screenshot** da UI.
-5. Após merge, gere o catálogo do ambiente alvo com overlay (se houver).
-
----
-
-## Próximos passos
-
-* **[Estrutura JSON (categories, blocks)](./01-estrutura-json-categories-blocks)**
-* **[Esquema de bloco (categoryId, ui, navigation, routes, ...)](./02-esquema-de-bloco-categoryid-ui-navigation-routes)**
-* **[Convenções (icon, order, hidden)](./03-convenções-icon-order-hidden)**
-
----
-
-> _Criado em 2025-11-18_
+1. editar `catalog/catalog.dev.json`;
+2. validar o JSON com `jq`;
+3. conferir `categoryId`, `requiredRoles`, `navigation[]` e `routes[]`;
+4. abrir o Host e validar a navegação;
+5. testar a URL de `ui` diretamente no BFF quando o bloco for iframe.

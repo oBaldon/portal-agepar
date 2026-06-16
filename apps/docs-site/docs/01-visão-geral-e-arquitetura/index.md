@@ -38,6 +38,7 @@ flowchart LR
 - diagrama alto nível
 - estrutura de pastas
 - fluxo dev local x produção
+- auditoria do estado atual do repositório
 
 ## Observação importante
 
@@ -50,3 +51,7 @@ pelo comportamento realmente implementado no código:
 - `/devdocs`
 - Docusaurus
 - PostgreSQL
+
+Também consolida que, dentro do fluxo de compras, **DFD e ETP já existem como
+automações reais**, enquanto PCA permanece como demo e as demais etapas seguem
+como backlog de produto.

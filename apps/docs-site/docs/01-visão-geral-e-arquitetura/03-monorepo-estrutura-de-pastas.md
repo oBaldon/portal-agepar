@@ -85,4 +85,5 @@ Compose, scripts operacionais e SQL consolidado de bootstrap.
 - o repositório usa **Docusaurus**, não MkDocs;
 - a documentação de dev é publicada em **`/devdocs/`** no estado atual;
 - o banco de dev é **PostgreSQL**, não SQLite;
+- a documentação do portal é servida por **Docusaurus** em `/devdocs/`, e não mais por MkDocs em `/docs`;
 - a composição completa depende de dois arquivos YAML.
