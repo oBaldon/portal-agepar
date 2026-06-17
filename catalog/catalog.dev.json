@@ -88,7 +88,7 @@
     {
       "name": "dfd",
       "displayName": "DFD — Documento de Formalização da Demanda",
-      "version": "1.0.0",
+      "version": "2.6.0",
       "categoryId": "compras",
       "description": "Gerar o Documento de Formalização da Demanda, em PDF, com rastreabilidade.",
       "ui": {
@@ -191,16 +191,9 @@
       },
       "navigation": [
         {
-          "label": "Painel (Auditoria)",
-          "href": "/api/automations/controle/ui"
-        },
-        {
-          "label": "Férias (Calendário)",
-          "href": "/api/automations/controle/ferias/ui"
-        },
-        {
-          "label": "Tarefas",
-          "href": "/api/automations/controle/tarefas/ui"
+          "label": "Painel de Controle (Auditoria)",
+          "path": "/controle",
+          "icon": "Shield"
         }
       ],
       "routes": [
@@ -221,7 +214,8 @@
         "dnr",
         "dp"
       ],
-      "order": 1
+      "order": 1,
+      "readOnly": true
     },
     {
       "name": "form2json",
@@ -372,7 +366,7 @@
     },
     {
       "name": "usuarios",
-      "displayName": "Usuários (RH)",
+      "displayName": "Admin — Gestão de Usuários",
       "version": "0.1.0",
       "categoryId": "pessoas",
       "ui": {
@@ -381,7 +375,7 @@
       },
       "navigation": [
         {
-          "label": "Usuários (RH)",
+          "label": "Admin — Gestão de Usuários",
           "path": "/usuarios",
           "icon": "Users"
         },
@@ -425,8 +419,8 @@
     },
     {
       "name": "ferias",
-      "displayName": "Férias — Requerimento e Substituição",
-      "version": "0.1.0",
+      "displayName": "Férias — Requerimento + Substituição",
+      "version": "0.2.2",
       "categoryId": "pessoas",
       "description": "Requerimento + Substituição em um único fluxo (gera dois PDFs).",
       "ui": {
@@ -458,7 +452,7 @@
     {
       "name": "tasks",
       "displayName": "Gestão de Tarefas",
-      "version": "0.1.0",
+      "version": "0.7.0",
       "categoryId": "produtividade",
       "description": "Organize tarefas pessoais e de equipe com visualização em lista e kanban. Calendário e automações entram nas próximas etapas.",
       "ui": {
@@ -517,7 +511,7 @@
     },
     {
       "name": "fileshare",
-      "displayName": "Uploader temporário",
+      "displayName": "Área Comunitária — Arquivos Temporários",
       "version": "0.1.0",
       "categoryId": "produtividade",
       "description": "Área comunitária para envio/compartilhamento temporário de arquivos (TTL 1 dia/semana/mês, opção de chave secreta).",
@@ -527,7 +521,7 @@
       },
       "navigation": [
         {
-          "label": "Uploader temporário",
+          "label": "Área Comunitária — Arquivos Temporários",
           "path": "/fileshare",
           "icon": "Upload"
         }
@@ -583,7 +577,7 @@
     },
     {
       "name": "avisos",
-      "displayName": "Avisos Globais",
+      "displayName": "Admin — Avisos Globais",
       "version": "0.1.0",
       "categoryId": "governanca",
       "description": "Publicar avisos globais com popup obrigatório, confirmação, objeção e acompanhamento por usuário.",
@@ -593,7 +587,7 @@
       },
       "navigation": [
         {
-          "label": "Avisos Globais",
+          "label": "Admin — Avisos Globais",
           "path": "/avisos",
           "icon": "Bell"
         }
@@ -616,7 +610,7 @@
     },
     {
       "name": "whoisonline",
-      "displayName": "Admin — Usuários Online",
+      "displayName": "Quem está online (Superuser)",
       "version": "0.1.0",
       "categoryId": "governanca",
       "description": "Sessões ativas, idle, agentes e revogação — somente superuser.",
@@ -626,7 +620,7 @@
       },
       "navigation": [
         {
-          "label": "Admin — Usuários Online",
+          "label": "Quem está online (Superuser)",
           "path": "/admin/whoisonline",
           "icon": "Activity"
         }

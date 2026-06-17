@@ -219,7 +219,11 @@ def _validate_catalog_metadata_consistency() -> None:
         catalog_by_kind[kind] = block
 
     catalog_kinds = set(catalog_by_kind)
-    published_kinds = set(AUTOMATION_META_BY_KIND)
+    published_kinds = {
+        kind
+        for kind, meta in AUTOMATION_META_BY_KIND.items()
+        if meta.get("catalogPublished", True)
+    }
 
     for kind in sorted(catalog_kinds - published_kinds):
         logger.warning("Catalog block '%s' points to /api/automations but is not published in /api/automations", kind)

@@ -43,6 +43,8 @@ AUTOMATION_META = {
     "kind": KIND,
     "version": PROFILE_VERSION,
     "title": TITLE,
+    # Self-service acessado pelo menu da conta; não participa do catálogo principal.
+    "catalogPublished": False,
 }
 
 router = APIRouter(
