@@ -22,6 +22,7 @@ passivos observáveis sem depender de premissas antigas.
 - proxy de `/devdocs` para `http://docs:8000`
 - catálogo em `catalog/catalog.dev.json`
 - blocos iframe renderizados pelo Host com regras de RBAC de vitrine
+- rota de perfil self-service em `/conta/perfil`, fora do catálogo principal
 
 ### BFF
 - `APP = FastAPI(..., docs_url="/api/docs", redoc_url="/api/redoc")`
@@ -29,11 +30,25 @@ passivos observáveis sem depender de premissas antigas.
 - autenticação local com sessão persistida em banco
 - `AUTH_LEGACY_MOCK=1` mantém o atalho legado de mock
 - módulos ativos para DFD, ETP, férias, tarefas, fileshare, suporte, avisos, usuários e outros
+- `GET /api/automations` é montado a partir de `AUTOMATION_META` de cada módulo
+- `GET /catalog/dev` reconcilia metadados canônicos (`version`, `title`,
+  `displayName`, `readOnly`, `superuserOnly`) antes de responder
+- o startup valida a consistência entre catálogo e automações publicadas
+- `profile` é publicado pelo backend, mas marcado como `catalogPublished: false`
 
 ### Banco
 - `infra/sql/init_db.sql` inicializa o domínio base de auth/RBAC/auditoria/RH
 - `apps/bff/app/db.py` garante tabelas operacionais como `submissions`,
   `automation_audits`, `notifications`, `tasks` e `fileshare_items`
+
+### Tarefas e compilado semanal
+- `tasks.py` é o módulo operacional de tarefas
+- `controle_tasks.py` expõe a visão consolidada gerencial e o download manual
+  do compilado semanal
+- `task_weekly_report.py` gera o workbook XLSX
+- `task_weekly_email.py` executa o envio semanal por cargo
+- o critério do compilado já considera tarefas que **estavam em andamento ao
+  entrar na semana**, não apenas tarefas criadas no período
 
 ## Principais passivos ainda observáveis
 
@@ -42,14 +57,20 @@ passivos observáveis sem depender de premissas antigas.
 - o Host continua embutindo módulos em `iframe` sem `sandbox`;
 - o repositório continua sem suíte de testes automatizados versionada;
 - coexistem `package-lock.json` e `pnpm-lock.yaml` no projeto `apps/docs-site`;
+- a stack de docs ainda instala dependências com warnings de `npm audit` e
+  pacotes deprecated no ambiente dev;
 - ainda existem nomes históricos em alguns arquivos da documentação.
 
-## O que mudou em relação à revisão anterior
+## O que mudou nesta revisão
 
-- `.env.example` deste snapshot está **sanitizado**, com placeholders vazios para
-  integrações externas;
-- a principal divergência restante na doc não é mais segredo versionado, mas sim
-  trechos históricos e páginas novas que precisavam voltar ao padrão editorial.
+- o catálogo estático foi saneado para refletir títulos, versões e flags do
+  backend;
+- a centralização de metadados das automações saiu da `main.py` e foi para os
+  próprios módulos via `AUTOMATION_META`;
+- o compilado semanal de tarefas deixou de esconder tarefas antigas que seguem
+  em execução;
+- a planilha semanal ficou mais legível para usuários leigos, com destaque para
+  descrição da atividade e cabeçalhos mais claros.
 
 ## Leitura relacionada
 

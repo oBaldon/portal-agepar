@@ -168,7 +168,9 @@ O Host:
 - filtra categorias e blocos respeitando `hidden`, `requiredRoles` e
   `superuserOnly`;
 - preserva a ordem declarada no catálogo;
-- renderiza módulos `iframe` com `src = block.ui.url`.
+- renderiza módulos `iframe` com `src = block.ui.url`;
+- expõe a rota self-service de perfil em `/conta/perfil`, fora do catálogo
+  principal.
 
 O proxy do Vite hoje aponta para:
 - `/api`     → `http://bff:8000`
@@ -209,6 +211,18 @@ Há blocos plenamente implementados e blocos ainda de demonstração, como:
 - `avisos`
 - `whoisonline`
 - `pca` (ainda apontando para `/api/demo?view=pca`)
+
+O ponto importante do estado atual é que **versão, título e flags canônicas das
+automações não ficam mais duplicados na `main.py`**. Cada módulo publicado agora
+expõe um `AUTOMATION_META`, e o BFF usa isso para:
+
+- montar `GET /api/automations`;
+- sincronizar `version`, `title`, `displayName`, `readOnly` e
+  `superuserOnly` ao servir `GET /catalog/dev`;
+- validar no startup se o catálogo está coerente com os módulos.
+
+O módulo `profile` continua publicado pelo backend, mas fica fora do catálogo
+principal porque é acessado pelo menu da conta (`catalogPublished: false`).
 
 ---
 
@@ -265,6 +279,18 @@ Há ainda:
 - `task_weekly_report.py`
 
 que não expõem UI própria, mas suportam o envio/resumo semanal de tarefas.
+
+No módulo de tarefas, o estado atual já inclui um **compilado semanal** com
+duas formas de uso:
+
+- **download manual** pelo painel `Controle > Tarefas`, respeitando o escopo do
+  usuário logado;
+- **anexo de e-mail semanal** por cargo, gerado pelo scheduler.
+
+Ambos usam o mesmo gerador de workbook, mas com **escopos diferentes**. O
+critério do compilado também foi corrigido: a planilha passou a incluir tarefas
+que **já estavam em andamento ao entrar na semana**, além das iniciadas,
+concluídas ou canceladas no período.
 
 ---
 

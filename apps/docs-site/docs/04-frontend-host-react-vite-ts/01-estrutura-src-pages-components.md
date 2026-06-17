@@ -4,7 +4,8 @@ title: "Estrutura src/, pages/, components/"
 sidebar_position: 1
 ---
 
-Esta página descreve a **organização do Host (React/Vite/TS)**: pastas, páginas, componentes e bibliotecas de apoio que integram **catálogo** e **BFF**.
+Esta página descreve a **organização do Host (React/Vite/TS)**: pastas, páginas,
+componentes e bibliotecas de apoio que integram **catálogo** e **BFF**.
 
 > Referências principais:  
 > `apps/host/src/App.tsx`, `apps/host/src/main.tsx`, `apps/host/src/auth/AuthProvider.tsx`,  
@@ -36,16 +37,16 @@ apps/host/
    ├─ App.tsx
    ├─ main.tsx
    └─ index.css
-````
+```
 
 **Ideia geral**
 
-* `auth/` centraliza **contexto de sessão** e helpers.
-* `lib/` guarda **acesso à API** e **leitura do catálogo**.
-* `pages/` são **rotas** renderizadas pelo `App.tsx`.
-* `types.ts` contém **tipos compartilhados** (Catálogo, Auth, RBAC).
-* `App.tsx` define **roteamento** e **layout**.
-* `main.tsx` faz o **bootstrap** do React com o `AuthProvider`.
+- `auth/` centraliza **contexto de sessão** e helpers.
+- `lib/` guarda **acesso à API** e **leitura do catálogo**.
+- `pages/` são **rotas** renderizadas pelo `App.tsx`.
+- `types.ts` contém **tipos compartilhados** (catálogo, auth, RBAC).
+- `App.tsx` define **roteamento** e **layout**.
+- `main.tsx` faz o **bootstrap** do React com o `AuthProvider`.
 
 ---
 
@@ -53,57 +54,75 @@ apps/host/
 
 ```mermaid
 flowchart LR
-  C[Catalogo JSON] --> L[lib catalog]
+  C[Catálogo JSON] --> L[lib catalog]
   L --> P[CategoryView]
   A[AuthProvider] --> P
   A --> R[Routes App]
   R --> H[HomeDashboard]
 ```
 
-* O **catálogo** é lido por `lib/catalog.ts`.
-* As **páginas** consomem o catálogo e aplicam **RBAC** simples (ANY-of).
-* `AuthProvider` expõe **usuário** e **roles** às páginas.
+- O **catálogo** é lido por `lib/catalog.ts`.
+- As **páginas** consomem o catálogo e aplicam **RBAC** simples (ANY-of).
+- `AuthProvider` expõe **usuário** e **roles** às páginas.
 
 ---
 
-## 3) Tipos essenciais (types.ts)
+## 3) Tipos essenciais (`types.ts`)
 
-> Os nomes podem variar; abaixo um modelo compatível com o projeto.
+No estado atual do projeto, o Host tipa o catálogo com **objetos ricos** de
+navegação e rota, não mais com arrays simples de strings.
 
 ```ts
-// apps/host/src/types.ts
-export type Role = "viewer" | "editor" | "admin" | string;
+export type NavigationLink = {
+  label: string;
+  path: string;
+  icon?: string;
+};
 
-export type CatalogCategory = {
+export type BlockRoute =
+  | { path: string; kind: "iframe" }
+  | { path: string; kind: "react" };
+
+export type BlockUI =
+  | { type: "iframe"; url: string }
+  | { type: "react"; component?: string };
+
+export type Category = {
   id: string;
   label: string;
   icon?: string;
   order?: number;
   hidden?: boolean;
+  requiredRoles?: string[];
 };
 
-export type CatalogBlockUI =
-  | { type: "iframe"; url: string }
-  | { type: "link"; href: string }
-  | { type: "placeholder"; text: string };
+export type Block = {
+  name: string;
+  displayName?: string;
+  version: string;
 
-export type CatalogBlock = {
-  categoryId: string;
-  ui: CatalogBlockUI;
+  ui: BlockUI;
+  navigation?: NavigationLink[];
+  routes?: BlockRoute[];
+
+  categoryId?: string;
+  tags?: string[];
   description?: string;
-  routes?: string[];
-  navigation?: string[];
-  requiredRoles?: Role[]; // regra: ANY-of
-  order?: number;
   hidden?: boolean;
+  order?: number;
+  requiredRoles?: string[];
+  superuserOnly?: boolean;
 };
 
 export type Catalog = {
-  categories: CatalogCategory[];
-  blocks: CatalogBlock[];
   generatedAt?: string;
+  host: { version: string; minBlockEngine: string };
+  categories?: Category[];
+  blocks: Block[];
 };
 ```
+
+### Observações importantes
 
 ---
 
