@@ -42,6 +42,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "tasks"
 TASKS_VERSION = "0.7.0"
+TITLE = "Gestão de Tarefas"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": TASKS_VERSION,
+    "title": TITLE,
+}
 
 router = APIRouter(
     prefix="/api/automations/tasks",

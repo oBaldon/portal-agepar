@@ -38,6 +38,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "profile"
 PROFILE_VERSION = "0.2.1"
+TITLE = "Meu Perfil"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": PROFILE_VERSION,
+    "title": TITLE,
+}
 
 router = APIRouter(
     prefix="/api/automations/profile",

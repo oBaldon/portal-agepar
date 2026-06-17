@@ -66,6 +66,15 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
+KIND = "support"
+SUPPORT_VERSION = "1.0.0"
+TITLE = "Suporte & Feedback"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": SUPPORT_VERSION,
+    "title": TITLE,
+}
+
 ALLOWED_AUDIT_ROLES = {"auditor", "admin", "controle"}
 
 
@@ -88,7 +97,7 @@ def _has_audit_role(user: Optional[Dict[str, Any]]) -> bool:
 
 
 router = APIRouter(
-    prefix="/api/automations/support",
+    prefix=f"/api/automations/{KIND}",
     tags=["automations", "support"],
     dependencies=[Depends(require_roles_any("user", "compras", "ferias", "admin", "controle", "auditor"))],
 )
@@ -276,8 +285,8 @@ def get_schema() -> JSONResponse:
     modules = _safe_load_catalog_blocks()
     return JSONResponse(
         {
-            "kind": "support",
-            "version": "1.0.0",
+            "kind": KIND,
+            "version": SUPPORT_VERSION,
             "modules": modules,
             "severities": SEVERITIES,
             "reproducibility": REPRO,
@@ -424,8 +433,8 @@ def submit_bug(request: Request, payload: SupportPayload, bg: BackgroundTasks) -
     sub_id = str(uuid4())
     sub = {
         "id": sub_id,
-        "kind": "support",
-        "version": "1.0.0",
+        "kind": KIND,
+        "version": SUPPORT_VERSION,
         "actor_cpf": user.get("cpf"),
         "actor_nome": user.get("nome") or user.get("name"),
         "actor_email": user.get("email"),

@@ -180,8 +180,14 @@ class Form2JsonIn(BaseModel):
     itens: List[FormItem] = Field(default_factory=list)
 
 
-FORM2JSON_VERSION = "1.0.0"
 KIND = "form2json"
+FORM2JSON_VERSION = "1.0.0"
+TITLE = "Formulário para JSON"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": FORM2JSON_VERSION,
+    "title": TITLE,
+}
 
 SCHEMA = {
     "title": "Formulário para JSON",

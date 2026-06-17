@@ -39,6 +39,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "ponto_saldo"
 PONTO_SALDO_VERSION = "0.1.0"
+TITLE = "Saldo de Horas (PDF)"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": PONTO_SALDO_VERSION,
+    "title": TITLE,
+}
 
 _PONTO_SALDO_ALLOWED_ROLES = ("ca", "rh", "cof")
 

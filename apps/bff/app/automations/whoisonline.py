@@ -48,6 +48,13 @@ from app.auth.rbac import _get_user
 
 KIND = "whoisonline"
 VERSION = "0.1.0"
+TITLE = "Quem está online (Superuser)"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": VERSION,
+    "title": TITLE,
+    "superuserOnly": True,
+}
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / KIND
 
 

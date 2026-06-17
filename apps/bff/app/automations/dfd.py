@@ -54,6 +54,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "dfd"
 DFD_VERSION = "2.6.0"
+TITLE = "DFD — Documento de Formalização da Demanda"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": DFD_VERSION,
+    "title": TITLE,
+}
 REQUIRED_ROLES = ("compras",)
 ELEVATED_ROLES = ("admin",)
 MODELS_DIR = os.environ.get("DFD_MODELS_DIR", "/app/templates/dfd_models")

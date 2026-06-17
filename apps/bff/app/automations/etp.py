@@ -64,6 +64,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "etp"
 ETP_VERSION = "1.0.0"
+TITLE = "ETP — Estudo Técnico Preliminar"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": ETP_VERSION,
+    "title": TITLE,
+}
 REQUIRED_ROLES = ("compras",)
 ELEVATED_ROLES = ("admin",)
 

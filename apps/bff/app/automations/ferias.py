@@ -232,6 +232,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "ferias"
 FERIAS_VERSION = "0.2.2"
+TITLE = "Férias — Requerimento + Substituição"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": FERIAS_VERSION,
+    "title": TITLE,
+}
 REQUIRED_ROLES = ("ferias",)
 ELEVATED_ROLES = ("admin",)
 FERIAS_DEBUG_LOG = os.getenv("FERIAS_DEBUG_LOG", "0").lower() in ("1", "true", "yes")

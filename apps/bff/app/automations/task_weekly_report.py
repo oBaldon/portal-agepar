@@ -108,16 +108,13 @@ def _load_weekly_rows(
     where_clauses = [
         "t.deleted_at IS NULL",
         "("
-        "  (t.created_at >= %s AND t.created_at < %s)"
+        "  COALESCE(prev.status_before_week = 'em_andamento', FALSE)"
         "  OR evt.started_in_week_at IS NOT NULL"
         "  OR evt.completed_in_week_at IS NOT NULL"
         "  OR evt.cancelled_in_week_at IS NOT NULL"
         ")",
     ]
-    params: list[Any] = [
-        week_start,
-        week_end,
-    ]
+    params: list[Any] = []
 
     if scope != "full":
         if not role_names:
@@ -143,10 +140,7 @@ def _load_weekly_rows(
               COALESCE(NULLIF(BTRIM(t.assigned_role_name), ''), NULL) AS assigned_role_name,
               creator.name AS created_by_name,
               assignee.name AS assigned_to_name,
-              CASE
-                WHEN t.created_at >= %s AND t.created_at < %s THEN t.created_at
-                ELSE NULL
-              END AS created_in_week_at,
+              prev.status_before_week,
               evt.started_in_week_at,
               evt.completed_in_week_at,
               evt.cancelled_in_week_at
@@ -154,11 +148,21 @@ def _load_weekly_rows(
             LEFT JOIN users creator ON creator.id = t.created_by_user_id
             LEFT JOIN users assignee ON assignee.id = t.assigned_to_user_id
             LEFT JOIN (
+              SELECT DISTINCT ON (e.task_id)
+                e.task_id,
+                COALESCE(NULLIF(BTRIM(e.new_value->>'status'), ''), NULL) AS status_before_week
+              FROM task_events e
+              WHERE e.created_at < %s
+                AND e.event_type IN ('task_created', 'task_status_changed')
+                AND COALESCE(NULLIF(BTRIM(e.new_value->>'status'), ''), NULL) IS NOT NULL
+              ORDER BY e.task_id ASC, e.created_at DESC, e.id DESC
+            ) prev ON prev.task_id = t.id
+            LEFT JOIN (
               SELECT
                 e.task_id,
                 MIN(
                   CASE
-                    WHEN e.event_type = 'task_status_changed'
+                    WHEN e.event_type IN ('task_created', 'task_status_changed')
                      AND COALESCE(e.new_value->>'status', '') = 'em_andamento'
                     THEN e.created_at
                     ELSE NULL
@@ -190,10 +194,14 @@ def _load_weekly_rows(
               WHERE e.created_at >= %s
                 AND e.created_at < %s
                 AND (
-                  e.event_type IN ('task_completed', 'task_cancelled')
+                  (
+                    e.event_type IN ('task_created', 'task_status_changed')
+                    AND COALESCE(e.new_value->>'status', '') = 'em_andamento'
+                  )
+                  OR e.event_type IN ('task_completed', 'task_cancelled')
                   OR (
                     e.event_type = 'task_status_changed'
-                    AND COALESCE(e.new_value->>'status', '') IN ('em_andamento', 'concluida', 'cancelada')
+                    AND COALESCE(e.new_value->>'status', '') IN ('concluida', 'cancelada')
                   )
                 )
               GROUP BY e.task_id
@@ -202,12 +210,11 @@ def _load_weekly_rows(
             ORDER BY
               COALESCE(NULLIF(BTRIM(t.assigned_role_name), ''), 'zzzz') ASC,
               COALESCE(assignee.name, 'Sem responsável') ASC,
-              COALESCE(evt.completed_in_week_at, evt.cancelled_in_week_at, evt.started_in_week_at, t.created_at) DESC,
+              COALESCE(evt.completed_in_week_at, evt.cancelled_in_week_at, evt.started_in_week_at, t.updated_at, t.created_at) DESC,
               t.title ASC
             """,
             [
                 week_start,
-                week_end,
                 week_start,
                 week_end,
                 *params,
@@ -246,6 +253,17 @@ def _description_preview(value: Any, max_len: int = 120) -> str:
     return text[: max_len - 1].rstrip() + "…"
 
 
+def _in_progress_week_label(row: dict[str, Any]) -> str:
+    if row.get("started_in_week_at") is not None:
+        return "Sim"
+
+    status_before_week = str(row.get("status_before_week") or "").strip().lower()
+    if status_before_week == "em_andamento":
+        return "Já estava em andamento"
+
+    return ""
+
+
 def _group_rows_by_sheet(
     rows: list[dict[str, Any]],
     *,
@@ -277,7 +295,7 @@ def _sheet_rows(role_label: str, rows: list[dict[str, Any]]) -> list[list[Any]]:
                 str(row.get("priority") or "").capitalize() or "",
                 row.get("created_by_name") or "—",
                 role_label,
-                _localize_datetime(row.get("created_in_week_at")),
+                _in_progress_week_label(row),
                 _localize_datetime(row.get("started_in_week_at")),
                 _localize_datetime(row.get("completed_in_week_at")),
                 _localize_datetime(row.get("cancelled_in_week_at")),
@@ -314,7 +332,7 @@ def _build_workbook(
         "Prioridade",
         "Criador",
         "Cargo a Notificar",
-        "Criada na Semana",
+        "Em Andamento na Semana",
         "Iniciada na Semana",
         "Concluída na Semana",
         "Cancelada na Semana",
@@ -345,7 +363,7 @@ def _build_workbook(
         if ws.max_row == 1:
             ws.append(
                 [
-                    "Nenhuma tarefa desta categoria teve criação, início, conclusão ou cancelamento na semana selecionada.",
+                    "Nenhuma tarefa desta categoria esteve em andamento, foi iniciada, concluída ou cancelada na semana selecionada.",
                     "",
                     "",
                     "",
@@ -372,8 +390,8 @@ def _build_workbook(
     wb.properties.creator = "Portal AGEPAR"
     wb.properties.title = f"Compilado semanal de tarefas ({context['weekLabel']})"
     wb.properties.description = (
-        "Compilado semanal de tarefas por cargo a notificar, com recorte da semana útil "
-        "(segunda a sexta, horário de Brasília.)"
+        "Compilado semanal de tarefas por cargo a notificar, destacando o que esteve em andamento "
+        "ou teve início, conclusão ou cancelamento na semana útil (segunda a sexta, horário de Brasília.)"
     )
 
     buffer = io.BytesIO()

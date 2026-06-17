@@ -64,15 +64,24 @@ from app.auth.rbac import require_roles_any
 
 logger = logging.getLogger(__name__)
 
+KIND = "accounts"
+ACCOUNTS_VERSION = "1.0.0"
+TITLE = "Admin — Contas & Roles"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": ACCOUNTS_VERSION,
+    "title": TITLE,
+}
+
 ACCOUNTS_MAX_LIST = int(os.getenv("ACCOUNTS_MAX_LIST", "5000"))
 
 REQUIRED_ROLES = ("admin",)
 BLOCKED_ROLES = {"is_superuser"}
 
-TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "accounts"
+TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / KIND
 
 router = APIRouter(
-    prefix="/api/automations/accounts",
+    prefix=f"/api/automations/{KIND}",
     tags=["automations:accounts"],
     dependencies=[Depends(require_roles_any(*REQUIRED_ROLES))],
 )
@@ -493,8 +502,8 @@ def schema() -> Dict[str, Any]:
         Estrutura com nome, versão e ações suportadas, incluindo marcação deprecatória do fluxo legado.
     """
     return {
-        "name": "accounts",
-        "version": "1.0.0",
+        "name": KIND,
+        "version": ACCOUNTS_VERSION,
         "actions": [
             "create_user",
             "update_user",
@@ -720,8 +729,8 @@ def create_user(payload: CreateUserIn, request: Request):
         actor = request.session.get("user") or {}
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -800,8 +809,8 @@ def update_user(user_id: str, payload: UpdateUserIn, request: Request):
         actor = request.session.get("user") or {}
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -867,8 +876,8 @@ def delete_user(user_id: str, request: Request):
 
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -910,8 +919,8 @@ def set_password(user_id: str, payload: SetPasswordIn, request: Request):
             raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -1005,8 +1014,8 @@ def set_roles(user_id: str, body: Dict[str, Any], request: Request):
 
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -1083,8 +1092,8 @@ def create_role(payload: RoleIn, request: Request):
         add_audit("accounts", "create_role", actor, {"role": name_norm})
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -1137,8 +1146,8 @@ def delete_role(role_name: str, request: Request):
         add_audit("accounts", "delete_role", actor, {"role": role_name})
         insert_submission(
             {
-                "kind": "accounts",
-                "version": "1.0.0",
+                "kind": KIND,
+                "version": ACCOUNTS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),

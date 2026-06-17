@@ -59,6 +59,12 @@ logger = logging.getLogger(__name__)
 
 KIND = "avisos"
 AVISOS_VERSION = "0.1.0"
+TITLE = "Admin — Avisos Globais"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": AVISOS_VERSION,
+    "title": TITLE,
+}
 
 TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / KIND
 

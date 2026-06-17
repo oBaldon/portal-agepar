@@ -66,8 +66,17 @@ from app import db as db
 
 logger = logging.getLogger(__name__)
 
+KIND = "fileshare"
+FILESHARE_VERSION = "0.1.0"
+TITLE = "Área Comunitária — Arquivos Temporários"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": FILESHARE_VERSION,
+    "title": TITLE,
+}
+
 router = APIRouter(
-    prefix="/api/automations/fileshare",
+    prefix=f"/api/automations/{KIND}",
     tags=["automations", "fileshare"],
     dependencies=[Depends(require_roles_any("user", "admin"))],
 )
@@ -430,6 +439,9 @@ def get_schema():
         Descrição de rotas, campos e regras de autorização.
     """
     return {
+        "name": KIND,
+        "version": FILESHARE_VERSION,
+        "title": TITLE,
         "POST /submit": {
             "fields": {"file": "binary", "ttl": "1d|7d|30d", "secret": "(opcional)"}
         },

@@ -30,24 +30,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.automations.dfd import DFD_VERSION as DFD_VER
-from app.automations.etp import router as etp_router, ETP_VERSION as ETP_VER
-from app.automations.ferias import router as ferias_router, FERIAS_VERSION as FERIAS_VER
-from app.automations.ponto_saldo import router as ponto_saldo_router, PONTO_SALDO_VERSION as PONTO_SALDO_VER
+from app.automations.dfd import AUTOMATION_META as DFD_META, DFD_VERSION as DFD_VER, router as dfd_router
+from app.automations.etp import AUTOMATION_META as ETP_META, ETP_VERSION as ETP_VER, router as etp_router
+from app.automations.ferias import AUTOMATION_META as FERIAS_META, FERIAS_VERSION as FERIAS_VER, router as ferias_router
+from app.automations.ponto_saldo import AUTOMATION_META as PONTO_SALDO_META, PONTO_SALDO_VERSION as PONTO_SALDO_VER, router as ponto_saldo_router
 from app.db import init_db, DATABASE_URL
-from app.automations.profile import router as profile_router
-from app.automations.form2json import router as form2json_router
-from app.automations.dfd import router as dfd_router
-from app.automations.controle import router as controle_router
+from app.automations.profile import AUTOMATION_META as PROFILE_META, PROFILE_VERSION as PROFILE_VER, router as profile_router
+from app.automations.form2json import AUTOMATION_META as FORM2JSON_META, FORM2JSON_VERSION as FORM2JSON_VER, router as form2json_router
+from app.automations.controle import AUTOMATION_META as CONTROLE_META, CONTROLE_VERSION as CONTROLE_VER, router as controle_router
 from app.automations.controle_ferias import router as controle_ferias_router
 from app.automations.controle_tasks import router as controle_tasks_router
-from app.automations.accounts import router as accounts_router
-from app.automations.fileshare import router as fileshare_router
-from app.automations.whoisonline import router as whoisonline_router
-from app.automations.tasks import router as tasks_router, TASKS_VERSION as TASKS_VER
-from app.automations.support import router as support_router
-from app.automations.usuarios import router as usuarios_router
-from app.automations.avisos import router as avisos_router, AVISOS_VERSION as AVISOS_VER
+from app.automations.accounts import AUTOMATION_META as ACCOUNTS_META, ACCOUNTS_VERSION as ACCOUNTS_VER, router as accounts_router
+from app.automations.fileshare import AUTOMATION_META as FILESHARE_META, FILESHARE_VERSION as FILESHARE_VER, router as fileshare_router
+from app.automations.whoisonline import AUTOMATION_META as WHOISONLINE_META, VERSION as WHOISONLINE_VER, router as whoisonline_router
+from app.automations.tasks import AUTOMATION_META as TASKS_META, TASKS_VERSION as TASKS_VER, router as tasks_router
+from app.automations.support import AUTOMATION_META as SUPPORT_META, SUPPORT_VERSION as SUPPORT_VER, router as support_router
+from app.automations.usuarios import AUTOMATION_META as USUARIOS_META, USUARIOS_VERSION as USUARIOS_VER, router as usuarios_router
+from app.automations.avisos import AUTOMATION_META as AVISOS_META, AVISOS_VERSION as AVISOS_VER, router as avisos_router
 from app.notifications import router as notifications_router
 from app.automations.task_weekly_email import start_weekly_task_email_scheduler
 from app.games.snake import router as snake_router
@@ -91,6 +90,31 @@ logger.info(
     ENV, AUTH_MODE, AUTH_LEGACY_MOCK, LOG_LEVEL, EP_MODE
 )
 logger.info("CORS_ORIGINS=%s | CATALOG_FILE=%s", ",".join(CORS_ORIGINS), str(CATALOG_FILE))
+
+
+AUTOMATIONS_INDEX_ITEMS = [
+    dict(FORM2JSON_META),
+    dict(PROFILE_META),
+    dict(ETP_META),
+    dict(DFD_META),
+    dict(FERIAS_META),
+    dict(CONTROLE_META),
+    dict(FILESHARE_META),
+    dict(SUPPORT_META),
+    dict(PONTO_SALDO_META),
+    dict(ACCOUNTS_META),
+    dict(AVISOS_META),
+    dict(TASKS_META),
+    dict(WHOISONLINE_META),
+    dict(USUARIOS_META),
+]
+AUTOMATION_META_BY_KIND = {
+    item["kind"]: dict(item) for item in AUTOMATIONS_INDEX_ITEMS
+}
+AUTOMATION_VERSION_BY_KIND = {
+    kind: meta["version"] for kind, meta in AUTOMATION_META_BY_KIND.items()
+}
+
 
 APP = FastAPI(title="Portal AGEPAR BFF", version="0.3.0", docs_url="/api/docs", redoc_url="/api/redoc")
 
@@ -142,7 +166,107 @@ def _startup() -> None:
     logger.info("ETP engine version: %s", ETP_VER)
     logger.info("TASKS engine version: %s", TASKS_VER)
     logger.info("AVISOS engine version: %s", AVISOS_VER)
+    _validate_catalog_metadata_consistency()
     start_weekly_task_email_scheduler()
+
+
+def _sync_catalog_block_metadata(block: Dict[str, Any]) -> None:
+    kind = block.get("name")
+    if not isinstance(kind, str):
+        return
+
+    meta = AUTOMATION_META_BY_KIND.get(kind)
+    if not meta:
+        return
+
+    block["version"] = meta["version"]
+    block["title"] = meta["title"]
+    if not block.get("displayName"):
+        block["displayName"] = meta["title"]
+
+    for key in ("readOnly", "superuserOnly"):
+        if key in meta:
+            block[key] = meta[key]
+
+
+def _validate_catalog_metadata_consistency() -> None:
+    if not CATALOG_FILE.exists():
+        logger.warning("Catalog consistency check skipped: file not found (%s)", CATALOG_FILE)
+        return
+
+    try:
+        data = json.loads(CATALOG_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Catalog consistency check skipped: failed to read %s", exc)
+        return
+
+    blocks = data.get("blocks", [])
+    if not isinstance(blocks, list):
+        logger.warning("Catalog consistency check skipped: blocks is not a list")
+        return
+
+    catalog_by_kind: Dict[str, Dict[str, Any]] = {}
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        kind = block.get("name")
+        ui = block.get("ui") or {}
+        url = ui.get("url") if isinstance(ui, dict) else None
+        if not isinstance(kind, str) or not isinstance(url, str):
+            continue
+        if not url.startswith("/api/automations/"):
+            continue
+        catalog_by_kind[kind] = block
+
+    catalog_kinds = set(catalog_by_kind)
+    published_kinds = set(AUTOMATION_META_BY_KIND)
+
+    for kind in sorted(catalog_kinds - published_kinds):
+        logger.warning("Catalog block '%s' points to /api/automations but is not published in /api/automations", kind)
+
+    for kind in sorted(published_kinds - catalog_kinds):
+        logger.warning("Published automation '%s' is missing from catalog/dev", kind)
+
+    for kind in sorted(catalog_kinds & published_kinds):
+        block = catalog_by_kind[kind]
+        meta = AUTOMATION_META_BY_KIND[kind]
+
+        if block.get("version") != meta["version"]:
+            logger.warning(
+                "Catalog version mismatch for '%s': catalog=%s module=%s",
+                kind,
+                block.get("version"),
+                meta["version"],
+            )
+
+        display_name = block.get("displayName")
+        if isinstance(display_name, str) and display_name != meta["title"]:
+            logger.warning(
+                "Catalog title mismatch for '%s': displayName=%s module_title=%s",
+                kind,
+                display_name,
+                meta["title"],
+            )
+
+        for key in ("readOnly", "superuserOnly"):
+            if key in meta and block.get(key) != meta[key]:
+                logger.warning(
+                    "Catalog flag mismatch for '%s': %s catalog=%s module=%s",
+                    kind,
+                    key,
+                    block.get(key),
+                    meta[key],
+                )
+
+        navigation = block.get("navigation")
+        if isinstance(navigation, list):
+            for idx, item in enumerate(navigation):
+                if isinstance(item, dict) and "href" in item and "path" not in item:
+                    logger.warning(
+                        "Catalog navigation mismatch for '%s' item[%s]: uses 'href' instead of 'path'",
+                        kind,
+                        idx,
+                    )
 
 def _get_user_from_session(req: Request) -> Optional[Dict[str, Any]]:
     """
@@ -417,6 +541,12 @@ def catalog_dev() -> Any:
         data = json.loads(CATALOG_FILE.read_text(encoding="utf-8"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"failed to read catalog: {e}")
+
+    for block in data.get("blocks", []):
+        if not isinstance(block, dict):
+            continue
+        _sync_catalog_block_metadata(block)
+
     return JSONResponse(data)
 
 @APP.get("/api/eprotocolo/ping")
@@ -489,23 +619,7 @@ def automations_index() -> Dict[str, Any]:
     dict
         Lista com {kind, version, title} por automação.
     """
-    return {
-        "items": [
-            {"kind": "form2json", "version": "1.0.0", "title": "Formulário para JSON"},
-            {"kind": "profile", "version": "0.1.0", "title": "Meu Perfil"},
-            {"kind": "etp", "version": ETP_VER, "title": "ETP — Estudo Técnico Preliminar"},
-            {"kind": "dfd", "version": DFD_VER, "title": "DFD — Documento de Formalização da Demanda"},
-            {"kind": "ferias", "version": FERIAS_VER, "title": "Férias — Requerimento + Substituição"},
-            {"kind": "controle", "version": "1.0.0", "title": "Painel de Controle (Auditoria)", "readOnly": True},
-            {"kind": "fileshare", "version": "0.1.0", "title": "Área Comunitária — Arquivos Temporários"},
-            {"kind": "support", "version": "1.0.0", "title": "Suporte & Feedback"},
-            {"kind": "ponto_saldo", "version": PONTO_SALDO_VER, "title": "Saldo de Horas (PDF)"},
-            {"kind": "accounts", "version": "1.0.0", "title": "Admin — Contas & Roles"},
-            {"kind": "avisos", "version": AVISOS_VER, "title": "Admin — Avisos Globais"},
-            {"kind": "whoisonline", "version": "0.1.0", "title": "Quem está online (Superuser)"},
-            {"kind": "usuarios", "version": "1.0.0", "title": "Admin — Gestão de Usuários"},
-        ]
-    }
+    return {"items": AUTOMATIONS_INDEX_ITEMS}
 
 APP.include_router(fileshare_router,       dependencies=[Depends(require_password_changed)])
 APP.include_router(form2json_router,       dependencies=[Depends(require_password_changed)])

@@ -63,6 +63,16 @@ from app import db as db
 
 logger = logging.getLogger(__name__)
 
+KIND = "controle"
+CONTROLE_VERSION = "1.0.0"
+TITLE = "Painel de Controle (Auditoria)"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": CONTROLE_VERSION,
+    "title": TITLE,
+    "readOnly": True,
+}
+
 _CONTROL_ALLOWED_ROLES = {
     "admin",
     *{str(role).strip().lower() for role in tasks_automation._load_role_options()},
@@ -79,7 +89,7 @@ def require_admin_coord_or_superuser(request: Request) -> Dict[str, Any]:
     raise HTTPException(status_code=403, detail="forbidden")
 
 router = APIRouter(
-    prefix="/api/automations/controle",
+    prefix=f"/api/automations/{KIND}",
     tags=["automations", "controle"],
     dependencies=[Depends(require_admin_coord_or_superuser)],
 )
@@ -201,6 +211,9 @@ def get_schema():
     Retorna metadados informativos sobre filtros/limites aceitos pelos endpoints.
     """
     return {
+        "name": KIND,
+        "version": CONTROLE_VERSION,
+        "title": TITLE,
         "filters": {
             "kind": {"type": "string", "description": "Opcional: filtra por automação de origem (alvo)"},
             "username": {"type": "string"},

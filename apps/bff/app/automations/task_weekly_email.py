@@ -163,8 +163,8 @@ def _build_role_body_plain(role_name: str, run_ctx: Dict[str, Any], *, task_coun
             f"Período de referência: {run_ctx['weekLabel']} ({run_ctx['weekCadenceLabel']}, horário de Brasília).",
             f"Quantidade de tarefas incluídas no anexo: {task_count}.",
             "",
-            "O arquivo anexo reúne as tarefas que tiveram criação, início, conclusão ou cancelamento "
-            "dentro da semana útil considerada.",
+            "O arquivo anexo reúne as tarefas que estiveram em andamento ou tiveram início, conclusão "
+            "ou cancelamento dentro da semana útil considerada.",
             "Os dados refletem os registros disponíveis no momento da geração deste compilado.",
             "Solicitamos a gentileza de utilizar este material para acompanhamento e controle interno das atividades do cargo.",
             "",

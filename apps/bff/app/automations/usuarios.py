@@ -52,15 +52,24 @@ from app.db import insert_submission, get_submission, list_submissions_admin, ad
 
 logger = logging.getLogger(__name__)
 
+KIND = "usuarios"
+USUARIOS_VERSION = "0.1.0"
+TITLE = "Admin — Gestão de Usuários"
+AUTOMATION_META = {
+    "kind": KIND,
+    "version": USUARIOS_VERSION,
+    "title": TITLE,
+}
+
 USUARIOS_HISTORY_MAX = int(os.getenv("USUARIOS_HISTORY_MAX", "20000"))
 USUARIOS_HISTORY_BATCH = int(os.getenv("USUARIOS_HISTORY_BATCH", "1000"))
 
 REQUIRED_ROLES = ("rh", "admin")
-TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / "usuarios"
+TPL_DIR = pathlib.Path(__file__).resolve().parent / "templates" / KIND
 DEFAULT_ORG_UNIT_CODE = "AGEPAR"
 
 router = APIRouter(
-    prefix="/api/automations/usuarios",
+    prefix=f"/api/automations/{KIND}",
     tags=["automations:usuarios"],
     dependencies=[Depends(require_roles_any(*REQUIRED_ROLES))],
 )
@@ -645,8 +654,8 @@ def schema() -> Dict[str, Any]:
         cur.execute("SELECT code, name FROM org_units WHERE active = TRUE ORDER BY code")
         orgs = [dict(r) for r in (cur.fetchall() or [])]
     return {
-        "name": "usuarios",
-        "version": "0.1.0",
+        "name": KIND,
+        "version": USUARIOS_VERSION,
         "enums": {
             "tipo_vinculo": ["efetivo", "comissionado", "estagiario"],
             "status_vinculo": ["ativo", "inativo"],
@@ -1048,8 +1057,8 @@ def create_user(payload: UserCreateIn, request: Request):
         add_audit("usuarios", "user.create", actor, {"user_id": user_id, "org_unit": desired_code})
         insert_submission(
             _json_safe({
-                "kind": "usuarios",
-                "version": "0.1.0",
+                "kind": KIND,
+                "version": USUARIOS_VERSION,
                 "actor_cpf": actor.get("cpf"),
                 "actor_nome": actor.get("name") or actor.get("nome"),
                 "actor_email": actor.get("email"),
@@ -1335,8 +1344,8 @@ def update_user(user_id: str, payload: UserUpdateIn, request: Request):
     actor = request.session.get("user") or {}
     add_audit("usuarios", "user.update", actor, {"user_id": user_id, "changes_count": len(changes)})
     insert_submission(_json_safe({
-        "kind": "usuarios",
-        "version": "0.1.0",
+        "kind": KIND,
+        "version": USUARIOS_VERSION,
         "actor_cpf": actor.get("cpf"),
         "actor_nome": actor.get("name") or actor.get("nome"),
         "actor_email": actor.get("email"),
