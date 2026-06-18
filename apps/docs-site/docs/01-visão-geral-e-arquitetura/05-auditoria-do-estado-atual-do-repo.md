@@ -35,6 +35,8 @@ passivos observáveis sem depender de premissas antigas.
   `displayName`, `readOnly`, `superuserOnly`) antes de responder
 - o startup valida a consistência entre catálogo e automações publicadas
 - `profile` é publicado pelo backend, mas marcado como `catalogPublished: false`
+- a semântica de e-mails de usuário ainda carrega nomes históricos (`email_principal`,
+  `email_institucional`) que não refletem perfeitamente a regra de negócio desejada;
 
 ### Banco
 - `infra/sql/init_db.sql` inicializa o domínio base de auth/RBAC/auditoria/RH
@@ -59,6 +61,9 @@ passivos observáveis sem depender de premissas antigas.
 - coexistem `package-lock.json` e `pnpm-lock.yaml` no projeto `apps/docs-site`;
 - a stack de docs ainda instala dependências com warnings de `npm audit` e
   pacotes deprecated no ambiente dev;
+- existe uma pendência estrutural de modelagem dos campos de e-mail de usuário
+  (`users.email` vs `users.email_institucional`), com impacto em login,
+  notificações, perfil, usuários e autocomplete do ETP;
 - ainda existem nomes históricos em alguns arquivos da documentação.
 
 ## O que mudou nesta revisão

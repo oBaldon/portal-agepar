@@ -104,3 +104,6 @@ send_notification(
 )
 ```
 
+## Observação de domínio
+
+A resolução de destinatários por e-mail depende da semântica atual de `users.email` e `users.email_institucional`. Há uma pendência registrada em `./11-modelagem-de-e-mails-de-usuario-pendencia` para alinhar esses campos à regra de negócio desejada sem quebrar auth, perfil, usuários, ETP e integrações de notificação.

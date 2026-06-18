@@ -26,15 +26,31 @@ O módulo `expresso_mail.py` encapsula:
 
 ## Regra de seleção de e-mail do destinatário
 
-Regra específica do Portal AGEPAR:
+O comportamento implementado hoje em `apps/bff/app/notifications.py` é:
 
-1. `email_institucional` é obrigatório como pré-condição.
-2. Se `email_institucional` vier em branco, o sistema **relata e não envia nada**.
-3. Havendo `email` válido, ele é usado como prioridade.
-4. Se `email` vier ausente ou inválido, usa `email_institucional` como fallback.
+1. tenta normalizar e usar `email`;
+2. se `email` estiver ausente ou inválido, tenta `email_institucional`;
+3. se ambos estiverem ausentes/inválidos, o envio é descartado e fica só a notificação inbox.
 
-Em resumo: o portal só envia e-mail quando o usuário possui `email_institucional`
-preenchido; porém, quando ambos existem, o endereço preferencial é `email`.
+Em resumo: **`email` é preferencial e `email_institucional` é fallback**.
+
+### Observação importante de domínio
+
+Esse comportamento funciona com o contrato técnico atual, mas há uma **pendência de modelagem**
+registrada na página seguinte:
+
+- `users.email` hoje já é o campo canônico para login e sessão;
+- no negócio desejado, ele também deve ser tratado como **e-mail institucional**;
+- `users.email_institucional` tende a ser reinterpretado futuramente como **e-mail secundário**.
+
+Por isso, qualquer revisão desta lógica precisa ser feita em conjunto com:
+
+- auth/login;
+- perfil e cadastro de usuários;
+- autocomplete do ETP;
+- documentação e contratos de API/UI.
+
+Veja a página: `./11-modelagem-de-e-mails-de-usuario-pendencia`.
 
 ## Variáveis de ambiente
 
@@ -60,14 +76,14 @@ PORTAL_PUBLIC_BASE_URL: "http://localhost:5173"
 ## Logs esperados
 
 - `INFO` quando houver fallback para `email_institucional`
-- `WARNING` quando o envio for descartado por ausência de `email_institucional`
+- `WARNING` quando o envio for descartado por ausência ou invalidez dos endereços disponíveis
 - `ERROR` quando o Expresso falhar
 - `INFO` com resumo final de enviados/falhas por notificação
 
 ## Teste manual sugerido
 
 1. Preencher `EXPRESSO_MAIL_ENABLED=true` e credenciais válidas.
-2. Garantir que os destinatários da role tenham `email_institucional` preenchido.
+2. Garantir que os destinatários tenham ao menos um endereço válido entre `email` e `email_institucional`.
 3. Criar uma DFD/ETP/Férias que já dispare notificação.
 4. Conferir:
    - inbox do portal;
