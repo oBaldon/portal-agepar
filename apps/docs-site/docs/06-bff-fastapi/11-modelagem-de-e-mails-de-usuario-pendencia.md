@@ -48,6 +48,26 @@ do portal deveria ser justamente o institucional.
 
 ---
 
+## Exemplo concreto do problema
+
+Considere um usuário com os seguintes endereços:
+
+- e-mail institucional desejado para login: `douglas.correa@agepar.pr.gov.br`
+- e-mail pessoal/complementar: `douglascorrea@gmail.com`
+
+A regra de negócio desejada é:
+
+- `users.email` conter `douglas.correa@agepar.pr.gov.br`
+- `users.email_institucional` deixar de representar “institucional” e passar a guardar o endereço secundário, por exemplo `douglascorrea@gmail.com`
+
+O problema é que o sistema atual ainda carrega nomes históricos. Por isso, uma mudança apressada pode gerar três leituras diferentes ao mesmo tempo:
+
+- banco entendendo uma coisa;
+- API/UI exibindo outra;
+- integrações usando uma terceira semântica implícita.
+
+Em especial, **não basta trocar rótulo de tela** e também **não é seguro sair invertendo os valores entre as colunas sem revisar os consumidores do dado**.
+
 ## Estado atual observado no código
 
 ### Colunas físicas do banco
@@ -97,6 +117,8 @@ Em linguagem de produto:
 - o e-mail institucional deve ser o endereço oficial do usuário no portal;
 - o e-mail secundário pode ser Gmail ou outro endereço pessoal/complementar;
 - o e-mail secundário **não deve ser tratado como identidade canônica** por padrão.
+
+Importante: nesta proposta, `email_secundario` é um **nome de contrato na aplicação/UI**, não uma nova coluna física já existente no banco. No schema atual, esse papel continuaria sendo exercido por `users.email_institucional` até que uma migração futura fosse realmente planejada.
 
 ---
 
@@ -181,6 +203,13 @@ Os pontos que dependem dessa modelagem hoje incluem:
 - templates HTML/JS embutidos do profile e usuários;
 - documentação técnica do BFF e fluxos relacionados.
 
+No snapshot atual, os pontos mais sensíveis observados no código são:
+
+- `apps/bff/app/notifications.py`: escolhe `email` primeiro e usa `email_institucional` como fallback;
+- `apps/bff/app/automations/etp.py`: prioriza `email_institucional` na montagem do e-mail exibido na busca;
+- `apps/bff/app/auth/routes.py`: login local consulta `users.email`;
+- `apps/bff/app/automations/profile.py` e `usuarios.py`: ainda expõem contratos com nomes históricos (`email_principal`, `email_institucional`).
+
 Isso significa que a correção futura deve ser tratada como ajuste transversal de contrato,
 e não como simples rename local.
 
@@ -188,7 +217,7 @@ e não como simples rename local.
 
 ## Estratégia mais segura para resolver no futuro
 
-A abordagem mais segura não é trocar nomes de forma abrupta. O caminho recomendado é:
+A abordagem mais segura não é trocar nomes de forma abrupta **nem inverter diretamente os valores entre `users.email` e `users.email_institucional` sem uma revisão transversal**. O caminho recomendado é:
 
 1. **definir a semântica canônica desejada** em nível de produto e backend;
 2. **preservar `users.email` como campo canônico de login** durante a transição;
