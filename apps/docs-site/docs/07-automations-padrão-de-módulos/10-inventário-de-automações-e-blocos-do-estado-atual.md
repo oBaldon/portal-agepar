@@ -19,11 +19,11 @@ do repositório.
 | `usuarios` | `pessoas` | `/api/automations/usuarios/ui` | `rh`, `admin` | Cadastro e histórico de usuários |
 | `ferias` | `pessoas` | `/api/automations/ferias/ui` | `ferias` | Solicitações e documentos |
 | `tasks` | `produtividade` | `/api/automations/tasks/ui` | catálogo sem restrição própria | Tarefas, comentários e histórico |
-| `support` | `suporte` | `/api/automations/support/ui` | catálogo sem restrição própria | Chamados/documentos |
+| `support` | `suporte` | `/api/automations/support/padrao.html` | catálogo sem restrição própria | UI padrão no catálogo; UI técnica e painel admin vivem no mesmo módulo |
 | `fileshare` | `produtividade` | `/api/automations/fileshare/ui` | catálogo sem restrição própria | Compartilhamento temporário |
 | `ponto_saldo` | `pessoas` | `/api/automations/ponto_saldo/ui` | `ca`, `rh`, `cof` | Leitura de PDF de espelho |
 | `avisos` | `governanca` | `/api/automations/avisos/ui` | `admin` | Avisos globais rastreáveis |
-| `whoisonline` | `governanca` | `/api/automations/whoisonline/ui` | catálogo sem restrição própria | Sessões e presença |
+| `whoisonline` | `governanca` | `/api/automations/whoisonline/ui` | `superuserOnly` | Sessões, presença e atalho para o painel administrativo de suporte |
 | `demo`, `form2json`, `automacao2`, `automacao3`, `possibilidades` | ocultos/lab | variado | variado | Blocos ocultos ou de apoio |
 
 ## Módulos Python observados em `apps/bff/app/automations`
@@ -58,3 +58,17 @@ aparecem como bloco navegável próprio no catálogo.
 - `./06-checklist-para-criar-nova-automação`
 - `./07-ui-via-iframe-e-integração-com-catálogo`
 - `../05-catálogo-catalog-dev/01-estrutura-json-categories-blocks`
+
+
+## Observações específicas do fluxo de suporte
+
+O inventário acima merece duas notas de leitura:
+
+1. o bloco `support` do catálogo abre a UI **padrão** (`/padrao.html`);
+2. o mesmo módulo `support.py` também expõe:
+   - uma UI **técnica** (`/ui` e `/ui.html`);
+   - um painel **administrativo** (`/admin/ui`);
+   - listagem/detalhe administrativos (`/admin/submissions*`).
+
+Com isso, o módulo `support` concentra tanto o registro de chamados quanto a
+leitura administrativa de chamados padrão e técnicos.

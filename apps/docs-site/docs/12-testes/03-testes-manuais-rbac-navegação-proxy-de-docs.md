@@ -366,3 +366,86 @@ passar por este checklist:
 ---
 
 > _Criado em 2025-12-02_
+
+
+## 5) Testes manuais do painel administrativo de suporte
+
+### 5.1. Pré-condição
+
+Ter uma sessão com acesso ao contexto administrativo usado hoje:
+
+- abrir `Quem está online`;
+- localizar o botão **Chamados de suporte** no topo da tela.
+
+> Como o ponto de entrada atual mora em `whoisonline`, o teste deve ser feito com
+> um usuário que consiga abrir essa automação.
+
+### 5.2. Roteiro — navegação básica
+
+1. Abrir `/api/automations/whoisonline/ui`.
+2. Clicar em **Chamados de suporte**.
+3. Confirmar abertura de `/api/automations/support/admin/ui`.
+
+Resultado esperado:
+
+- header com título **Chamados de suporte**;
+- cards de KPI carregados;
+- filtros visíveis;
+- lista de cards de chamados ou mensagem de vazio.
+
+### 5.3. Roteiro — filtros
+
+1. Preencher a busca textual com nome do autor, trecho do resumo ou nome de módulo.
+2. Aplicar filtro por:
+   - tipo (`Padrão` / `Técnico`);
+   - módulo;
+   - severidade;
+   - contato autorizado.
+3. Validar que os cards e KPIs reagem à consulta.
+
+Resultado esperado:
+
+- o filtro reduz a lista;
+- badges e metadados continuam consistentes;
+- limpar filtros restaura a listagem original.
+
+### 5.4. Roteiro — detalhe lateral
+
+1. Clicar em **Ver detalhes** em um chamado.
+2. Validar a abertura do drawer lateral.
+3. Conferir:
+   - tipo do chamado;
+   - autor;
+   - módulo;
+   - severidade;
+   - descrição;
+   - payload bruto.
+
+Resultado esperado:
+
+- drawer abre sem perder a posição da lista;
+- chamados técnicos exibem campos estruturados extras;
+- chamados padrão continuam legíveis mesmo com payload mais simples.
+
+### 5.5. Roteiro — downloads
+
+1. Abrir o detalhe de um chamado.
+2. Acionar **Baixar JSON**.
+3. Acionar **Baixar PDF**.
+
+Resultado esperado:
+
+- os downloads retornam 200 quando o perfil tem permissão;
+- o arquivo JSON vem formatado;
+- o PDF abre/baixa normalmente quando ReportLab está disponível.
+
+### 5.6. Roteiro — RBAC
+
+1. Tentar abrir diretamente `/api/automations/support/admin/ui` com um usuário sem papel administrativo.
+2. Repetir para `/api/automations/support/admin/submissions`.
+
+Resultado esperado:
+
+- o BFF responde 403;
+- o simples conhecimento da URL não substitui autorização.
+

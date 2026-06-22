@@ -14,15 +14,15 @@ No Portal AGEPAR, o Host (React/Vite) aplica um **RBAC de vitrine** em cima do c
 
 O modelo é **ANY-of**:
 
-> Se um bloco ou categoria define `requiredRoles`, basta o usuário ter **ao menos um** desses papéis.  
+> Se um bloco ou categoria define `requiredRoles`, basta o usuário ter **ao menos um** desses papéis.
 > `admin` e `is_superuser=true` sempre enxergam tudo.
 
-> Referências principais no repositório:  
-> `apps/host/src/types.ts`  
-> `apps/host/src/lib/catalog.ts`  
-> `apps/host/src/App.tsx`  
-> `apps/host/src/pages/HomeDashboard.tsx`  
-> `apps/host/src/pages/CategoryView.tsx`  
+> Referências principais no repositório:
+> `apps/host/src/types.ts`
+> `apps/host/src/lib/catalog.ts`
+> `apps/host/src/App.tsx`
+> `apps/host/src/pages/HomeDashboard.tsx`
+> `apps/host/src/pages/CategoryView.tsx`
 > `apps/bff/app/auth/rbac.py` (RBAC no BFF, para comparação)
 
 ---
@@ -445,3 +445,35 @@ Uso na página:
 ---
 
 > _Criado em 2025-12-01_
+
+
+## 5) Exemplo atual importante: `whoisonline` + painel administrativo de suporte
+
+O caso mais útil para entender a separação entre **RBAC do Host** e **RBAC do BFF**
+é o fluxo recente de chamados administrativos de suporte.
+
+### No Host / catálogo
+
+- o bloco `whoisonline` está marcado com `superuserOnly`;
+- portanto, só superusers enxergam o card/rota de “Quem está online”.
+
+### No BFF
+
+- `whoisonline.py` exige `require_superuser`;
+- já `support.py` protege `support/admin/*` com `require_roles_any("admin", "controle", "auditor")`.
+
+### Leitura prática
+
+Isso significa que o botão **Chamados de suporte** aparece dentro de uma área já
+altamente restrita, mas a API administrativa do módulo `support` **não depende
+do catálogo** para proteger o acesso.
+
+Em outras palavras:
+
+- o Host decide **quem vê o atalho**;
+- o BFF decide **quem realmente pode abrir o painel e listar os chamados**.
+
+Esse exemplo é útil para evitar uma confusão comum:
+
+> esconder um botão no catálogo **não substitui** autorização no servidor.
+

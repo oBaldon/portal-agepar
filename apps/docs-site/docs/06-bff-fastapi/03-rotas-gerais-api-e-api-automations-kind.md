@@ -43,3 +43,36 @@ O contrato não é 100% uniforme entre todos os módulos:
 Por isso esta documentação agora diferencia:
 - padrão recorrente;
 - inventário real de cada módulo.
+
+
+## Fluxo real atual do módulo `support`
+
+No estado atual do repositório, `support` deixou de ser apenas um formulário único
+e passou a expor **três visões** diferentes, todas sob o mesmo módulo FastAPI:
+
+- `GET /api/automations/support/padrao.html` — formulário simples que o catálogo abre por padrão;
+- `GET /api/automations/support/ui` e `GET /api/automations/support/ui.html` — formulário técnico, com mais contexto;
+- `GET /api/automations/support/admin/ui` — painel administrativo de leitura, filtros e detalhe.
+
+Além do `POST /submit`, o módulo também expõe:
+
+- `GET /api/automations/support/submissions`
+- `GET /api/automations/support/submissions/{id}`
+- `POST /api/automations/support/submissions/{id}/download`
+- `POST /api/automations/support/submissions/{id}/document?fmt=pdf`
+- `GET /api/automations/support/admin/submissions`
+- `GET /api/automations/support/admin/submissions/{id}`
+
+### Observação importante de RBAC
+
+- O bloco de catálogo `support` continua levando o usuário para a UI padrão.
+- O painel administrativo de chamados **não** entra pelo catálogo; ele é acessado
+  a partir do contexto de `whoisonline`.
+- `whoisonline` continua sendo **superuser only** no BFF.
+- Já o backend de `support/admin/*` usa RBAC próprio (`admin`, `controle`, `auditor`).
+
+Na prática, isso cria duas camadas de proteção:
+
+1. o **atalho visual** nasce em uma tela já restrita;
+2. a **API administrativa** do módulo `support` faz sua própria autorização.
+

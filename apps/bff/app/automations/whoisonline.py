@@ -151,6 +151,17 @@ def schema() -> Dict[str, Any]:
         "version": VERSION,
         "title": "Quem está online (Superuser)",
         "endpoints": ["/ui", "/online", "/stats", "/sessions/{id}/revoke"],
+        "shortcuts": [
+            {
+                "label": "Chamados de suporte",
+                "href": "/api/automations/support/admin/ui",
+                "description": "Atalho para a fila administrativa de chamados padrão e técnicos.",
+            }
+        ],
+        "capabilities": {
+            "revoke_session": True,
+            "support_admin_shortcut": True,
+        },
     }
 
 

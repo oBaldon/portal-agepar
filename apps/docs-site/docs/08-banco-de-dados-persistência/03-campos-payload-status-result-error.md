@@ -13,12 +13,12 @@ Na tabela `submissions`, quatro campos aparecem em praticamente **todas** as aut
 
 Eles formam o “coração” do modelo de execução do Portal AGEPAR: **entrada normalizada**, **estado da execução**, **saída final** e **motivo de falha**.
 
-> Referências principais no repositório:  
-> `apps/bff/app/db.py`  
-> `apps/bff/app/automations/form2json.py`  
-> `apps/bff/app/automations/dfd.py`  
-> `apps/bff/app/automations/ferias.py`  
-> `apps/bff/app/automations/accounts.py`  
+> Referências principais no repositório:
+> `apps/bff/app/db.py`
+> `apps/bff/app/automations/form2json.py`
+> `apps/bff/app/automations/dfd.py`
+> `apps/bff/app/automations/ferias.py`
+> `apps/bff/app/automations/accounts.py`
 
 ---
 
@@ -187,6 +187,40 @@ Resumo de invariantes de **payload**:
 * Pode ser usado em filtros e índices (ex.: `numero`, `protocolo`).
 
 ---
+
+
+### 2.4. Exemplo atual do módulo `support`
+
+No estado atual do repositório, `support` persiste tanto chamados padrão quanto
+técnicos na mesma tabela `submissions`. O discriminador fica dentro do `payload`:
+
+```json title="Exemplo resumido de payload persistido para support"
+{
+  "module": "support",
+  "summary": "Erro ao anexar documento",
+  "description": "Ao tentar anexar o arquivo, a tela voltou para o início.",
+  "severity": "low",
+  "reproducibility": "untested",
+  "contact_email": "usuario@agepar.pr.gov.br",
+  "consent_contact": true,
+  "ticket_type": "padrao"
+}
+```
+
+Na UI técnica, o mesmo `kind="support"` recebe campos adicionais, por exemplo:
+
+- `steps_to_reproduce`
+- `expected_result`
+- `actual_result`
+- `environment`
+
+Isso é importante porque o painel administrativo de suporte lê `payload` para:
+
+- diferenciar `padrao` e `tecnico`;
+- montar badges de severidade;
+- filtrar por módulo;
+- mostrar o detalhe lateral do chamado.
+
 
 ## 3) `status` — estado da submissão
 

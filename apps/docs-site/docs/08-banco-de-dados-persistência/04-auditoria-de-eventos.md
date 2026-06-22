@@ -17,16 +17,17 @@ Na prática, isso aparece como:
 
 - tabela `automation_audits` no banco,
 - helpers `add_audit`, `audit_log`, `list_audits` em `app/db.py`,
-- endpoints de consulta em automações como `controle`, `dfd`, `ferias` e `fileshare`.
+- endpoints de consulta em automações como `controle`, `dfd`, `ferias`, `fileshare` e `support`.
 
-> Referências principais no repositório:  
-> `apps/bff/app/db.py`  
-> `apps/bff/app/automations/controle.py`  
-> `apps/bff/app/automations/dfd.py`  
-> `apps/bff/app/automations/ferias.py`  
-> `apps/bff/app/automations/accounts.py`  
-> `apps/bff/app/automations/usuarios.py`  
-> `apps/bff/app/automations/fileshare.py`  
+> Referências principais no repositório:
+> `apps/bff/app/db.py`
+> `apps/bff/app/automations/controle.py`
+> `apps/bff/app/automations/dfd.py`
+> `apps/bff/app/automations/ferias.py`
+> `apps/bff/app/automations/accounts.py`
+> `apps/bff/app/automations/usuarios.py`
+> `apps/bff/app/automations/fileshare.py`
+> `apps/bff/app/automations/support.py`
 > `apps/bff/app/automations/whoisonline.py`
 
 ---
@@ -64,7 +65,7 @@ Semântica dos campos:
     `submitted`, `running`, `completed`, `failed`, `download`,
     `duplicate_rejected`, `create_user`, `update_user`, `delete_role`,
     `uploaded`, `shared_link_created`, `downloaded_shared_link`,
-    `revoke` (sessão revogada), etc.
+    `revoke` (sessão revogada), `download_json`, `document_pdf`, etc.
 * `meta` — JSONB com detalhes de contexto:
 
   * `sid`, `protocolo`, `user_id`, `session_id`,

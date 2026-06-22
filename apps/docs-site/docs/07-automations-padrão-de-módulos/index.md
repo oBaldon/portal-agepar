@@ -4,7 +4,7 @@ title: "Automations – Padrão de Módulos"
 sidebar_position: 0
 ---
 
-Nesta seção está documentado o **padrão oficial de módulos de automação** do Portal AGEPAR.  
+Nesta seção está documentado o **padrão oficial de módulos de automação** do Portal AGEPAR.
 Cada automação é um módulo isolado em `apps/bff/app/automations/{slug}.py`, com UI HTML própria, exposta via **iframe** e integrada ao **catálogo** (`/catalog/dev`).
 
 ## Objetivos
@@ -27,6 +27,7 @@ Cada automação é um módulo isolado em `apps/bff/app/automations/{slug}.py`, 
 - `05-post-submissions-id-download` — padrão para gerar/retornar artefatos (PDF/DOCX/ZIP) a partir de uma submission.
 - `06-checklist-para-criar-nova-automação` — passo a passo completo, de `slug.py` ao bloco no catálogo.
 - `07-ui-via-iframe-e-integração-com-catálogo` — ligação entre UI HTML, catálogo (`/catalog/dev`) e renderização no Host.
+- `11-automacao-support-chamados-padrao-tecnico-e-painel-admin` — caso real com múltiplas UIs, `ticket_type` e painel administrativo.
 
 ## Visão geral do padrão de módulos
 

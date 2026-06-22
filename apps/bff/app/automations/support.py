@@ -527,7 +527,33 @@ def get_schema() -> JSONResponse:
             "modules": modules,
             "severities": SEVERITIES,
             "reproducibility": REPRO,
-            "capabilities": {"download_json": True, "document_pdf": True},
+            "ticket_types": TICKET_TYPES,
+            "views": {
+                "default_ui": f"/api/automations/{KIND}/padrao.html",
+                "technical_ui": f"/api/automations/{KIND}/ui",
+                "admin_ui": f"/api/automations/{KIND}/admin/ui",
+            },
+            "endpoints": [
+                "/schema",
+                "/ui",
+                "/ui.html",
+                "/padrao.html",
+                "/submit",
+                "/submissions",
+                "/submissions/{id}",
+                "/submissions/{id}/download",
+                "/submissions/{id}/document?fmt=pdf",
+                "/admin/ui",
+                "/admin/submissions",
+                "/admin/submissions/{id}",
+            ],
+            "capabilities": {
+                "download_json": True,
+                "document_pdf": True,
+                "admin_panel": True,
+                "legacy_ticket_type_inference": True,
+            },
+            "admin_roles": list(ADMIN_SUPPORT_ROLES),
         }
     )
 
