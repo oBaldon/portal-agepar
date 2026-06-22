@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Chamados de suporte — Painel administrativo</title>
+  <style>
+    :root {
+      --fg:#0f172a; --muted:#475569; --bg:#f8fafc; --card:#ffffff; --line:#e2e8f0;
+      --pri:#2563eb; --pri-soft:#dbeafe; --ok:#16a34a; --warn:#b45309; --err:#dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font:14px system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif; }
+    body.drawer-open { overflow:hidden; }
+    a { color:inherit; }
+    .wrap { max-width: 1320px; margin: 24px auto; padding: 0 16px 24px; }
+    .topbar {
+      display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:18px;
+      padding:20px 22px; border:1px solid var(--line); border-radius:20px;
+      background:linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      box-shadow:0 1px 2px rgba(15,23,42,.04);
+    }
+    .topbar-copy { min-width:0; }
+    .eyebrow {
+      display:inline-flex; align-items:center; margin-bottom:10px; padding:5px 9px; border-radius:999px;
+      background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:12px; font-weight:700;
+      letter-spacing:.01em;
+    }
+    .topbar h1 { margin:0; font-size:32px; line-height:1.1; letter-spacing:-0.02em; }
+    .sub { margin:8px 0 0; color:var(--muted); max-width:560px; font-size:14px; line-height:1.45; }
+    .actions { display:flex; gap:10px; flex-wrap:nowrap; align-items:center; justify-content:flex-end; }
+    .actions .btn { white-space:nowrap; }
+    .btn {
+      appearance:none; border:1px solid transparent; border-radius:12px; padding:10px 14px;
+      background:var(--pri); color:#fff; cursor:pointer; font:inherit; font-weight:600;
+      text-decoration:none; display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn.secondary { background:#fff; color:#334155; border-color:#cbd5e1; }
+    .btn.ghost { background:transparent; color:#334155; border-color:#cbd5e1; }
+    .btn:disabled { opacity:.65; cursor:not-allowed; }
+
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 1px 2px rgba(15,23,42,.04); padding:16px; margin-bottom:16px; }
+    .grid { display:grid; gap:12px; }
+    .kpis { grid-template-columns:repeat(5, minmax(0,1fr)); }
+    .kpi { border:1px solid var(--line); border-radius:16px; padding:14px; background:#fff; }
+    .kpi h3 { margin:0 0 6px; font-size:12px; color:var(--muted); font-weight:600; }
+    .kpi div { font-size:24px; font-weight:800; }
+    .filters { display:grid; grid-template-columns: 2fr repeat(4, 1fr) auto; gap:10px; align-items:end; }
+    .field label { display:block; font-size:12px; color:var(--muted); margin:0 0 6px; }
+    .field input, .field select {
+      width:100%; border:1px solid #cbd5e1; border-radius:12px; padding:10px 12px; background:#fff; font:inherit;
+    }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .chip {
+      display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 10px;
+      background:#eef2ff; color:#1e3a8a; font-size:12px; border:1px solid #dbeafe;
+    }
+    .chip button {
+      appearance:none; border:none; background:none; color:inherit; cursor:pointer; padding:0; font-size:12px;
+    }
+    .status { color:var(--muted); font-size:13px; }
+    .list { display:grid; gap:12px; }
+    .ticket {
+      border:1px solid var(--line); border-radius:18px; background:#fff; padding:16px;
+      box-shadow:0 1px 2px rgba(15,23,42,.04);
+    }
+    .ticket-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+    .ticket-head h3 { margin:8px 0 6px; font-size:18px; }
+    .meta { color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; gap:12px; }
+    .badges { display:flex; gap:8px; flex-wrap:wrap; }
+    .badge {
+      display:inline-flex; align-items:center; border-radius:999px; padding:5px 10px; font-size:12px; font-weight:700;
+      border:1px solid transparent;
+    }
+    .badge.type-padrao { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .badge.type-tecnico { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+    .badge.sev-none { background:#f1f5f9; color:#334155; border-color:#e2e8f0; }
+    .badge.sev-low { background:#ecfdf5; color:#047857; border-color:#bbf7d0; }
+    .badge.sev-medium { background:#fffbeb; color:#b45309; border-color:#fde68a; }
+    .badge.sev-high, .badge.sev-blocker { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+    .badge.contact-yes { background:#ecfeff; color:#0f766e; border-color:#a5f3fc; }
+    .badge.contact-no { background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
+    .preview { color:#1e293b; margin:8px 0 12px; line-height:1.5; }
+    .ticket-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .empty { text-align:center; padding:32px 16px; color:var(--muted); border:1px dashed #cbd5e1; border-radius:16px; background:#fff; }
+    .pager { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:12px; }
+    .drawer-backdrop {
+      position:fixed; inset:0; background:rgba(15,23,42,.45); opacity:0; pointer-events:none; transition:.18s ease;
+    }
+    .drawer {
+      position:fixed; top:0; right:0; width:min(640px, 100vw); height:100vh; background:#fff;
+      border-left:1px solid var(--line); box-shadow:-20px 0 40px rgba(15,23,42,.12);
+      transform:translateX(100%); transition:.22s ease; display:flex; flex-direction:column;
+    }
+    .drawer-backdrop.open { opacity:1; pointer-events:auto; }
+    .drawer.open { transform:translateX(0); }
+    .drawer-header { padding:18px 20px 12px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+    .drawer-header h2 { margin:8px 0 0; font-size:20px; }
+    .drawer-body { padding:20px; overflow:auto; display:grid; gap:16px; }
+    .section { border:1px solid var(--line); border-radius:16px; padding:14px; background:#fff; }
+    .section h3 { margin:0 0 10px; font-size:14px; }
+    .kv { display:grid; grid-template-columns:160px 1fr; gap:8px 12px; font-size:14px; }
+    .kv dt { color:var(--muted); }
+    .kv dd { margin:0; word-break:break-word; }
+    .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; }
+    pre {
+      margin:0; padding:12px; background:#0f172a; color:#e2e8f0; border-radius:12px;
+      overflow:auto; font-size:12px; line-height:1.45;
+    }
+    .drawer-footer { padding:16px 20px; border-top:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; }
+    .linkish { color:#1d4ed8; text-decoration:none; }
+    @media (max-width: 1120px) {
+      .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .filters { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 900px) {
+      .topbar { align-items:flex-start; }
+      .actions { flex-wrap:wrap; justify-content:flex-start; }
+    }
+    @media (max-width: 720px) {
+      .topbar { flex-direction:column; padding:18px; }
+      .actions { width:100%; }
+      .kpis { grid-template-columns: 1fr; }
+      .filters { grid-template-columns: 1fr; }
+      .ticket-head { flex-direction:column; }
+      .kv { grid-template-columns: 1fr; }
+      .pager { flex-direction:column; align-items:flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="topbar-copy">
+        <div class="eyebrow">Painel administrativo</div>
+        <h1>Chamados de suporte</h1>
+        <p class="sub">Consulte, filtre e abra chamados padrão e técnicos.</p>
+      </div>
+      <div class="actions">
+        <a class="btn ghost" href="/api/automations/whoisonline/ui">← Voltar para usuários online</a>
+        <button class="btn secondary" id="btn-clear">Limpar filtros</button>
+        <button class="btn" id="btn-refresh">Atualizar</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="grid kpis" id="kpis">
+        <div class="kpi"><h3>Total</h3><div>–</div></div>
+        <div class="kpi"><h3>Novos hoje</h3><div>–</div></div>
+        <div class="kpi"><h3>Padrão</h3><div>–</div></div>
+        <div class="kpi"><h3>Técnicos</h3><div>–</div></div>
+        <div class="kpi"><h3>Contato autorizado</h3><div>–</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="filters">
+        <div class="field">
+          <label for="q">Busca</label>
+          <input id="q" placeholder="Autor, módulo, resumo ou descrição"/>
+        </div>
+        <div class="field">
+          <label for="ticket_type">Tipo</label>
+          <select id="ticket_type">
+            <option value="">Todos</option>
+            {% for item in ticket_types %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="module">Módulo</label>
+          <select id="module">
+            <option value="">Todos</option>
+            <option value="support">Suporte geral</option>
+            {% for item in modules %}
+            <option value="{{ item.name }}">{{ item.displayName }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="severity">Severidade</label>
+          <select id="severity">
+            <option value="">Todas</option>
+            {% for item in severities %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="consent_contact">Contato autorizado</label>
+          <select id="consent_contact">
+            <option value="">Todos</option>
+            <option value="true">Sim</option>
+            <option value="false">Não</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex; gap:8px">
+          <button class="btn ghost" id="btn-apply" type="button">Aplicar</button>
+        </div>
+      </div>
+      <div class="chips" id="active-filters"></div>
+      <div class="status" id="msg" style="margin-top:12px"></div>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <div class="pager">
+      <div class="status" id="pager-status"></div>
+      <div class="actions">
+        <button class="btn secondary" id="btn-prev" type="button">Anterior</button>
+        <button class="btn secondary" id="btn-next" type="button">Próxima</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <div class="badges" id="drawer-badges"></div>
+        <h2 id="drawer-title">Detalhe do chamado</h2>
+        <div class="status" id="drawer-meta"></div>
+      </div>
+      <button class="btn secondary" id="drawer-close" type="button">Fechar</button>
+    </div>
+    <div class="drawer-body" id="drawer-body">
+      <div class="empty">Selecione um chamado para ver os detalhes.</div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn secondary" id="drawer-json" type="button" disabled>Baixar JSON</button>
+      <button class="btn" id="drawer-pdf" type="button" disabled>Baixar PDF</button>
+    </div>
+  </aside>
+
+<script>
+const apiBase = "/api/automations/support/admin";
+const state = { limit: 12, offset: 0, total: 0, item: null };
+
+const $ = (sel) => document.querySelector(sel);
+const esc = (v) => (v ?? "").toString().replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const fmt = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return esc(iso);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle:"short", timeStyle:"medium" }).format(d);
+};
+const humanBool = (v) => v ? "Sim" : "Não";
+
+function badgeType(item){
+  return `<span class="badge type-${esc(item.ticket_type)}">${esc(item.ticket_type_label || item.ticket_type)}</span>`;
+}
+function badgeSeverity(item){
+  return `<span class="badge sev-${esc(item.severity || "none")}">${esc(item.severity_label || "Sem impacto")}</span>`;
+}
+function badgeContact(item){
+  return `<span class="badge ${item.consent_contact ? "contact-yes" : "contact-no"}">${item.consent_contact ? "Contato permitido" : "Sem contato"}</span>`;
+}
+
+function currentFilters(){
+  const data = {
+    q: $("#q").value.trim(),
+    ticket_type: $("#ticket_type").value,
+    module: $("#module").value,
+    severity: $("#severity").value,
+    consent_contact: $("#consent_contact").value,
+    limit: String(state.limit),
+    offset: String(state.offset),
+  };
+  return data;
+}
+
+function setMsg(text){
+  $("#msg").textContent = text || "";
+}
+
+function syncActiveFilters(){
+  const holder = $("#active-filters");
+  const entries = [
+    ["q", $("#q").value.trim()],
+    ["ticket_type", $("#ticket_type").selectedOptions[0]?.textContent && $("#ticket_type").value ? $("#ticket_type").selectedOptions[0].textContent : ""],
+    ["module", $("#module").selectedOptions[0]?.textContent && $("#module").value ? $("#module").selectedOptions[0].textContent : ""],
+    ["severity", $("#severity").selectedOptions[0]?.textContent && $("#severity").value ? $("#severity").selectedOptions[0].textContent : ""],
+    ["consent_contact", $("#consent_contact").selectedOptions[0]?.textContent && $("#consent_contact").value !== "" ? $("#consent_contact").selectedOptions[0].textContent : ""],
+  ].filter(([, value]) => value);
+  holder.innerHTML = entries.map(([key, value]) => `
+    <span class="chip">${esc(value)} <button type="button" data-clear="${esc(key)}">✕</button></span>
+  `).join("");
+}
+
+function buildQuery(){
+  const params = new URLSearchParams();
+  const filters = currentFilters();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== "") params.set(key, value);
+  });
+  return params.toString();
+}
+
+function renderKpis(kpis = {}){
+  $("#kpis").innerHTML = `
+    <div class="kpi"><h3>Total</h3><div>${kpis.total ?? 0}</div></div>
+    <div class="kpi"><h3>Novos hoje</h3><div>${kpis.today ?? 0}</div></div>
+    <div class="kpi"><h3>Padrão</h3><div>${kpis.padrao ?? 0}</div></div>
+    <div class="kpi"><h3>Técnicos</h3><div>${kpis.tecnico ?? 0}</div></div>
+    <div class="kpi"><h3>Contato autorizado</h3><div>${kpis.consent_contact ?? 0}</div></div>
+  `;
+}
+
+function renderList(items){
+  const holder = $("#list");
+  if (!items || items.length === 0){
+    holder.innerHTML = `<div class="empty">Nenhum chamado encontrado com os filtros atuais.</div>`;
+    return;
+  }
+  holder.innerHTML = items.map((item) => `
+    <article class="ticket">
+      <div class="ticket-head">
+        <div>
+          <div class="badges">
+            ${badgeType(item)}
+            ${badgeSeverity(item)}
+            ${badgeContact(item)}
+          </div>
+          <h3>${esc(item.summary || "Relato de suporte")}</h3>
+          <div class="meta">
+            <span><strong>Autor:</strong> ${esc(item.actor_nome || "Sem nome")}</span>
+            <span><strong>E-mail:</strong> ${esc(item.actor_email || "—")}</span>
+            <span><strong>Módulo:</strong> ${esc(item.module_label || item.module || "—")}</span>
+            <span><strong>Data:</strong> ${fmt(item.created_at)}</span>
+          </div>
+        </div>
+        <div class="ticket-actions">
+          <button class="btn secondary" type="button" data-view="${esc(item.id)}">Ver detalhes</button>
+          <button class="btn secondary" type="button" data-json="${esc(item.id)}">JSON</button>
+          <button class="btn" type="button" data-pdf="${esc(item.id)}">PDF</button>
+        </div>
+      </div>
+      <p class="preview">${esc(item.preview || "Sem descrição.")}</p>
+    </article>
+  `).join("");
+}
+
+function renderPager(){
+  const start = state.total === 0 ? 0 : state.offset + 1;
+  const end = Math.min(state.offset + state.limit, state.total);
+  $("#pager-status").textContent = `Mostrando ${start}-${end} de ${state.total} chamado(s).`;
+  $("#btn-prev").disabled = state.offset <= 0;
+  $("#btn-next").disabled = state.offset + state.limit >= state.total;
+}
+
+async function fetchJSON(url){
+  const res = await fetch(url, { credentials:"include" });
+  if (!res.ok){
+    throw new Error(`Falha ao carregar (HTTP ${res.status})`);
+  }
+  return await res.json();
+}
+
+async function postDownload(url){
+  const res = await fetch(url, { method:"POST", credentials:"include" });
+  if (!res.ok){
+    throw new Error(`Falha no download (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const dispo = res.headers.get("Content-Disposition") || "";
+  const match = dispo.match(/filename="?([^"]+)"?/i);
+  const filename = match ? match[1] : "arquivo";
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(href);
+}
+
+async function loadList(){
+  setMsg("Carregando chamados…");
+  syncActiveFilters();
+  const qs = buildQuery();
+  try {
+    const data = await fetchJSON(`${apiBase}/submissions?${qs}`);
+    state.total = Number(data.total || 0);
+    renderKpis(data.kpis || {});
+    renderList(data.items || []);
+    renderPager();
+    setMsg("");
+  } catch (err) {
+    renderList([]);
+    renderKpis({});
+    renderPager();
+    setMsg(err.message || String(err));
+  }
+}
+
+function openDrawer(){
+  document.body.classList.add("drawer-open");
+  $("#drawer-backdrop").classList.add("open");
+  $("#drawer").classList.add("open");
+  $("#drawer").setAttribute("aria-hidden", "false");
+}
+
+function closeDrawer(){
+  document.body.classList.remove("drawer-open");
+  $("#drawer-backdrop").classList.remove("open");
+  $("#drawer").classList.remove("open");
+  $("#drawer").setAttribute("aria-hidden", "true");
+}
+
+function renderDrawer(item){
+  state.item = item;
+  $("#drawer-title").textContent = item.summary || "Relato de suporte";
+  $("#drawer-meta").textContent = `Chamado ${item.id} • ${fmt(item.created_at)} • ${item.actor_nome || "Sem nome"}`;
+  $("#drawer-badges").innerHTML = `${badgeType(item)} ${badgeSeverity(item)} ${badgeContact(item)}`;
+  $("#drawer-body").innerHTML = `
+    <section class="section">
+      <h3>Identificação</h3>
+      <dl class="kv">
+        <dt>ID</dt><dd class="mono">${esc(item.id)}</dd>
+        <dt>Autor</dt><dd>${esc(item.actor_nome || "Sem nome")}</dd>
+        <dt>E-mail</dt><dd>${esc(item.actor_email || "—")}</dd>
+        <dt>CPF</dt><dd>${esc(item.actor_cpf || "—")}</dd>
+        <dt>Módulo</dt><dd>${esc(item.module_label || item.module || "—")}</dd>
+        <dt>Contato permitido</dt><dd>${humanBool(item.consent_contact)}</dd>
+        <dt>Status</dt><dd>${esc(item.status || "—")}</dd>
+      </dl>
+    </section>
+
+    <section class="section">
+      <h3>Conteúdo do chamado</h3>
+      <dl class="kv">
+        <dt>Resumo</dt><dd>${esc(item.summary || "—")}</dd>
+        <dt>Descrição</dt><dd>${esc(item.description || "—").replace(/\n/g, "<br/>")}</dd>
+      </dl>
+    </section>
+
+    ${item.ticket_type === "tecnico" ? `
+      <section class="section">
+        <h3>Contexto técnico</h3>
+        <dl class="kv">
+          <dt>Severidade</dt><dd>${esc(item.severity_label || "—")}</dd>
+          <dt>Reprodutibilidade</dt><dd>${esc(item.reproducibility_label || "—")}</dd>
+          <dt>Passos</dt><dd>${esc(item.steps_to_reproduce || "—").replace(/\n/g, "<br/>")}</dd>
+          <dt>Esperado</dt><dd>${esc(item.expected_result || "—").replace(/\n/g, "<br/>")}</dd>
+          <dt>Obtido</dt><dd>${esc(item.actual_result || "—").replace(/\n/g, "<br/>")}</dd>
+          <dt>Ambiente</dt><dd>${esc(item.environment || "—").replace(/\n/g, "<br/>")}</dd>
+        </dl>
+      </section>
+    ` : ""}
+
+    <section class="section">
+      <h3>Payload bruto</h3>
+      <pre>${esc(JSON.stringify(item.payload || {}, null, 2))}</pre>
+    </section>
+  `;
+  $("#drawer-json").disabled = false;
+  $("#drawer-pdf").disabled = false;
+  openDrawer();
+}
+
+async function openDetail(id){
+  setMsg("Carregando detalhe do chamado…");
+  try {
+    const data = await fetchJSON(`${apiBase}/submissions/${encodeURIComponent(id)}`);
+    renderDrawer(data.item);
+    setMsg("");
+  } catch (err) {
+    setMsg(err.message || String(err));
+  }
+}
+
+document.addEventListener("click", async (ev) => {
+  const clearBtn = ev.target.closest("[data-clear]");
+  if (clearBtn){
+    const key = clearBtn.getAttribute("data-clear");
+    if (key && document.getElementById(key)) {
+      document.getElementById(key).value = "";
+      state.offset = 0;
+      loadList();
+    }
+    return;
+  }
+
+  const view = ev.target.closest("[data-view]");
+  if (view){
+    openDetail(view.getAttribute("data-view"));
+    return;
+  }
+
+  const jsonBtn = ev.target.closest("[data-json]");
+  if (jsonBtn){
+    try {
+      await postDownload(`/api/automations/support/submissions/${encodeURIComponent(jsonBtn.getAttribute("data-json"))}/download`);
+    } catch (err) {
+      setMsg(err.message || String(err));
+    }
+    return;
+  }
+
+  const pdfBtn = ev.target.closest("[data-pdf]");
+  if (pdfBtn){
+    try {
+      await postDownload(`/api/automations/support/submissions/${encodeURIComponent(pdfBtn.getAttribute("data-pdf"))}/document?fmt=pdf`);
+    } catch (err) {
+      setMsg(err.message || String(err));
+    }
+  }
+});
+
+$("#btn-apply").addEventListener("click", () => {
+  state.offset = 0;
+  loadList();
+});
+$("#btn-refresh").addEventListener("click", () => loadList());
+$("#btn-clear").addEventListener("click", () => {
+  ["q", "ticket_type", "module", "severity", "consent_contact"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  state.offset = 0;
+  loadList();
+});
+$("#q").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") {
+    ev.preventDefault();
+    state.offset = 0;
+    loadList();
+  }
+});
+$("#btn-prev").addEventListener("click", () => {
+  state.offset = Math.max(0, state.offset - state.limit);
+  loadList();
+});
+$("#btn-next").addEventListener("click", () => {
+  state.offset = state.offset + state.limit;
+  loadList();
+});
+$("#drawer-close").addEventListener("click", closeDrawer);
+$("#drawer-backdrop").addEventListener("click", closeDrawer);
+$("#drawer-json").addEventListener("click", async () => {
+  if (!state.item) return;
+  try {
+    await postDownload(`/api/automations/support/submissions/${encodeURIComponent(state.item.id)}/download`);
+  } catch (err) {
+    setMsg(err.message || String(err));
+  }
+});
+$("#drawer-pdf").addEventListener("click", async () => {
+  if (!state.item) return;
+  try {
+    await postDownload(`/api/automations/support/submissions/${encodeURIComponent(state.item.id)}/document?fmt=pdf`);
+  } catch (err) {
+    setMsg(err.message || String(err));
+  }
+});
+
+loadList();
+</script>
+</body>
+</html>

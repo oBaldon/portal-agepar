@@ -47,12 +47,13 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.auth.rbac import require_roles_any
-from app.db import add_audit, get_submission, insert_submission, list_submissions, update_submission
+from app.db import _pg, add_audit, get_submission, insert_submission, list_submissions, update_submission
 
 HAS_REPORTLAB = True
 try:
@@ -76,6 +77,13 @@ AUTOMATION_META = {
 }
 
 ALLOWED_AUDIT_ROLES = {"auditor", "admin", "controle"}
+ADMIN_SUPPORT_ROLES = ("admin", "controle", "auditor")
+
+TICKET_TYPES = [
+    {"id": "padrao", "label": "Padrão"},
+    {"id": "tecnico", "label": "Técnico"},
+]
+
 
 
 def _has_audit_role(user: Optional[Dict[str, Any]]) -> bool:
@@ -94,6 +102,14 @@ def _has_audit_role(user: Optional[Dict[str, Any]]) -> bool:
     """
     roles = set((user or {}).get("roles") or [])
     return bool(roles & ALLOWED_AUDIT_ROLES)
+
+
+def _ticket_type_label(ticket_type: str) -> str:
+    for item in TICKET_TYPES:
+        if item["id"] == (ticket_type or "").lower():
+            return item["label"]
+    return ticket_type or ""
+
 
 
 router = APIRouter(
@@ -217,6 +233,7 @@ class SupportPayload(BaseModel):
     contact_email: Optional[EmailStr] = Field(default=None)
     contact_phone: Optional[str] = Field(default=None, max_length=60)
     consent_contact: bool = Field(default=True)
+    ticket_type: Optional[str] = Field(default=None, pattern="^(padrao|tecnico)$")
 
     def normalized(self) -> Dict[str, Any]:
         """
@@ -232,9 +249,229 @@ class SupportPayload(BaseModel):
         d["summary"] = (d["summary"] or "").strip()
         d["severity"] = (d["severity"] or "").lower()
         d["reproducibility"] = (d["reproducibility"] or "untested").lower()
+        d["ticket_type"] = ((d.get("ticket_type") or "").strip().lower() or None)
         if isinstance(d.get("attachments"), list):
             d["attachments"] = [a.strip() for a in d["attachments"] if a and str(a).strip()]
         return d
+
+
+
+
+def _infer_ticket_type(payload: Optional[Dict[str, Any]]) -> str:
+    payload = payload or {}
+    explicit = (payload.get("ticket_type") or "").strip().lower()
+    if explicit in {"padrao", "tecnico"}:
+        return explicit
+
+    module = (payload.get("module") or "").strip().lower()
+    has_structured_context = any(
+        (payload.get(key) or "").strip()
+        for key in ("steps_to_reproduce", "expected_result", "actual_result", "environment")
+    )
+    if module == "support" and not has_structured_context:
+        return "padrao"
+    return "tecnico"
+
+
+def _module_label(module_name: str) -> str:
+    module_name = (module_name or "").strip().lower()
+    if not module_name:
+        return ""
+    if module_name == "support":
+        return "Suporte geral"
+    for module in _safe_load_catalog_blocks():
+        if (module.get("name") or "").strip().lower() == module_name:
+            return module.get("displayName") or module_name
+    return module_name
+
+
+def _description_preview(description: str, max_chars: int = 220) -> str:
+    description = " ".join((description or "").split())
+    if len(description) <= max_chars:
+        return description
+    return description[: max_chars - 1].rstrip() + "…"
+
+
+def _present_support_submission(sub: Dict[str, Any]) -> Dict[str, Any]:
+    payload = dict(sub.get("payload") or {})
+    ticket_type = _infer_ticket_type(payload)
+    payload["ticket_type"] = ticket_type
+    severity = (payload.get("severity") or "").strip().lower()
+    module_name = (payload.get("module") or "").strip().lower()
+    out = {
+        "id": sub.get("id"),
+        "kind": sub.get("kind"),
+        "status": sub.get("status"),
+        "created_at": sub.get("created_at"),
+        "updated_at": sub.get("updated_at"),
+        "actor_nome": sub.get("actor_nome"),
+        "actor_email": sub.get("actor_email"),
+        "actor_cpf": sub.get("actor_cpf"),
+        "summary": payload.get("summary") or "Relato de suporte",
+        "description": payload.get("description") or "",
+        "preview": _description_preview(payload.get("description") or ""),
+        "ticket_type": ticket_type,
+        "ticket_type_label": _ticket_type_label(ticket_type),
+        "module": module_name,
+        "module_label": _module_label(module_name),
+        "severity": severity or "none",
+        "severity_label": _severity_label(severity or "none"),
+        "reproducibility": (payload.get("reproducibility") or "").strip().lower() or "untested",
+        "reproducibility_label": _repro_label((payload.get("reproducibility") or "").strip().lower() or "untested"),
+        "steps_to_reproduce": payload.get("steps_to_reproduce") or "",
+        "expected_result": payload.get("expected_result") or "",
+        "actual_result": payload.get("actual_result") or "",
+        "environment": payload.get("environment") or "",
+        "attachments": payload.get("attachments") or [],
+        "contact_email": payload.get("contact_email"),
+        "contact_phone": payload.get("contact_phone"),
+        "consent_contact": bool(payload.get("consent_contact")),
+        "payload": payload,
+        "download_json_url": f"/api/automations/support/submissions/{sub.get('id')}/download",
+        "download_pdf_url": f"/api/automations/support/submissions/{sub.get('id')}/document?fmt=pdf",
+    }
+    return out
+
+
+def _build_admin_support_where(
+    q: Optional[str],
+    status_filter: Optional[str],
+    ticket_type: Optional[str],
+    module: Optional[str],
+    severity: Optional[str],
+    consent_contact: Optional[bool],
+) -> tuple[str, List[Any]]:
+    inferred_ticket_type_sql = """
+        COALESCE(
+            NULLIF(LOWER(COALESCE(payload->>'ticket_type', '')), ''),
+            CASE
+                WHEN LOWER(COALESCE(payload->>'module', '')) = 'support'
+                 AND COALESCE(payload->>'steps_to_reproduce', '') = ''
+                 AND COALESCE(payload->>'expected_result', '') = ''
+                 AND COALESCE(payload->>'actual_result', '') = ''
+                 AND COALESCE(payload->>'environment', '') = ''
+                THEN 'padrao'
+                ELSE 'tecnico'
+            END
+        )
+    """
+    where = ["kind = %s"]
+    params: List[Any] = [KIND]
+
+    if status_filter:
+        where.append("LOWER(status) = LOWER(%s)")
+        params.append(status_filter)
+
+    if q:
+        term = f"%{q}%"
+        digits = "".join(ch for ch in q if ch.isdigit())
+        where.append(
+            "("
+            "actor_nome ILIKE %s OR "
+            "actor_email ILIKE %s OR "
+            "actor_cpf LIKE %s OR "
+            "COALESCE(payload->>'summary', '') ILIKE %s OR "
+            "COALESCE(payload->>'description', '') ILIKE %s OR "
+            "COALESCE(payload->>'module', '') ILIKE %s"
+            ")"
+        )
+        params.extend([term, term, f"%{digits}%" if digits else "__no-cpf-match__", term, term, term])
+
+    if ticket_type:
+        where.append(f"{inferred_ticket_type_sql} = %s")
+        params.append(ticket_type.strip().lower())
+
+    if module:
+        where.append("LOWER(COALESCE(payload->>'module', '')) = LOWER(%s)")
+        params.append(module.strip().lower())
+
+    if severity:
+        where.append("LOWER(COALESCE(payload->>'severity', '')) = LOWER(%s)")
+        params.append(severity.strip().lower())
+
+    if consent_contact is not None:
+        where.append("COALESCE((payload->>'consent_contact')::boolean, false) = %s")
+        params.append(bool(consent_contact))
+
+    return " AND ".join(where), params
+
+
+def _list_admin_support_submissions(
+    q: Optional[str],
+    status_filter: Optional[str],
+    ticket_type: Optional[str],
+    module: Optional[str],
+    severity: Optional[str],
+    consent_contact: Optional[bool],
+    limit: int,
+    offset: int,
+) -> Dict[str, Any]:
+    where_sql, params = _build_admin_support_where(
+        q=q,
+        status_filter=status_filter,
+        ticket_type=ticket_type,
+        module=module,
+        severity=severity,
+        consent_contact=consent_contact,
+    )
+
+    items_sql = f"""
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM submissions
+        WHERE {where_sql}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+    """
+    kpi_sql = f"""
+        WITH filtered AS (
+            SELECT
+                created_at,
+                COALESCE((payload->>'consent_contact')::boolean, false) AS consent_contact,
+                COALESCE(
+                    NULLIF(LOWER(COALESCE(payload->>'ticket_type', '')), ''),
+                    CASE
+                        WHEN LOWER(COALESCE(payload->>'module', '')) = 'support'
+                         AND COALESCE(payload->>'steps_to_reproduce', '') = ''
+                         AND COALESCE(payload->>'expected_result', '') = ''
+                         AND COALESCE(payload->>'actual_result', '') = ''
+                         AND COALESCE(payload->>'environment', '') = ''
+                        THEN 'padrao'
+                        ELSE 'tecnico'
+                    END
+                ) AS inferred_ticket_type
+            FROM submissions
+            WHERE {where_sql}
+        )
+        SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE) AS today,
+            COUNT(*) FILTER (WHERE inferred_ticket_type = 'padrao') AS padrao,
+            COUNT(*) FILTER (WHERE inferred_ticket_type = 'tecnico') AS tecnico,
+            COUNT(*) FILTER (WHERE consent_contact IS TRUE) AS consent_contact
+        FROM filtered
+    """
+
+    with _pg() as conn, conn.cursor() as cur:
+        cur.execute(items_sql, [*params, limit, offset])
+        rows = cur.fetchall() or []
+        cur.execute(kpi_sql, params)
+        kpis = dict(cur.fetchone() or {})
+
+    total = int(rows[0].get("total_count") or 0) if rows else int(kpis.get("total") or 0)
+    items = [_present_support_submission(dict(row)) for row in rows]
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "kpis": {
+            "total": int(kpis.get("total") or 0),
+            "today": int(kpis.get("today") or 0),
+            "padrao": int(kpis.get("padrao") or 0),
+            "tecnico": int(kpis.get("tecnico") or 0),
+            "consent_contact": int(kpis.get("consent_contact") or 0),
+        },
+    }
 
 
 class SubmissionResponse(BaseModel):
@@ -429,6 +666,7 @@ def submit_bug(request: Request, payload: SupportPayload, bg: BackgroundTasks) -
     p = payload.normalized()
     if p["module"] not in modules:
         logger.warning("Módulo informado não existe no catálogo: %s", p["module"])
+    p["ticket_type"] = p.get("ticket_type") or _infer_ticket_type(p)
 
     sub_id = str(uuid4())
     sub = {
@@ -445,7 +683,17 @@ def submit_bug(request: Request, payload: SupportPayload, bg: BackgroundTasks) -
     }
     try:
         insert_submission(sub)
-        add_audit("support", "submitted", user, {"sid": sub_id, "summary": p.get("summary"), "module": p.get("module")})
+        add_audit(
+            "support",
+            "submitted",
+            user,
+            {
+                "sid": sub_id,
+                "summary": p.get("summary"),
+                "module": p.get("module"),
+                "ticket_type": p.get("ticket_type"),
+            },
+        )
         update_submission(sub_id, status="done", error=None)
         add_audit("support", "completed", user, {"sid": sub_id})
     except Exception as e:
@@ -453,6 +701,75 @@ def submit_bug(request: Request, payload: SupportPayload, bg: BackgroundTasks) -
         raise HTTPException(status_code=500, detail="failed to create submission")
 
     return JSONResponse({"id": sub_id, "status": "done"})
+
+
+
+
+@router.get(
+    "/admin/ui",
+    dependencies=[Depends(require_roles_any(*ADMIN_SUPPORT_ROLES))],
+)
+def support_admin_ui(request: Request) -> HTMLResponse:
+    """
+    UI administrativa para leitura de chamados de suporte.
+
+    A tela é pensada para uso a partir do contexto de "Quem está online",
+    mas pode ser acessada diretamente por perfis autorizados.
+    """
+    modules = _safe_load_catalog_blocks()
+    return templates.TemplateResponse(
+        "support/admin.html",
+        {
+            "request": request,
+            "modules": modules,
+            "severities": SEVERITIES,
+            "ticket_types": TICKET_TYPES,
+        },
+    )
+
+
+@router.get(
+    "/admin/submissions",
+    dependencies=[Depends(require_roles_any(*ADMIN_SUPPORT_ROLES))],
+)
+def admin_submissions(
+    q: Optional[str] = Query(default=None, description="Busca por autor, módulo ou conteúdo do chamado."),
+    ticket_type: Optional[str] = Query(default=None, pattern="^(padrao|tecnico)$"),
+    module: Optional[str] = Query(default=None),
+    severity: Optional[str] = Query(default=None, pattern="^(none|low|medium|high|blocker)$"),
+    consent_contact: Optional[bool] = Query(default=None),
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    limit: int = Query(default=30, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> Dict[str, Any]:
+    """
+    Lista administrativa de chamados com filtros orientados à tela de suporte.
+    """
+    data = _list_admin_support_submissions(
+        q=q,
+        status_filter=status_filter,
+        ticket_type=ticket_type,
+        module=module,
+        severity=severity,
+        consent_contact=consent_contact,
+        limit=limit,
+        offset=offset,
+    )
+    return jsonable_encoder(data)
+
+
+@router.get(
+    "/admin/submissions/{id}",
+    dependencies=[Depends(require_roles_any(*ADMIN_SUPPORT_ROLES))],
+)
+def admin_submission_detail(id: str) -> Dict[str, Any]:
+    """
+    Detalha um chamado para a tela administrativa.
+    """
+    sub = get_submission(id)
+    if not sub or sub.get("kind") != KIND:
+        raise HTTPException(status_code=404, detail="submission not found")
+    return jsonable_encoder({"item": _present_support_submission(sub)})
 
 
 @router.get("/submissions")
@@ -683,6 +1000,7 @@ def _build_support_pdf(sub: Dict[str, Any]) -> bytes:
         ["ID", sub.get("id") or ""],
         ["Data/Hora", str(sub.get("created_at") or "")],
         ["Status", sub.get("status") or ""],
+        ["Tipo", _ticket_type_label(_infer_ticket_type(payload))],
         ["Módulo", payload.get("module") or ""],
         ["Gravidade", _severity_label(payload.get("severity") or "")],
         ["Reprodutibilidade", _repro_label(payload.get("reproducibility") or "")],
