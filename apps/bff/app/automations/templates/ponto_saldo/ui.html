@@ -18,7 +18,7 @@
       color:var(--fg);
     }
 
-    .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .wrap { max-width: 1320px; margin: 24px auto; padding: 0 16px; }
     h1 { font-size: 20px; margin: 0 0 12px; }
     h2 { font-size: 16px; margin: 0 0 10px; }
 
@@ -193,22 +193,51 @@
       color:#166534;
     }
     .ok strong{ color:#14532d; }
+    /* Resultado */
+    .result-grid{
+      display:grid;
+      gap:16px;
+      margin-top: 14px;
+    }
+
+    .result-card{
+      border:1px solid #e2e8f0;
+      border-radius: 14px;
+      background:#fff;
+      padding: 16px;
+    }
+
+    .section-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom: 10px;
+    }
+
+    .summary-note{
+      max-width: 780px;
+    }
 
     /* Resumo */
     .kv{
       display:grid;
-      grid-template-columns: 220px 1fr;
-      gap:6px 12px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap:12px;
       margin-top: 8px;
-      border:1px dashed #cbd5e1;
+    }
+    .kv-item{
+      border:1px solid #e2e8f0;
       border-radius: 12px;
       padding: 12px;
-      background:#fff;
+      background:#f8fafc;
+      min-width: 0;
     }
-    .k{ color:var(--muted); font-size:12px; }
-    .v{ font-size:13px; color:var(--fg); }
+    .k{ color:var(--muted); font-size:12px; margin-bottom:4px; }
+    .v{ font-size:15px; color:var(--fg); font-weight:600; word-break: break-word; }
 
-    /* Lista de submissões / itens */
+/* Lista de submissões / itens */
     .list{ margin-top: 24px; }
 
     .item{
@@ -388,34 +417,43 @@
         <hr class="hr" />
         <div id="resultBanner" class="banner hidden"></div>
 
-        <div class="row">
-          <div class="col">
-            <h2>Resumo</h2>
-            <div class="kv" id="summary"></div>
-
-            <div class="filters">
-              <label class="checkline">
-                <input type="checkbox" id="onlyIssues" />
-                Mostrar apenas pendências/avisos
-              </label>
-              <label class="checkline">
-                <input type="checkbox" id="hideWeekend" checked />
-                Ocultar fim de semana
-              </label>
-            </div>
-
-            <h2 style="margin-top:14px;">Dias do mês</h2>
-            <div class="table-wrap" id="daysTableWrap" aria-label="Tabela de dias"></div>
-          </div>
-
-          <div class="col">
-            <h2>Plano sugerido (a partir de hoje)</h2>
-            <div class="mini" id="planHint">
-              Distribuição uniforme do que falta/ajusta pelos dias úteis restantes no mês (sem arredondar minutos).
-            </div>
-            <div class="table-wrap" id="planTableWrap" style="margin-top:10px;" aria-label="Tabela do plano"></div>
-          </div>
+        <div class="result-grid">
+  <div class="result-card">
+    <div class="section-head">
+      <div>
+        <h2>Resumo</h2>
+        <div class="mini summary-note">
+          Leitura consolidada do PDF processado, com o fechamento parcial do mês e o saldo acumulado até agora.
         </div>
+      </div>
+    </div>
+    <div class="kv" id="summary"></div>
+
+    <div class="filters">
+      <label class="checkline">
+        <input type="checkbox" id="onlyIssues" />
+        Mostrar apenas pendências/avisos
+      </label>
+      <label class="checkline">
+        <input type="checkbox" id="hideWeekend" checked />
+        Ocultar fim de semana
+      </label>
+    </div>
+  </div>
+
+  <div class="result-card">
+    <h2>Plano sugerido (a partir de hoje)</h2>
+    <div class="mini" id="planHint">
+      Distribuição uniforme do que falta/ajusta pelos dias úteis restantes no mês (sem arredondar minutos).
+    </div>
+    <div class="table-wrap" id="planTableWrap" style="margin-top:10px;" aria-label="Tabela do plano"></div>
+  </div>
+
+  <div class="result-card">
+    <h2>Dias do mês</h2>
+    <div class="table-wrap" id="daysTableWrap" aria-label="Tabela de dias"></div>
+  </div>
+</div>
       </div>
     </div>
 
@@ -507,14 +545,35 @@
     const avail = (p.available_business_days ?? 0);
 
     summaryEl.innerHTML = `
-      <div class="k">Competência</div><div class="v">${period || "—"}</div>
-      <div class="k">Esperado (mês)</div><div class="v num">${hhmm(t.expected_minutes||0)}</div>
-      <div class="k">Creditado (até agora)</div><div class="v num">${hhmm(t.credited_minutes||0)}</div>
-      <div class="k">Faltando p/ fechar</div><div class="v num">${hhmm(t.missing_minutes_total||0)}</div>
-      <div class="k">Sobrando p/ fechar</div><div class="v num">${hhmm(t.extra_minutes_total||0)}</div>
-      <div class="k">Saldo acumulado (até agora)</div><div class="v num">${hhmm(t.so_far_net_balance_minutes||0)}</div>
-      <div class="k">Dias úteis restantes</div><div class="v">${avail}</div>
-    `;
+  <div class="kv-item">
+    <div class="k">Competência</div>
+    <div class="v">${period || "—"}</div>
+  </div>
+  <div class="kv-item">
+    <div class="k">Esperado (mês)</div>
+    <div class="v num">${hhmm(t.expected_minutes||0)}</div>
+  </div>
+  <div class="kv-item">
+    <div class="k">Creditado (até agora)</div>
+    <div class="v num">${hhmm(t.credited_minutes||0)}</div>
+  </div>
+  <div class="kv-item">
+    <div class="k">Faltando p/ fechar</div>
+    <div class="v num">${hhmm(t.missing_minutes_total||0)}</div>
+  </div>
+  <div class="kv-item">
+    <div class="k">Sobrando p/ fechar</div>
+    <div class="v num">${hhmm(t.extra_minutes_total||0)}</div>
+  </div>
+  <div class="kv-item">
+    <div class="k">Saldo acumulado (até agora)</div>
+    <div class="v num">${hhmm(t.so_far_net_balance_minutes||0)}</div>
+  </div>
+  <div class="kv-item">
+    <div class="k">Dias úteis restantes</div>
+    <div class="v">${avail}</div>
+  </div>
+`;
   }
 
   function renderPlanTable(result){
