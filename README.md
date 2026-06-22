@@ -352,6 +352,24 @@ misturar locks ao mesmo tempo.
 
 ---
 
+## Diretrizes para implementações futuras
+
+Antes de evoluções sensíveis, a ordem de leitura recomendada é:
+
+- `README.md`
+- `IMPLEMENTACOES_FUTURAS.md`
+- `apps/docs-site/docs/dev-guide.md`
+- `apps/docs-site/docs/15-apêndices/05-diretrizes-para-implementações-futuras-e-pontos-sensíveis.md`
+- `apps/docs-site/docs/15-apêndices/06-checklist-de-validação-para-mudanças-futuras.md`
+
+Esses arquivos concentram:
+- bootstrap real do ambiente,
+- diferenças entre estado atual e premissas antigas,
+- pontos sensíveis de auth, catálogo, docs e suporte,
+- checklist mínimo para validar que a stack continua funcional.
+
+---
+
 ## Onde continuar lendo
 
 - `apps/docs-site/docs/intro.md`

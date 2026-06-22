@@ -12,6 +12,8 @@ trabalhar bem no projeto:
 - esquema formal do catálogo em JSON Schema,
 - convenções de commit/branch/versionamento,
 - roadmap e backlog técnico,
+- diretrizes para implementações futuras,
+- checklist de validação para mudanças futuras,
 - guia de estilo de código e playgrounds React/TSX.
 
 ## Objetivos
@@ -25,6 +27,8 @@ trabalhar bem no projeto:
   - *semver* por serviço.
 - Registrar o **roadmap e backlog técnico**, ajudando a organizar prioridades de
   produto, plataforma e qualidade.
+- Consolidar **diretrizes para implementações futuras**, destacando premissas e pontos sensíveis.
+- Oferecer um **checklist de validação** para smoke manual após mudanças relevantes.
 - Agrupar guias utilitários:
   - **Guia de estilo de código** para snippets (cURL, TS/TSX, Python),
   - **Playground React/TSX** com exemplos interativos em Docusaurus.
@@ -38,8 +42,12 @@ trabalhar bem no projeto:
   o schema em sincronia com o código.
 - `03-convenções-de-commit-branch-versionamento`  
   regras de commits (Conventional Commits), branches e versionamento (*semver*).
-- `04-roadmap-e-backlog-técnico`  
+- `04-roadmap-e-backlog-técnico`
   visão de roadmap técnico e backlog organizado (produto, plataforma, qualidade).
+- `05-diretrizes-para-implementações-futuras-e-pontos-sensíveis`
+  premissas atuais da stack, arquivos críticos e áreas que exigem validação explícita.
+- `06-checklist-de-validação-para-mudanças-futuras`
+  smoke mínimo para validar Host, BFF, docs, catálogo, suporte e RBAC após mudanças.
 - `estilo-de-codigo.mdx`  
   guia de estilo para exemplos de código (linguagens, títulos, line numbers, tabs).
 - `playground-react.mdx`  
@@ -54,7 +62,7 @@ Portal AGEPAR:
 
 - Não descrevem um único componente (como o BFF ou o Host),
 - mas **costuram** conceitos entre as seções:
-  - Tipos (TS/Pydantic) ↔ Catálogo ↔ Convenções ↔ Roadmap.
+  - Tipos (TS/Pydantic) ↔ Catálogo ↔ Convenções ↔ Roadmap ↔ Diretrizes de evolução.
 
 Sempre que surgir uma dúvida do tipo:
 
@@ -67,6 +75,15 @@ Sempre que surgir uma dúvida do tipo:
 …a resposta provavelmente está aqui.
 
 ## Conteúdos principais
+
+### Diretrizes para implementações futuras
+
+Nas páginas **“Diretrizes para implementações futuras e pontos sensíveis”** e
+**“Checklist de validação para mudanças futuras”** você encontra:
+
+- premissas operacionais que não devem ser assumidas pelo nome histórico dos arquivos;
+- áreas do repositório que pedem validação explícita antes de mudanças;
+- um roteiro prático para validar Host, BFF, docs, catálogo, suporte e RBAC depois de alterações.
 
 ### Tipos TS e modelos Pydantic
 

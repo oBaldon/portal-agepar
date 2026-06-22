@@ -97,6 +97,19 @@ infra/
 - Parte da documentação antiga ainda falava em MkDocs/SQLite; esta revisão corrige isso.
 - Há nomes históricos de alguns arquivos de doc que ainda não refletem o nome final ideal.
 
+## Leituras recomendadas antes de mudanças sensíveis
+
+Antes de mexer em auth, sessão, catálogo, proxy de docs, `support` ou `whoisonline`, vale revisar:
+
+- `IMPLEMENTACOES_FUTURAS.md`
+- `15-apêndices/05-diretrizes-para-implementações-futuras-e-pontos-sensíveis`
+- `15-apêndices/06-checklist-de-validação-para-mudanças-futuras`
+
+Esses materiais consolidam:
+- premissas atuais da stack,
+- arquivos e fluxos mais sensíveis,
+- checklist mínimo para validação manual de mudanças.
+
 ## Onde registrar ajustes de documentação
 
 - mudanças de arquitetura: `01-visão-geral-e-arquitetura/`

@@ -41,6 +41,17 @@ apps/docs-site/
   package.json          # scripts do Docusaurus
 ```
 
+## Leitura recomendada antes de evoluções sensíveis
+
+Vale começar por:
+
+- `../../IMPLEMENTACOES_FUTURAS.md`
+- `docs/dev-guide.md`
+- `docs/15-apêndices/05-diretrizes-para-implementações-futuras-e-pontos-sensíveis.md`
+- `docs/15-apêndices/06-checklist-de-validação-para-mudanças-futuras.md`
+
+Esses materiais resumem o estado funcional atual, os pontos sensíveis e o smoke mínimo para validar a stack após mudanças.
+
 ## Observações importantes
 
 - O container de docs do compose usa **npm**.
