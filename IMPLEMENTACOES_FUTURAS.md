@@ -1,4 +1,4 @@
-# Diretrizes para implementações futuras — Portal AGEPAR
+# Diretrizes para implementações futuras — Plataforma AGEPAR
 
 Este arquivo concentra as premissas e validações que devem orientar evoluções futuras do repositório.
 
@@ -17,12 +17,14 @@ Comece por esta ordem:
 ## 2) Premissas atuais que precisam ser preservadas
 
 ### 2.1. Stack real do snapshot
+
 - **BFF:** FastAPI em `apps/bff`
 - **Host:** React/Vite/TypeScript em `apps/host`
 - **Docs:** Docusaurus em `apps/docs-site`
 - **Banco dev:** PostgreSQL via `infra/docker-compose.pg.yml`
 
 ### 2.2. URLs em dev
+
 - Host: `http://localhost:5173`
 - BFF: `http://localhost:8000`
 - OpenAPI: `http://localhost:8000/api/docs`
@@ -30,6 +32,7 @@ Comece por esta ordem:
 - Docs direto: `http://localhost:9000/devdocs/`
 
 ### 2.3. Comando recomendado para subir tudo
+
 ```bash
 cp .env.example .env
 ./infra/scripts/dev.sh up
@@ -40,31 +43,40 @@ cp .env.example .env
 ## 3) Pontos não óbvios que impactam futuras implementações
 
 ### 3.1. Docs não usam mais MkDocs
+
 A documentação técnica atual vive em `apps/docs-site` e roda com **Docusaurus**, publicada em dev via **`/devdocs/`**.
 
 ### 3.2. O BFF hoje depende de PostgreSQL
+
 O runtime atual usa Postgres, mesmo que ainda existam nomes históricos de arquivo ou texto mencionando SQLite.
 
 ### 3.3. Há dois modos de autenticação em dev
+
 - `apps/bff/run_dev.sh` assume `AUTH_MODE=local`
 - `infra/docker-compose.dev.yml` injeta `AUTH_MODE=mock`
 
 Qualquer mudança em login, sessão ou troubleshooting deve considerar essa diferença.
 
 ### 3.4. O catálogo não é mais a única fonte de verdade de metadados
+
 Cada automação publicada expõe `AUTOMATION_META`, e o BFF usa isso para:
+
 - montar `GET /api/automations`,
 - sincronizar `version`, `title`, `readOnly` e `superuserOnly` ao servir `GET /catalog/dev`,
 - validar consistência do catálogo no startup.
 
 ### 3.5. “Chamados de suporte” ficam ancorados em “Quem está online”
+
 O fluxo administrativo atual é:
+
 - o bloco `whoisonline` continua **superuserOnly**;
 - a UI dessa automação expõe um botão para o painel de chamados;
 - o painel administrativo de suporte é servido por `support/admin.html`.
 
 ### 3.6. O módulo support concentra três experiências
+
 `apps/bff/app/automations/support.py` hoje cobre:
+
 - abertura de chamado padrão,
 - abertura de chamado técnico,
 - leitura administrativa.
@@ -74,6 +86,7 @@ Tudo é persistido em `submissions` com `kind="support"`. A diferenciação prin
 ## 4) Arquivos-chave antes de evoluções maiores
 
 ### Operação / bootstrap
+
 - `README.md`
 - `.env.example`
 - `infra/scripts/dev.sh`
@@ -81,6 +94,7 @@ Tudo é persistido em `submissions` com `kind="support"`. A diferenciação prin
 - `infra/docker-compose.pg.yml`
 
 ### Backend / catálogo
+
 - `apps/bff/app/main.py`
 - `apps/bff/app/db.py`
 - `apps/bff/app/auth/routes.py`
@@ -88,12 +102,14 @@ Tudo é persistido em `submissions` com `kind="support"`. A diferenciação prin
 - `catalog/catalog.dev.json`
 
 ### Frontend Host
+
 - `apps/host/src/App.tsx`
 - `apps/host/src/types.ts`
 - `apps/host/src/lib/catalog.ts`
 - `apps/host/vite.config.ts`
 
 ### Módulos mais sensíveis
+
 - `apps/bff/app/automations/support.py`
 - `apps/bff/app/automations/whoisonline.py`
 - `apps/bff/app/automations/tasks.py`
@@ -103,19 +119,23 @@ Tudo é persistido em `submissions` com `kind="support"`. A diferenciação prin
 ## 5) Mudanças que pedem validação explícita
 
 ### Segurança / sessão
+
 - `SessionMiddleware` em `apps/bff/app/main.py`
 - regras de cookie / `same_site` / `https_only`
 - qualquer tentativa de introduzir CSRF sem revisar o modelo de iframe e sessão
 
 ### Navegação / proxy
+
 - `baseUrl` do Docusaurus em `apps/docs-site/docusaurus.config.ts`
 - proxy `/devdocs` em `apps/host/vite.config.ts`
 
 ### Catálogo / metadados
+
 - contratos de `AUTOMATION_META`
 - validação de consistência do catálogo no startup do BFF
 
 ### Auth
+
 - a coexistência entre `AUTH_MODE=local` e `AUTH_MODE=mock`
 - rotas legadas de login mock
 
